@@ -1,6 +1,5 @@
----
 global:
-  pattern: multicloud-gitops
+  pattern: coco-demo-pattern
   options:
     useCSV: false
     syncPolicy: Automatic
