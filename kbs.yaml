@@ -1,0 +1,165 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+    operatorframework.io/installed-alongside-d63538836ed26323: kbs-operator-system/trustee-operator.v0.1.0
+  creationTimestamp: "2024-07-22T06:22:48Z"
+  generation: 1
+  labels:
+    olm.managed: "true"
+    operators.coreos.com/trustee-operator.kbs-operator-system: ""
+  name: kbsconfigs.confidentialcontainers.org
+  resourceVersion: "1538081"
+  uid: 341d1185-86e6-47cd-9f4d-c7d63426031d
+spec:
+  conversion:
+    strategy: None
+  group: confidentialcontainers.org
+  names:
+    kind: KbsConfig
+    listKind: KbsConfigList
+    plural: kbsconfigs
+    singular: kbsconfig
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: KbsConfig is the Schema for the kbsconfigs API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: KbsConfigSpec defines the desired state of KbsConfig
+            properties:
+              ibmSEConfigSpec:
+                description: ibmSEConfigSpec is the struct that hosts the IBMSE specific
+                  configuration
+                properties:
+                  configPvcName:
+                    description: configPvcName is the name of the PeristentVolumeClaim
+                      where certificates/keys are mounted
+                    type: string
+                type: object
+              itaConfigSpec:
+                description: itaConfigSpec is the struct that hosts the Intel Trusted
+                  Authority (ITA) specific configuration
+                properties:
+                  kbsItaConfigMapName:
+                    description: kbsItaConfigMapName is the name of the configmap
+                      containing intel-trust-authority-certs.txt file
+                    type: string
+                type: object
+              kbsAsConfigMapName:
+                description: |-
+                  KbsAsConfigMapName is the name of the configmap that contains the KBS AS configuration
+                  Required only when MicroservicesDeployment is set
+                type: string
+              kbsAuthSecretName:
+                description: KbsAuthSecretName is the name of the secret that contains
+                  the KBS auth secret
+                type: string
+              kbsConfigMapName:
+                description: KbsConfigMapName is the name of the configmap that contains
+                  the KBS configuration
+                type: string
+              kbsDeploymentType:
+                description: |-
+                  KbsDeploymentType is the type of KBS deployment
+                  It can assume one of the following values:
+                     AllInOneDeployment: all the KBS components will be deployed in the same container
+                     MicroservicesDeployment: all the KBS components will be deployed in separate containers
+                  Default value is AllInOneDeployment
+                enum:
+                - AllInOneDeployment
+                - MicroservicesDeployment
+                type: string
+              kbsHttpsCertSecretName:
+                description: KbsHttpsCertSecretName is the name of the secret that
+                  contains the KBS https certificate
+                type: string
+              kbsHttpsKeySecretName:
+                description: KbsHttpsKeySecretName is the name of the secret that
+                  contains the KBS https private key
+                type: string
+              kbsResourcePolicyConfigMapName:
+                description: kbsResourcePolicyConfigMapName is the name of the configmap
+                  that contains the Resource Policy
+                type: string
+              kbsRvpsConfigMapName:
+                description: |-
+                  KbsRvpsConfigMapName is the name of the configmap that contains the KBS RVPS configuration
+                  Required only when MicroservicesDeployment is set
+                type: string
+              kbsRvpsRefValuesConfigMapName:
+                description: kbsRvpsRefValuesConfigMapName is the name of the configmap
+                  that contains the RVPS reference values
+                type: string
+              kbsSecretResources:
+                description: KbsSecretResources is an array of secret names that contain
+                  the keys required by clients
+                items:
+                  type: string
+                type: array
+              kbsServiceType:
+                description: |-
+                  KbsServiceType is the type of service to create for KBS
+                  Default value is ClusterIP
+                type: string
+              tdxConfigSpec:
+                description: tdxConfigSpec is the struct that hosts the TDX specific
+                  configuration
+                properties:
+                  kbsTdxConfigMapName:
+                    description: kbsTdxConfigMapName is the name of the configmap
+                      containing sgx_default_qcnl.conf file
+                    type: string
+                type: object
+            type: object
+          status:
+            description: KbsConfigStatus defines the observed state of KbsConfig
+            properties:
+              isReady:
+                description: IsReady is true when the KBS configuration is ready
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: KbsConfig
+    listKind: KbsConfigList
+    plural: kbsconfigs
+    singular: kbsconfig
+  conditions:
+  - lastTransitionTime: "2024-07-22T06:22:48Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-07-22T06:22:48Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1alpha1
