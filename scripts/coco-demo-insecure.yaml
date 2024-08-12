@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: coco-demo-insecure
+  labels:
+    app: coco-demo-insecure
+  annotations:
+    io.katacontainers.config.hypervisor.default_vcpus: "2"
+    io.katacontainers.config.hypervisor.default_memory: "4096"
+spec:
+  initContainers:
+  - name: fetch-key
+    image: registry.access.redhat.com/ubi9/ubi:9.3
+    command:
+    - sh
+    - -c
+    - curl -L https://gist.githubusercontent.com/butler54/21a0e98d56796c2bff35f9e823f52a7f/raw/923cde0849a1755af70fee031e0f021659e346d2/raw.txt -o /keys/magickey.txt
+    volumeMounts:
+    - name: keys
+      mountPath: /keys
+  containers:
+  - name: coco-demo
+    image: registry.access.redhat.com/ubi9/ubi:9.3
+    command:
+    - sleep
+    - "36000"
+    securityContext:
+      privileged: false
+      seccompProfile:
+        type: RuntimeDefault
+    volumeMounts:
+    - name: keys
+      mountPath: /keys
+  volumes:
+  - name: keys
+    emptyDir:
+      medium: Memory
+

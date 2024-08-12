@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kbs-client
+spec:
+  # runtimeClassName: kata-cc-tdx
+  containers:
+  - name: kbs-client
+    image: quay.io/confidential-containers/kbs-client:latest
+    imagePullPolicy: IfNotPresent
+    command:
+    - sleep
+    - "360000"
+    env:
+    - name: RUST_LOG
+      value: none
+
+
+
+# ROR:tcti:src/tss2-tcti/tctildr.c:428:Tss2_TctiLdr_Initialize_Ex() Failed to instantiate TCTI
+# ERROR:tcti:src/tss2-tcti/tctildr.c:428:Tss2_TctiLdr_Initialize_Ex() Failed to instantiate TCTI
+# Error: http request failed: get failed: builder error: empty host
+# command terminated with exit code 1
