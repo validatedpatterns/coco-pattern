@@ -1,2 +1,6 @@
 global:
   cocoUpstream: true
+
+
+kbs:
+  catalogImage: quay.io/openshift_sandboxed_containers/kbs-operator-catalog:v0.0.1

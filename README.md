@@ -1,19 +1,19 @@
-# Multicloud Gitops
+# coco-demo-pattern
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+## Reference
 
-[Live build status](https://validatedpatterns.io/ci/?pattern=mcgitops)
+### Trustee
+- https://github.com/lmilleri/trustee-operator-install/tree/main
+- https://github.com/bpradipt/coco-install/tree/main/misc/kbs-operator-install
 
-## Start Here
 
-If you've followed a link to this repository, but are not really sure what it contains
-or how to use it, head over to [Multicloud GitOps](https://validatedpatterns.io/patterns/multicloud-gitops/)
-for additional context and installation instructions
+## OSC / coco stack
+git clone https://github.com/bpradipt/coco-install
+cd coco-install/osc-image-deploy
+./install.sh
 
-## Rationale
 
-The goal for this pattern is to:
 
-* Use a GitOps approach to manage hybrid and multi-cloud deployments across both public and private clouds.
-* Enable cross-cluster governance and application lifecycle management.
-* Securely manage secrets across the deployment.
+
+
+
