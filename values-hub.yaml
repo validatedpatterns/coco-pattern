@@ -12,10 +12,10 @@ clusterGroup:
       namespace: open-cluster-management
       channel: release-2.10
       #csv: advanced-cluster-management.v2.6.1
-    sandbox:
-      name:
-      namespace: openshift-sandboxed-containers-operator
-      channel: stable
+    # sandbox:
+    #   name:
+    #   namespace: openshift-sandboxed-containers-operator
+    #   channel: stable
 
 
 

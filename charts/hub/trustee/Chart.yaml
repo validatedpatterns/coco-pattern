@@ -1,0 +1,6 @@
+apiVersion: v2
+description: Deploy and configure trustee on the hub cluster
+keywords:
+- pattern
+name: trustee
+version: 0.0.1
