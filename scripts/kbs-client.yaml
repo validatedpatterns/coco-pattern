@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: kbs-client
 spec:
-  # runtimeClassName: kata-cc-tdx
+  runtimeClassName: kata-cc-tdx
   containers:
   - name: kbs-client
     image: quay.io/confidential-containers/kbs-client:latest
@@ -13,7 +13,7 @@ spec:
     - "360000"
     env:
     - name: RUST_LOG
-      value: none
+      value: debug
 
 
 

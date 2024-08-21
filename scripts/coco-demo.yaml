@@ -10,7 +10,6 @@ metadata:
 
 spec:
   runtimeClassName: kata-cc-tdx
-  #runtimeClassName: kata-cc-snp
   initContainers:
   - name: fetch-key
     image: registry.access.redhat.com/ubi9/ubi:9.3

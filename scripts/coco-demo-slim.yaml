@@ -1,18 +1,15 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: coco-demo-insecure-kata
+  name: coco-demo-slim
   labels:
-    app: coco-demo-insecure-kata
-  annotations:
-    io.katacontainers.config.hypervisor.default_vcpus: "2"
-    io.katacontainers.config.hypervisor.default_memory: "4096"
-
+    app: coco-demo-slim
 spec:
-  runtimeClassName: kata
+  runtimeClassName: kata-cc-tdx
+
   initContainers:
   - name: fetch-key
-    image: registry.access.redhat.com/ubi9/ubi:9.3
+    image: quay.io/rh-ee-chbutler/microsleep:latest
     command:
     - sh
     - -c
@@ -21,8 +18,8 @@ spec:
     - name: keys
       mountPath: /keys
   containers:
-  - name: coco-demo-insecure-kata
-    image: registry.access.redhat.com/ubi9/ubi:9.3
+  - name: coco-demo-slim
+    image: quay.io/rh-ee-chbutler/microsleep:latest
     command:
     - sleep
     - "36000"
@@ -37,5 +34,4 @@ spec:
   - name: keys
     emptyDir:
       medium: Memory
-
 

@@ -4,9 +4,9 @@ metadata:
   name: coco-demo-insecure
   labels:
     app: coco-demo-insecure
-  annotations:
-    io.katacontainers.config.hypervisor.default_vcpus: "2"
-    io.katacontainers.config.hypervisor.default_memory: "4096"
+    # annotations:
+    #   io.katacontainers.config.hypervisor.default_vcpus: "2"
+    #   io.katacontainers.config.hypervisor.default_memory: "4096"
 spec:
   initContainers:
   - name: fetch-key
@@ -19,7 +19,7 @@ spec:
     - name: keys
       mountPath: /keys
   containers:
-  - name: coco-demo
+  - name: coco-demo-insecure
     image: registry.access.redhat.com/ubi9/ubi:9.3
     command:
     - sleep
