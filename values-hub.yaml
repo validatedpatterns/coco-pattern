@@ -6,6 +6,7 @@ clusterGroup:
   - vault
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
+  - kbs-operator-system
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -22,8 +23,9 @@ clusterGroup:
 
   projects:
   - hub
-  - config-demo
-  - hello-world
+  - vault
+  - trustee
+  - golang-external-secrets
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -57,7 +59,8 @@ clusterGroup:
 
     trustee:
       name: trustee
-      project: hub
+      namespace: kbs-operator-system
+      project: trustee
       path: charts/hub/trustee
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
