@@ -5,7 +5,8 @@ global:
     syncPolicy: Automatic
     installPlanApproval: Automatic
 
-  upstream: true
+  # This defines whether or not to use upstream resources for CoCo.
+  cocoUpstream: true
 main:
   clusterGroupName: hub
   multiSourceConfig:

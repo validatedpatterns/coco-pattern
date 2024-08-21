@@ -12,7 +12,10 @@ git clone https://github.com/bpradipt/coco-install
 cd coco-install/osc-image-deploy
 ./install.sh
 
+## High level pattern topology
 
+- Hub cluster contains all privileged components (vault; kbs; AS etc)
+- 
 
 
 

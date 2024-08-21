@@ -1,0 +1,14 @@
+{{ if .Values.global.cocoUpstream }}
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+ name:  kbs-operator-catalog
+ namespace: openshift-marketplace
+spec:
+ displayName: KBS Operator Catalog
+ sourceType: grpc
+ image:  {{ $.Values.kbs.catalogImage }}
+ updateStrategy:
+   registryPoll:
+      interval: 5m
+{{ end }}

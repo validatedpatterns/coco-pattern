@@ -54,6 +54,11 @@ clusterGroup:
       project: golang-external-secrets
       chart: golang-external-secrets
       chartVersion: 0.1.*
+
+    trustee:
+      name: trustee
+      project: hub
+      path: charts/hub/trustee
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
