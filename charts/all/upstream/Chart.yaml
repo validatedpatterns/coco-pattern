@@ -1,0 +1,8 @@
+apiVersion: v2
+description: A Helm chart to deploy sandbox containers and uses upstream where required.
+keywords:
+- pattern
+- upstream
+- sandbox
+name: upstream
+version: 0.0.1

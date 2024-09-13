@@ -5,8 +5,5 @@ metadata:
   name: kbs-operator-system
   namespace: kbs-operator-system
 spec:
-  channel: alpha
   name: trustee-operator
-  source: operatorhubio-catalog
-  sourceNamespace: openshift-marketplace
 {{ end }}

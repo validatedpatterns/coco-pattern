@@ -29,6 +29,7 @@ clusterGroup:
   - trustee
   - golang-external-secrets
   - sandbox
+  - upstream
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -70,6 +71,11 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/all/sandbox
+    upstream:
+      name: upstream
+      namespace: openshift-marketplace #upstream config
+      project: upstream
+      path: charts/all/upstream
 
     # chartVersion: 0.1.*
     # sources:
