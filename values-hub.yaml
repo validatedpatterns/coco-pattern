@@ -7,6 +7,7 @@ clusterGroup:
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
   - kbs-operator-system
+
   subscriptions:
     acm:
       name: advanced-cluster-management

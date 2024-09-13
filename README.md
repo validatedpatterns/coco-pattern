@@ -1,4 +1,4 @@
-# coco-demo-pattern
+# coco-pattern
 This pattern deploys an mvp confidential computing pattern with OpenShift AI
 
 ## Current constraints and assumptions
@@ -11,8 +11,8 @@ This pattern deploys an mvp confidential computing pattern with OpenShift AI
 
 
 ## Global flags
-- 1. global.upstream = true - deploy trustee / sandbox containers from upstream`
-- 2. global.converged = true - operate on a single cluster that will be insecure.
+- 1. global.cocoUpstream = true - deploy trustee / sandbox containers from upstream`
+- 2. global.cocoConverged = true - operate on a single cluster that will be insecure.
 - 
 
 

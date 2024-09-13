@@ -1,12 +1,14 @@
 global:
-  pattern: coco-demo-pattern
+  pattern: coco-pattern
   options:
     useCSV: false
     syncPolicy: Automatic
     installPlanApproval: Automatic
-
   # This defines whether or not to use upstream resources for CoCo.
   cocoUpstream: true
+  # Defines whether or not the hub cluster can be used for confidential containers
+  cocoConverged: true
+
 main:
   clusterGroupName: hub
   multiSourceConfig:
