@@ -1,13 +1,14 @@
-{{ }}
+{{ if .Values.global.cocoUpstream }}
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: kbs-operator-system
+  name: kbs-operator
   namespace: kbs-operator-system
 spec:
   channel: alpha
   installPlanApproval: Automatic
   name: trustee-operator
-  source: kbs-operator-catalog
+  source: operatorhubio-catalog
   sourceNamespace: openshift-marketplace
-  startingCSV: trustee-operator.v0.0.1
+  startingCSV: trustee-operator.v0.1.0
+{{ end }}

@@ -6,7 +6,8 @@ clusterGroup:
   - vault
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
-  - kbs-operator-system
+  - kbs-operator-system # Upstream
+  - trustee-operator-system # Downstream
 
   subscriptions:
     acm:
