@@ -1,4 +1,7 @@
----
 global:
-  hubClusterDomain: hub.example.com
-  localCluster: local.example.com
+  cocoUpstream: true
+  cocoConverged: true
+
+
+sandbox:
+  upstreamCatalogVersion: 1.7.0-22
