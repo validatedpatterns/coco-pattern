@@ -6,6 +6,7 @@ metadata:
   namespace: kbs-operator-system
 spec:
   channel: alpha
+  installPlanApproval: Automatic
   name: trustee-operator
   source: operatorhubio-catalog
   sourceNamespace: openshift-marketplace
