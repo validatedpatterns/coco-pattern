@@ -57,11 +57,23 @@ clusterGroup:
       chart: golang-external-secrets
       chartVersion: 0.1.*
 
-    trustee:
-      name: trustee
-      namespace: kbs-operator-system
-      project: trustee
-      path: charts/hub/trustee
+    # trustee:
+    #   name: trustee
+    #   namespace: kbs-operator-system
+    #   project: trustee
+    #   path: charts/hub/trustee
+
+    # chartVersion: 0.1.*
+    # sources:
+    # sources:
+    # - ref: patternref
+    #   repoURL: https://github.com/foo/multicloud-gitops
+    #   targetRevision: test2
+    # - chart: acm
+    #   repoURL: https://charts.validatedpatterns.io/ # default
+    #   targetRevision: 0.1.*
+
+
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule

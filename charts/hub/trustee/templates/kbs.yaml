@@ -1,0 +1,22 @@
+apiVersion: confidentialcontainers.org/v1alpha1
+kind: KbsConfig
+metadata:
+  name: kbsconfig
+  namespace: kbs-operator-system
+spec:
+  kbsConfigMapName: kbs-config-grpc
+  kbsAsConfigMapName: as-config-grpc
+  kbsRvpsConfigMapName: rvps-config-grpc
+  kbsAuthSecretName: kbs-auth-public-key 
+  kbsServiceType: ClusterIP
+  kbsDeploymentType: MicroservicesDeployment
+  kbsRvpsRefValuesConfigMapName: rvps-reference-values-sample
+  kbsSecretResources: ["kbsres1"]
+  # HTTPS support - internal to teh operator
+{{- if .Values.kbs.https.enabled }}
+  kbsHttpsKeySecretName: kbs-https-key
+  kbsHttpsCertSecretName: kbs-https-certificate
+{{- end }}
+  kbsResourcePolicyConfigMapName: resource-policy-sample
+  tdxConfigSpec:
+    kbsTdxConfigMapName: tdx-config-sample

@@ -58,6 +58,9 @@ PID=$(ps aux | grep qemu | grep -i "$POD_MAC" | awk '{print $2}')
 
 
 
-gcore $PID
+gcore $PID  
 
 strings core.$PID | grep -i MyMagicKeyIsABanana -c
+
+
+cat /proc/cpuinfo  | grep 'flags' | tr ' ' '\n' | grep "tdx"

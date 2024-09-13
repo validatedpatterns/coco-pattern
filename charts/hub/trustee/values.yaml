@@ -3,4 +3,9 @@ global:
 
 
 kbs:
+  # Do you do internal HTTPS for the KBS
+  https:
+    enabled: false
+  certAuth:
+    enabled: false
   catalogImage: quay.io/openshift_sandboxed_containers/kbs-operator-catalog:v0.0.1
