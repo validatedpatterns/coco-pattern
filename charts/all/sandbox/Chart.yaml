@@ -1,6 +1,8 @@
 apiVersion: v2
-description: A Helm chart to show a webserver and with no other dependencies
+description: A Helm chart to deploy sandbox containers and uses upstream where required.
 keywords:
 - pattern
-name: hello-world
+- upstream
+- sandbox
+name: sandbox
 version: 0.0.1

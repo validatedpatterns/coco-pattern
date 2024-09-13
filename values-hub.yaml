@@ -28,6 +28,7 @@ clusterGroup:
   - vault
   - trustee
   - golang-external-secrets
+  - sandbox
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -59,11 +60,16 @@ clusterGroup:
       chart: golang-external-secrets
       chartVersion: 0.1.*
 
-    # trustee:
-    #   name: trustee
-    #   namespace: kbs-operator-system
-    #   project: trustee
-    #   path: charts/hub/trustee
+    trustee:
+      name: trustee
+      namespace: kbs-operator-system #upstream config
+      project: trustee
+      path: charts/hub/trustee
+    sandbox:
+      name: sandbox
+      namespace: openshift-sandboxed-containers-operator #upstream config
+      project: sandbox
+      path: charts/all/sandbox
 
     # chartVersion: 0.1.*
     # sources:
