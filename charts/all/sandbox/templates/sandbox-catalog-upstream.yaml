@@ -7,7 +7,7 @@ metadata:
 spec:
   displayName: OSC Upstream Operator Catalog
   sourceType: grpc 
-  image:  quay.io/openshift_sandboxed_containers/openshift-sandboxed-containers-operator-catalog:1.7.*
+  image:  quay.io/openshift_sandboxed_containers/openshift-sandboxed-containers-operator-catalog:{{ .Values.sandbox.upstreamCatalogVersion }}
   updateStrategy:
     registryPoll:
       interval: 5m
