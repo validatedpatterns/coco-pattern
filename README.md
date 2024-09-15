@@ -1,9 +1,26 @@
 # coco-pattern
 This pattern deploys an mvp confidential computing pattern with OpenShift AI
 
+
+
 ## Current constraints and assumptions
 - Currently is pre-release of `trustee` and `sandbox-containers v1.7.*` to the Red Hat operator hub
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
+
+## Using pre-release sandbox container operator
+Pre-release sandbox container operator is accessible only via Red Hat / partners on an authenticated registry.
+To use this you need to update the canonical pull secret (oc get secret/pull-secret -n openshift-config) with the extra registry.
+
+### Procedural steps
+
+1. `oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' |
+base64 -d > authfile`
+
+2. `podman login --authfile authfile --username "(username)" --password "(password)" brew.registry.redhat.io`
+
+3. `oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=authfile`
+
+
 
 ## Future work
 - Update to mainstream `trustee` and `sandbox container operator`
@@ -14,6 +31,8 @@ This pattern deploys an mvp confidential computing pattern with OpenShift AI
 - 1. global.cocoUpstream = true - deploy trustee / sandbox containers from upstream`
 - 2. global.cocoConverged = true - operate on a single cluster that will be insecure.
 - 
+
+
 
 
 

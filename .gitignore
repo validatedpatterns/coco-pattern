@@ -8,3 +8,5 @@ vault.init
 super-linter.log
 common/pattern-vault.init
 secrets.md
+authfile
+
