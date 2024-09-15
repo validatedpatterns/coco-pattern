@@ -9,4 +9,6 @@ super-linter.log
 common/pattern-vault.init
 secrets.md
 authfile
-
+kubeconfig
+azure
+ocp-install
