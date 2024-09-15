@@ -13,15 +13,24 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.10
+      channel: release-2.10 # update t some staeg
+
       #csv: advanced-cluster-management.v2.6.1
     # sandbox:
     #   name:
     #   namespace: openshift-sandboxed-containers-operator
     #   channel: stable
 
+    ## catalog dependence. I've defined this here, however, as you need to first install the external catalogs there may be some pain. 
+    sandbox-upstream:
+      name: sandboxed-containers-operator
+      namespace: openshift-sandboxed-containers-operator
+      sources: osc-upstream-catalog
 
-
+    trustee:
+      name: trustee-operator
+      namespace: openshift-operators
+      source: kbs-operator-catalog
 
   projects:
   - hub
