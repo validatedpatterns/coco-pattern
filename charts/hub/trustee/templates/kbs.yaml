@@ -1,25 +1,42 @@
-# apiVersion: confidentialcontainers.org/v1alpha1
-# kind: KbsConfig
-# metadata:
-#   annotations:
-#       argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
-#       argocd.argoproj.io/sync-wave: "100"
-#   name: kbsconfig
-#   namespace: kbs-operator-system
-# spec:
-#   kbsConfigMapName: kbs-config-grpc
-#   kbsAsConfigMapName: as-config-grpc
-#   kbsRvpsConfigMapName: rvps-config-grpc
-#   kbsAuthSecretName: kbs-auth-public-key 
-#   kbsServiceType: ClusterIP
-#   kbsDeploymentType: MicroservicesDeployment
-#   kbsRvpsRefValuesConfigMapName: rvps-reference-values-sample
-#   kbsSecretResources: ["kbsres1"]
-#   # HTTPS support - internal to teh operator
-# {{- if .Values.kbs.https.enabled }}
+apiVersion: confidentialcontainers.org/v1alpha1
+kind: KbsConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: kbsconfig
+    app.kubernetes.io/instance: kbsconfig
+    app.kubernetes.io/part-of: trustee-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: trustee-operator
+  name: kbsconfig
+  namespace: trustee-operator-system
+spec:
+  kbsConfigMapName: kbs-config
+  kbsAuthSecretName: kbs-auth-public-key
+  kbsDeploymentType: AllInOneDeployment
+  kbsRvpsRefValuesConfigMapName: rvps-reference-values
+  kbsSecretResources: ["kbsres1"]
 #   kbsHttpsKeySecretName: kbs-https-key
 #   kbsHttpsCertSecretName: kbs-https-certificate
-# {{- end }}
-#   kbsResourcePolicyConfigMapName: resource-policy-sample
-#   tdxConfigSpec:
-#     kbsTdxConfigMapName: tdx-config-sample
+  kbsResourcePolicyConfigMapName: resource-policy
+
+  # TDX specific configuration (optional)
+  # tdxConfigSpec:
+  #   kbsTdxConfigMapName: tdx-config
+
+  # IBM SE specific configuration (optional)
+  # ibmSEConfigSpec:
+  #   certStorePvc: <persistent-volume-claim>
+
+  # Override attestation policy (optional)
+  # kbsAttestationPolicyConfigMapName: attestation-policy 
+
+  # Inject environment variables (optional)
+  # Enable DEBUG logging in trustee pods
+  KbsEnvVars: 
+    RUST_LOG: debug
+
+  # service type (optional, it defaults to ClusterIP)
+  kbsServiceType: ClusterIP
+  # kbsServiceType: NodePort
+  # kbsServiceType: LoadBalancer
+  # kbsServiceType: ExternalName

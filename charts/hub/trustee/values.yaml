@@ -13,3 +13,4 @@ kbs:
     enabled: false
   publicKey: secret/data/hub/kbsPublicKey
   privateKey: secret/data/global/kbsPrivateKey
+  kbsres1: secret/data/hub/kbsres1
