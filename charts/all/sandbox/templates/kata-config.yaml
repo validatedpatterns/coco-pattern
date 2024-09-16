@@ -1,0 +1,6 @@
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+ name: default-kata-config
+spec:
+  enablePeerPods: true
