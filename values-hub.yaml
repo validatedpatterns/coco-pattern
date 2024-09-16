@@ -27,12 +27,12 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       sources: osc-upstream-catalog
 
-    trustee:
-      name: trustee-operator
-      namespace: kbs-operator-system
-      source: kbs-operator-catalog
-      targetNamespace:
-      - kbs-operator-system
+    # trustee:
+    #   name: trustee-operator
+    #   namespace: kbs-operator-system
+    #   source: kbs-operator-catalog
+    #   targetNamespace:
+    #   - kbs-operator-system
   projects:
   - hub
   - vault
