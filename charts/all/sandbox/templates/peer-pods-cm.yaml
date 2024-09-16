@@ -3,16 +3,16 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: peer-pods-cm-template
+  name: peer-pods-cm
   namespace: openshift-sandboxed-containers-operator
 data:
   CLOUD_PROVIDER: "azure"
   VXLAN_PORT: "9000"
   AZURE_INSTANCE_SIZE: "Standard_DC2as_v5"
-  AZURE_RESOURCE_GROUP: "{{`{{ .resGroup }}`}}"
-  AZURE_REGION: "{{`{{ .region }}`}}"
-  AZURE_SUBNET_ID: "{{`{{ .subnet }}`}}" 
-  AZURE_NSG_ID: "{{`{{ .nsg }}`}}"
+  AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
+  AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
+  AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
+  AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}`"
   DISABLECVM: "false" 
   AZURE_IMAGE_ID: "****"
   DISABLE_CLOUD_CONFIG: "true"
