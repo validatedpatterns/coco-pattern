@@ -2,6 +2,10 @@ global:
   cocoUpstream: true
   cocoConverged: true
 
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
+
 
 sandbox:
   upstreamCatalogVersion: 1.7.0-22
