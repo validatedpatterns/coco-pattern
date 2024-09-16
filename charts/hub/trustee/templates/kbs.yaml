@@ -1,14 +1,8 @@
 apiVersion: confidentialcontainers.org/v1alpha1
 kind: KbsConfig
 metadata:
-  labels:
-    app.kubernetes.io/name: kbsconfig
-    app.kubernetes.io/instance: kbsconfig
-    app.kubernetes.io/part-of: trustee-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: trustee-operator
   name: kbsconfig
-  namespace: trustee-operator-system
+  namespace: kbs-operator-system
 spec:
   kbsConfigMapName: kbs-config
   kbsAuthSecretName: kbs-auth-public-key

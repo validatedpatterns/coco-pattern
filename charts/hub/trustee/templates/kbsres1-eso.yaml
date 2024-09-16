@@ -5,7 +5,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   name: kbsres1-eso
-  namespace: kbs-operating-system
+  namespace: kbs-operator-system
 spec:
   refreshInterval: 15s
   secretStoreRef:
