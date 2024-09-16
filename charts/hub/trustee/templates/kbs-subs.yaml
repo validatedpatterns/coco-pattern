@@ -6,7 +6,7 @@ metadata:
 spec:
   channel: stable
   installPlanApproval: Automatic
-  name: kbs-operator
+  name: trustee-operator
   source: kbs-operator-catalog
   sourceNamespace: openshift-marketplace
   startingCSV: trustee-operator.v0.1.0
