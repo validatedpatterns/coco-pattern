@@ -32,4 +32,4 @@ spec:
   templateFrom:
     - configMap:
         name: peer-pods-cm-template
-{{ end}}
+{{ end }}
