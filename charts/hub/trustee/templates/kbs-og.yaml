@@ -1,8 +1,8 @@
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: kbs-operator-system
-  namespace: kbs-operator-system
-spec:
-  targetNamespaces:
-  - kbs-operator-system
+# apiVersion: operators.coreos.com/v1
+# kind: OperatorGroup
+# metadata:
+#   name: kbs-operator-system
+#   namespace: kbs-operator-system
+# spec:
+#   targetNamespaces:
+#   - kbs-operator-system
