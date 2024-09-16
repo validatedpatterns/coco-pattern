@@ -3,7 +3,7 @@
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
 metadata:
-  name: peer-pods-eso
+  name: ssh-key-secret-eso
   namespace: openshift-sandboxed-containers-operator
 spec:
   refreshInterval: 15s
@@ -12,11 +12,11 @@ spec:
     kind: {{ .Values.secretStore.kind }}
   data:
   target:
-    name: peer-pods-secret
+    name: ssh-key-secret
     template:
       type: Opaque
   dataFrom:
   - extract:
-      key: {{ .Values.sandbox.peerpodsCreds }}
+      key: {{ .Values.sandbox.sshKey }}
 
 {{ end }}

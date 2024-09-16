@@ -8,6 +8,7 @@ secretStore:
 
 
 sandbox:
+  sshKey: secret/data/global/ssh-key
   upstreamCatalogVersion: 1.7.0-22
   azure: true
   peerpodsCreds: secret/data/global/azure
