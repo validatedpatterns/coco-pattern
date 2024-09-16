@@ -1,0 +1,12 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kbs-operator
+  namespace: kbs-operator-system
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: kbs-operator
+  source: kbs-operator-catalog
+  sourceNamespace: openshift-marketplace
+  startingCSV: trustee-operator.v0.1.0
