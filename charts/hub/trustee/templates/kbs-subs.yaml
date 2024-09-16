@@ -4,7 +4,7 @@ metadata:
   name: kbs-operator
   namespace: kbs-operator-system
 spec:
-  channel: stable
+  channel: alpha
   installPlanApproval: Automatic
   name: trustee-operator
   source: kbs-operator-catalog
