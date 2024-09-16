@@ -1,6 +1,9 @@
 global:
   cocoUpstream: true
 
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
 
 kbs:
   # Do you do internal HTTPS for the KBS
@@ -8,3 +11,5 @@ kbs:
     enabled: false
   certAuth:
     enabled: false
+  publicKey: secret/data/hub/kbsPublicKey
+  privateKey: secret/data/global/kbsPrivateKey

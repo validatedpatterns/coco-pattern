@@ -11,4 +11,4 @@ secrets.md
 authfile
 kubeconfig
 azure
-ocp-install
+ocp-install*

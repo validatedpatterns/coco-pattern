@@ -1,3 +1,4 @@
+{{ if .Values.sandbox.imageBuild }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -159,3 +160,4 @@ spec:
             --from-literal=PROXY_TIMEOUT=5m
 
       restartPolicy: Never
+{{ end }}

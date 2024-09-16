@@ -8,6 +8,7 @@ secretStore:
 
 
 sandbox:
+  imageBuild: false
   sshKey: secret/data/global/sshKey
   upstreamCatalogVersion: 1.7.0-22
   azure: true
@@ -15,7 +16,7 @@ sandbox:
   azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
-  azureResGroup: 'openenv-m8bsn'
+  azureResGroup: 'coco-sq6lk-rg'
   azureRegion: 'eastus'
-  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/sandboxer-8lw7x-rg/providers/Microsoft.Network/virtualNetworks/sandboxer-8lw7x-vnet/subnets/sandboxer-8lw7x-worker-subnet'
-  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/sandboxer-8lw7x-rg/providers/Microsoft.Network/networkSecurityGroups/sandboxer-8lw7x-nsg'
+  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-sq6lk-rg/providers/Microsoft.Network/virtualNetworks/coco-sq6lk-vnet/subnets/coco-sq6lk-worker-subnet'
+  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-sq6lk-rg/providers/Microsoft.Network/networkSecurityGroups/coco-sq6lk-nsg'

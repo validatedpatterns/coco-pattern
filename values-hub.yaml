@@ -29,7 +29,7 @@ clusterGroup:
 
     trustee:
       name: trustee-operator
-      namespace: openshift-operators
+      namespace: kbs-operator-system
       source: kbs-operator-catalog
 
   projects:

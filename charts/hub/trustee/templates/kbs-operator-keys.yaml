@@ -1,12 +1,11 @@
-{{ if .Values.sandbox.azure }}
 ---
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
 metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
-  name: peer-pods-cluster-metadata-eso
-  namespace: openshift-sandboxed-containers-operator
+  name: kbs-auth-public-key-eso
+  namespace: kbs-operator-system
 spec:
   refreshInterval: 15s
   secretStoreRef:
@@ -14,10 +13,11 @@ spec:
     kind: {{ .Values.secretStore.kind }}
   data:
   target:
-    name: peer-pods-cluster-metadata
+    name: kbs-auth-public-key
     template:
       type: Opaque
   dataFrom:
   - extract:
-      key: {{ .Values.sandbox.azureConfig }}
+      key: {{ .Values.kbs.publicKey }}
+
 {{ end }}
