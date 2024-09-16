@@ -17,7 +17,8 @@ data:
   #DISABLECVM: "false" 
   AZURE_IMAGE_ID: ""
   #DISABLE_CLOUD_CONFIG: "true"
-  AA_KBC_PARAMS: "cc_kbc::https://kbs-service-kbs-operator-system.{{ .Values.global.hubClusterDomain }}"
+  #AA_KBC_PARAMS: "cc_kbc::https://kbs-service-kbs-operator-system.{{ .Values.global.hubClusterDomain }}"
+  AA_KBC_PARAMS: "cc_kbc::http://kbs-service-kbs-operator-system.svc:8080"
   PROXY_TIMEOUT: "5m"
 {{- end }}
 {{- end }}
