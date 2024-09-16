@@ -5,7 +5,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   name: kbs-auth-public-key-eso
-  namespace: kbs-operator-system
+  namespace: openshift-operators
 spec:
   refreshInterval: 15s
   secretStoreRef:

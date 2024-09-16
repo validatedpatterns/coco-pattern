@@ -2,7 +2,7 @@ apiVersion: confidentialcontainers.org/v1alpha1
 kind: KbsConfig
 metadata:
   name: kbsconfig
-  namespace: kbs-operator-system
+  namespace: openshift-operators
 spec:
   kbsConfigMapName: kbs-config
   kbsAuthSecretName: kbs-auth-public-key
