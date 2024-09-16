@@ -8,11 +8,11 @@ secretStore:
 
 
 sandbox:
-  sshKey: secret/data/global/ssh-key
+  sshKey: secret/data/global/sshKey
   upstreamCatalogVersion: 1.7.0-22
   azure: true
   peerpodsCreds: secret/data/global/azure
-  azureConfig: secret/data/global/azure-cluster-metadata
+  azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
   azureResGroup: 'openenv-9vh7l'
