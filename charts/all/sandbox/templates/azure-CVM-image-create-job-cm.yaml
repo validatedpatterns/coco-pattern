@@ -62,9 +62,8 @@ spec:
         envFrom:
         - secretRef:
             name: peer-pods-secret
-        - configMapRef:
-            name: peer-pods-cm
-            optional: true
+        - secretRef:
+            name: peer-pods-cluster-metadata
         command:
         - /bin/sh
         - -c
@@ -137,9 +136,8 @@ spec:
         envFrom:
         - secretRef:
             name: peer-pods-secret
-        - configMapRef:
-            name: peer-pods-cm
-            optional: true
+        - secretRef:
+            name: peer-pods-cluster-metadata
         command:
         - /bin/sh
         - -c
