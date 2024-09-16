@@ -1,0 +1,35 @@
+{{ if .Values.sandbox.azure }}
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: peer-pods-cm-eso
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.secretStore.name }}
+    kind: {{ .Values.secretStore.kind }}
+  target:
+    name: peer-pods-cm
+    creationPolicy: None
+  data:
+    - secretKey: region
+      remoteRef:
+        key: {{ .Values.sandbox.azureConfig }}
+        property: AZURE_REGION
+    - secretKey: resGroup
+      remoteRef:
+        key: {{ .Values.sandbox.azureConfig }}
+        property: AZURE_RESOURCE_GROUP
+    - secretKey: subnet
+      remoteRef:
+        key: {{ .Values.sandbox.azureConfig }}
+        property: AZURE_SUBNET_ID
+    - secretKey: nsg
+      remoteRef:
+        key: {{ .Values.sandbox.azureConfig }}
+        property: AZURE_NSG_ID
+  templateFrom:
+    - configMap:
+        name: peer-pods-cm-template
+{{ end}}
