@@ -31,9 +31,8 @@ clusterGroup:
       name: trustee-operator
       namespace: kbs-operator-system
       source: kbs-operator-catalog
-      spec:
-        targetNamespace:
-        - kbs-operator-system
+      targetNamespace:
+      - kbs-operator-system
   projects:
   - hub
   - vault
