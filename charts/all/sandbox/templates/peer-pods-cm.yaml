@@ -1,20 +1,20 @@
 {{ if .Values.sandbox.azure }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: peer-pods-cm
-  namespace: openshift-sandboxed-containers-operator
-data:
-  CLOUD_PROVIDER: "azure"
-  VXLAN_PORT: "9000"
-  AZURE_INSTANCE_SIZE: "Standard_DC2as_v5"
-  AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
-  AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
-  AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
-  AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}`"
-  DISABLECVM: "false" 
-  AZURE_IMAGE_ID: "****"
-  DISABLE_CLOUD_CONFIG: "true"
-  PROXY_TIMEOUT: "5m"
+# ---
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: peer-pods-cm
+#   namespace: openshift-sandboxed-containers-operator
+# data:
+#   CLOUD_PROVIDER: "azure"
+#   VXLAN_PORT: "9000"
+#   AZURE_INSTANCE_SIZE: "Standard_DC2as_v5"
+#   AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
+#   AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
+#   AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
+#   AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}`"
+#   DISABLECVM: "false" 
+#   AZURE_IMAGE_ID: "****"
+#   DISABLE_CLOUD_CONFIG: "true"
+#   PROXY_TIMEOUT: "5m"
 {{ end }}
