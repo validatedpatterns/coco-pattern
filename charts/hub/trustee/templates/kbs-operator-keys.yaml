@@ -19,5 +19,3 @@ spec:
   dataFrom:
   - extract:
       key: {{ .Values.kbs.publicKey }}
-
-{{ end }}
