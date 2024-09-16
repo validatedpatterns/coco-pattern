@@ -15,7 +15,7 @@ clusterGroup:
       namespace: open-cluster-management
       channel: release-2.10 # update t some staeg
 
-      #csv: advanced-cluster-management.v2.6.1
+
     # sandbox:
     #   name:
     #   namespace: openshift-sandboxed-containers-operator
@@ -26,13 +26,10 @@ clusterGroup:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       sources: osc-upstream-catalog
-
-    # trustee:
-    #   name: trustee-operator
-    #   namespace: kbs-operator-system
-    #   source: kbs-operator-catalog
-    #   targetNamespace:
-    #   - kbs-operator-system
+      # Deploy cluster wide next time (e.g. defaults all the way. Only seemed to work in openshift-operators)
+      # trustee:
+      #   name: trustee-operator
+      #   source: kbs-operator-catalog
   projects:
   - hub
   - vault
