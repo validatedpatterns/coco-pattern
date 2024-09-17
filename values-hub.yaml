@@ -34,10 +34,6 @@ clusterGroup:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       sources: osc-upstream-catalog
-    # Deploy cluster wide next time (e.g. defaults all the way. Only seemed to work in openshift-operators)
-    # trustee:
-    #   name: trustee-operator
-    #   source: kbs-operator-catalog
     rhoai:
       name: rhods-operator
       # Fast is required for 2.9.0
