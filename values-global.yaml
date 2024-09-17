@@ -9,6 +9,16 @@ global:
   # Defines whether or not the hub cluster can be used for confidential containers
   cocoConverged: true
 
+
+  objectStorage:
+    # Whether or not to use PVC storage
+    pvcStorage: true
+    replicas: 3
+    storagePool: 50Gi
+    backingStorageClass: "managed-csi"
+    # IF ODF exists we don't need to deploy an storage system
+    existingODF: false
+    odfStorageSystem: "ocs-external-storagecluster-storagesystem"
 main:
   clusterGroupName: hub
   multiSourceConfig:

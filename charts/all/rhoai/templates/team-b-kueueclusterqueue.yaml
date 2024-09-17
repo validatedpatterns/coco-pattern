@@ -1,0 +1,34 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: "cluster-queue-b"
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  namespaceSelector: {}  # match all.
+  cohort: "team-ab" # Allow borrowing resources from team-a
+  preemption:
+    reclaimWithinCohort: Any
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+    flavors:
+    - name: "default-flavor"
+      resources:
+      - name: "cpu"
+        nominalQuota: 24
+      - name: "memory"
+        nominalQuota: 64Gi
+      - name: "nvidia.com/gpu"
+        nominalQuota: 0
+## Default example covering generic nvidia gpus
+#   - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
+#     flavors:
+#     - name: "default-flavor"
+#       resources:
+#       - name: "cpu"
+#         nominalQuota: 9
+#       - name: "memory"
+#         nominalQuota: 36Gi
+#       - name: "nvidia.com/gpu"
+#         nominalQuota: 5

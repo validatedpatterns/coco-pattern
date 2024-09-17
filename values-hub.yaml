@@ -9,12 +9,19 @@ clusterGroup:
   - kbs-operator-system # Upstream
   - trustee-operator-system # Downstream
 
+  # AI stuff 
+  - redhat-ods-operator
+  - openshift-pipelines
+  - openshift-storage
+  - openshift-nfd
+  - nvidia-gpu-operator
+  - openshift-serverless
+
   subscriptions:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
       channel: release-2.10 # update t some staeg
-
 
     # sandbox:
     #   name:
@@ -26,10 +33,34 @@ clusterGroup:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       sources: osc-upstream-catalog
-      # Deploy cluster wide next time (e.g. defaults all the way. Only seemed to work in openshift-operators)
-      # trustee:
-      #   name: trustee-operator
-      #   source: kbs-operator-catalog
+    # Deploy cluster wide next time (e.g. defaults all the way. Only seemed to work in openshift-operators)
+    # trustee:
+    #   name: trustee-operator
+    #   source: kbs-operator-catalog
+    rhoai:
+      name: rhods-operator
+      # Fast is required for 2.9.0
+      channel: fast
+      namespace: openshift-operators
+
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators
+
+    odf:
+      name: odf-operator
+      namespace: openshift-storage
+
+    serverless:
+      channel: stable
+      name: serverless-operator
+
+    servicemesh:
+      channel: stable
+      namespace: openshift-operators
+      name: servicemeshoperator
+
+
   projects:
   - hub
   - vault
@@ -73,16 +104,31 @@ clusterGroup:
       namespace: kbs-operator-system #upstream config
       project: trustee
       path: charts/hub/trustee
+
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/all/sandbox
+
     upstream:
       name: upstream
       namespace: openshift-marketplace #upstream config
       project: upstream
       path: charts/all/upstream
+
+    mcg:
+      name: mcg
+      namespace: openshift-storage
+      project: openshift-storage
+      path: charts/all/mcg
+
+    rhoai:
+      name: rhoai
+      namespace: redhat-ods-operator
+      project: hub
+      path: charts/all/rhoai
+
 
     # chartVersion: 0.1.*
     # sources:

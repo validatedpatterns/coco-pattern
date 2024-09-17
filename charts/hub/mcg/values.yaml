@@ -1,0 +1,10 @@
+global:
+  objectStorage:
+    # Whether or not to use PVC storage
+    pvcStorage: true
+    volumes: 3
+    storagePool: 50Gi
+    backingStorageClass: "ocs-external-storagecluster-ceph-rbd"
+    # IF ODF exists we don't need to deploy an storage system
+    existingODF: true
+    odfStorageSystem: "ocs-external-storagecluster-storagesystem"

@@ -1,0 +1,44 @@
+apiVersion: datasciencecluster.opendatahub.io/v1
+kind: DataScienceCluster
+metadata:
+  labels:
+    app.kubernetes.io/part-of: rhods-operator
+    app.kubernetes.io/created-by: rhods-operator
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  name: data-science-cluster
+spec:
+  components:
+    codeflare:
+      managementState: Managed
+{{ if  .Values.clusterGroup.isHubCluster }}
+    dashboard:
+      managementState: Managed
+    datasciencepipelines:
+      managementState: Managed
+{{ end }}
+    kserve:
+      serving:
+        ingressGateway:
+          certificate:
+            secretName: kserve-serving-cert
+            type: SelfSigned
+
+        managementState: Managed
+        name: knative-serving
+      managementState: Managed
+    modelmeshserving:
+      managementState: Managed
+    ray:
+      managementState: Managed
+    trustyai:
+      managementState: Managed
+{{ if  .Values.clusterGroup.isHubCluster }} 
+    workbenches:
+      managementState: Managed
+{{ end }}
+{{ if .Values.rhoai.customizedKueue }}
+{{ else }}
+    kueue:
+      managementState: Managed
+{{ end }}
