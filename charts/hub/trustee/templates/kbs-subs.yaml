@@ -12,15 +12,15 @@
 #   sourceNamespace: openshift-marketplace
 #   startingCSV: trustee-operator.v0.1.0
 ---
-# apiVersion: operators.coreos.com/v1alpha1
-# kind: Subscription
-# metadata:
-#   name: trustee-operator
-#   namespace: trustee-operator-system
-# spec:
-#   channel: stable
-#   installPlanApproval: Automatic
-#   name: trustee-operator
-#   source: trustee-operator-catalog
-#   sourceNamespace: trustee-operator-system
-#   startingCSV: trustee-operator.v0.1.0
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: trustee-operator
+  namespace: trustee-operator-system
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: trustee-operator
+  source: trustee-operator-catalog
+  sourceNamespace: trustee-operator-system
+  startingCSV: trustee-operator.v0.1.0
