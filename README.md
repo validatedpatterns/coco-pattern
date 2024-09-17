@@ -13,12 +13,50 @@ To use this you need to update the canonical pull secret (oc get secret/pull-sec
 
 ### Procedural steps
 
+#### Install of OCP cluster on azure.
+
+**NOTE: Don't use the default node sizes. Parts of ODF are deployed and soak up a quite a bit of memory.**
+
+1. Login to console.redhat.com
+2. Get the openshift installer
+3. Login to azure locally.
+4. `openshift-install create install-config`
+5. Change worker machine type e.g.
+```yaml
+  platform:
+    azure:
+      type: Standard_D16s_v5
+      osImage:
+        publisher: redhat
+        offer: rh-ocp-worker
+        sku: rh-ocp-worker
+        version: 413.92.2023101700
+```
+
+#### Setting up cluster to use pre-prod tags. Do this before deploying the validated pattern.
 1. `oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' |
 base64 -d > authfile`
 
 2. `podman login --authfile authfile --username "(username)" --password "(password)" brew.registry.redhat.io`
 
 3. `oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=authfile`
+
+#### Configuring secrets / parms
+
+1. If you have not previously, run `./scripts/gen-ssh-key-azure.sh`
+2. If you have not previously, run `./scripts/gen-kbs-keys.sh`
+3. Populate the azure details between those that must be known already (CLIENT_ID etc) and using, when logged into `az`, `sh ./get-azure-details.sh
+4. Update `charts/all/sandbox/values.yaml` with the appropriate azure details
+5. Recommended: Disable the kata config until system is up.
+
+
+#### Install the pattern
+`./pattern.sh make install`
+After everything has come up.. deploy the kata config.
+
+
+
+
 
 
 
