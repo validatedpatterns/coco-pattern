@@ -37,8 +37,5 @@ spec:
     workbenches:
       managementState: Managed
 {{ end }}
-{{ if .Values.rhoai.customizedKueue }}
-{{ else }}
     kueue:
       managementState: Managed
-{{ end }}
