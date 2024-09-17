@@ -32,6 +32,8 @@ To use this you need to update the canonical pull secret (oc get secret/pull-sec
         sku: rh-ocp-worker
         version: 413.92.2023101700
 ```
+6. If this didn't work make sure the machine sizes are upped signficantly
+7. 
 
 #### Setting up cluster to use pre-prod tags. Do this before deploying the validated pattern.
 1. `oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' |

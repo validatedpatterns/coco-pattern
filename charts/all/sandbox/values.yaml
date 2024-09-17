@@ -8,6 +8,7 @@ secretStore:
 
 
 sandbox:
+  deploy: false
   imageBuild: false
   sshKey: secret/data/global/sshKey
   upstreamCatalogVersion: 1.7.0-22
@@ -16,7 +17,7 @@ sandbox:
   azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
-  azureResGroup: 'coco-sq6lk-rg'
+  azureResGroup: 'coco-mzh2d-rg'
   azureRegion: 'eastus'
-  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-sq6lk-rg/providers/Microsoft.Network/virtualNetworks/coco-sq6lk-vnet/subnets/coco-sq6lk-worker-subnet'
-  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-sq6lk-rg/providers/Microsoft.Network/networkSecurityGroups/coco-sq6lk-nsg'
+  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-mzh2d-rg/providers/Microsoft.Network/virtualNetworks/coco-mzh2d-vnet/subnets/coco-mzh2d-worker-subnet'
+  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-mzh2d-rg/providers/Microsoft.Network/networkSecurityGroups/coco-mzh2d-nsg'
