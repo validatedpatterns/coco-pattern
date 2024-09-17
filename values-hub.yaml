@@ -6,7 +6,6 @@ clusterGroup:
   - vault
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
-  - kbs-operator-system # Upstream
   - trustee-operator-system # Downstream
 
   # AI stuff 
@@ -34,6 +33,10 @@ clusterGroup:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       sources: osc-upstream-catalog
+    trustee:
+      name: trustee-operator
+      namespace: trustee-operator-system
+      source: trustee-operator-catalog
     rhoai:
       name: rhods-operator
       # Fast is required for 2.9.0

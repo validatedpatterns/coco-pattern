@@ -17,7 +17,7 @@ sandbox:
   azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
-  azureResGroup: 'coco-mzh2d-rg'
+  azureResGroup: 'coco-kfrpp-rg'
   azureRegion: 'eastus'
-  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-mzh2d-rg/providers/Microsoft.Network/virtualNetworks/coco-mzh2d-vnet/subnets/coco-mzh2d-worker-subnet'
-  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-mzh2d-rg/providers/Microsoft.Network/networkSecurityGroups/coco-mzh2d-nsg'
+  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-kfrpp-rg/providers/Microsoft.Network/virtualNetworks/coco-kfrpp-vnet/subnets/coco-kfrpp-worker-subnet'
+  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-kfrpp-rg/providers/Microsoft.Network/networkSecurityGroups/coco-kfrpp-nsg'
