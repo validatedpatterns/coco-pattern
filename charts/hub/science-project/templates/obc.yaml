@@ -1,0 +1,13 @@
+{{ if .Values.clusterGroup.isHubCluster }}
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: {{ .Values.dsp.name }}-obc
+  namespace: {{ .Values.dsp.name }}
+spec:
+  #generateBucketName: {{ .Values.dsp.name }} 
+  bucketName: {{ .Values.dsp.name }}-bucket
+  storageClassName: openshift-storage.noobaa.io
+  additionalConfig:
+    bucketclass:  noobaa-default-bucket-class
+{{ end }}

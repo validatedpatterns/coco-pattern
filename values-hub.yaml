@@ -16,12 +16,13 @@ clusterGroup:
   - openshift-nfd
   - nvidia-gpu-operator
   - openshift-serverless
+  - knative-serving
 
   subscriptions:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.10 # update t some staeg
+      channel: release-2.11
 
     # sandbox:
     #   name:

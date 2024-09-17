@@ -1,0 +1,39 @@
+# apiVersion: v1
+# items:
+# - apiVersion: v1
+#   kind: PersistentVolumeClaim
+#   metadata:
+#     annotations:
+#       openshift.io/description: ""
+#       openshift.io/display-name: test-workbench
+#       pv.kubernetes.io/bind-completed: "yes"
+#       pv.kubernetes.io/bound-by-controller: "yes"
+#       volume.beta.kubernetes.io/storage-provisioner: openshift-storage.rbd.csi.ceph.com
+#       volume.kubernetes.io/storage-provisioner: openshift-storage.rbd.csi.ceph.com
+#     creationTimestamp: "2024-03-18T03:25:58Z"
+#     finalizers:
+#     - kubernetes.io/pvc-protection
+#     labels:
+#       opendatahub.io/dashboard: "true"
+#     name: test-workbench
+#     namespace: test001
+#     resourceVersion: "556509"
+#     uid: 70358b71-aa56-456b-890b-9f00f5ac8cc1
+#   spec:
+#     accessModes:
+#     - ReadWriteOnce
+#     resources:
+#       requests:
+#         storage: 20Gi
+#     storageClassName: ocs-external-storagecluster-ceph-rbd
+#     volumeMode: Filesystem
+#     volumeName: pvc-70358b71-aa56-456b-890b-9f00f5ac8cc1
+#   status:
+#     accessModes:
+#     - ReadWriteOnce
+#     capacity:
+#       storage: 20Gi
+#     phase: Bound
+# kind: List
+# metadata:
+#   resourceVersion: ""
