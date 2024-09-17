@@ -13,7 +13,7 @@ data:
   AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
   AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
   AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
-  AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}`"
+  AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}"
   #DISABLECVM: "false" 
   AZURE_IMAGE_ID: ""
   #DISABLE_CLOUD_CONFIG: "true"
