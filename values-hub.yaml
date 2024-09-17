@@ -68,6 +68,7 @@ clusterGroup:
   - golang-external-secrets
   - sandbox
   - upstream
+  - openshift-storage
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -121,13 +122,14 @@ clusterGroup:
       name: mcg
       namespace: openshift-storage
       project: openshift-storage
-      path: charts/all/mcg
+      path: charts/hub/mcg
 
     rhoai:
       name: rhoai
       namespace: redhat-ods-operator
       project: hub
       path: charts/all/rhoai
+
 
 
     # chartVersion: 0.1.*
