@@ -7,7 +7,7 @@ secretStore:
 
 kbs:
   # Do you do internal HTTPS for the KBS
-  deployNS: openshift-operators
+  deployNS: trustee-operator-system
   https:
     enabled: false
   certAuth:
