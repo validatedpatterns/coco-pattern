@@ -12,7 +12,10 @@ spec:
   sources:
     - name: osc-upstream-catalog
       disabled: false
-    - name: kbs-operator-catalog
-      disabled: false
+    # - name: kbs-operator-catalog
+    #   disabled: false
     - name: community-operators
       disabled: false
+    - name: trustee-operator-catalog
+      disabled: false
+
