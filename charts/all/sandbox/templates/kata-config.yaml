@@ -1,8 +1,8 @@
-# apiVersion: kataconfiguration.openshift.io/v1
-# kind: KataConfig
-# metadata:
-#   annotations:
-#     argocd.argoproj.io/sync-wave: "100"
-#   name: default-kata-config
-# spec:
-#   enablePeerPods: true
+apiVersion: kataconfiguration.openshift.io/v1
+kind: KataConfig
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "100"
+  name: default-kata-config
+spec:
+  enablePeerPods: true

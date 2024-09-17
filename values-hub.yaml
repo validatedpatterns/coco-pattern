@@ -130,8 +130,6 @@ clusterGroup:
       project: hub
       path: charts/all/rhoai
 
-
-
     # chartVersion: 0.1.*
     # sources:
     # sources:
