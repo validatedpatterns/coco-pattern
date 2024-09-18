@@ -17,3 +17,5 @@ spec:
     storageClass: {{ .Values.global.objectStorage.backingStorageClass }}
   type: pv-pool
 {{ end }}
+
+
