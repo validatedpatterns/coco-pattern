@@ -30,7 +30,7 @@ spec:
     RUST_LOG: debug
 
   # service type (optional, it defaults to ClusterIP)
-  kbsServiceType: ClusterIP
+  kbsServiceType: NodePort
   # kbsServiceType: NodePort
   # kbsServiceType: LoadBalancer
   # kbsServiceType: ExternalName
