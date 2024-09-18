@@ -58,7 +58,8 @@ After everything has come up.. deploy the kata config.
 
 
 
-
+# Label nodes:
+oc label node coco-kfrpp-worker-large-eastus1-k8fbn cluster.ocs.openshift.io/openshift-storage=""
 
 
 
