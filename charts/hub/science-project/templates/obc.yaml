@@ -9,5 +9,5 @@ spec:
   bucketName: {{ .Values.dsp.name }}-bucket
   storageClassName: openshift-storage.noobaa.io
   additionalConfig:
-    bucketclass:  noobaa-default-bucket-class
+    bucketclass: default-bucket
 {{ end }}
