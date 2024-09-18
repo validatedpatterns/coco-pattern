@@ -8,7 +8,7 @@ secretStore:
 
 
 sandbox:
-  deploy: true
+  deploy: false
   imageBuild: false
   sshKey: secret/data/global/sshKey
   upstreamCatalogVersion: 1.7.0-22
