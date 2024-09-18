@@ -1,11 +1,11 @@
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: LocalQueue
-metadata:
-  namespace: test-project
-  name: local-queue-test
-  annotations:
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
-    kueue.x-k8s.io/default-queue: 'true'
-    argocd.argoproj.io/sync-wave: "10"
-spec:
-  clusterQueue: cluster-queue
+# apiVersion: kueue.x-k8s.io/v1beta1
+# kind: LocalQueue
+# metadata:
+#   namespace: test-project
+#   name: local-queue-test
+#   annotations:
+#     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+#     kueue.x-k8s.io/default-queue: 'true'
+#     argocd.argoproj.io/sync-wave: "10"
+# spec:
+#   clusterQueue: cluster-queue

@@ -69,6 +69,7 @@ clusterGroup:
   - sandbox
   - upstream
   - openshift-storage
+  - science-project
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -136,15 +137,21 @@ clusterGroup:
       project: hub
       path: charts/all/rhoai
 
-    # chartVersion: 0.1.*
-    # sources:
-    # sources:
-    # - ref: patternref
-    #   repoURL: https://github.com/foo/multicloud-gitops
-    #   targetRevision: test2
-    # - chart: acm
-    #   repoURL: https://charts.validatedpatterns.io/ # default
-    #   targetRevision: 0.1.*
+
+    science-project:
+      name: science-project
+      namespace: default # creates a project
+      project: science-project
+      path: charts/hub/science-project
+      # chartVersion: 0.1.*
+      # sources:
+      # sources:
+      # - ref: patternref
+      #   repoURL: https://github.com/foo/multicloud-gitops
+      #   targetRevision: test2
+      # - chart: acm
+      #   repoURL: https://charts.validatedpatterns.io/ # default
+      #   targetRevision: 0.1.*
 
 
   imperative:
