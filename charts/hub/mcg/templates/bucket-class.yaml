@@ -9,5 +9,5 @@ spec:
   placementPolicy:
     tiers:
       - backingStores:
-          - local-backingstore
+          - mcg-backingstore
         placement: Spread
