@@ -9,12 +9,13 @@ metadata:
 data:
   CLOUD_PROVIDER: "azure"
   VXLAN_PORT: "9000"
-  AZURE_INSTANCE_SIZE: "Standard_DC2as_v5"
+  # AZURE_INSTANCE_SIZE: "Standard_DC2as_v5" # standard peer-pod
+  AZURE_INSTANCE_SIZE: "Standard_B2als_v2" # CoCo peer pod
   AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
   AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
   AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
   AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}"
-  #DISABLECVM: "false" 
+  DISABLECVM: "true" # CoCo requirement
   AZURE_IMAGE_ID: ""
   #DISABLE_CLOUD_CONFIG: "true"
   #AA_KBC_PARAMS: "cc_kbc::https://kbs-service-kbs-operator-system.{{ .Values.global.hubClusterDomain }}"

@@ -111,6 +111,12 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/all/sandbox
+      ignoreDifferences:
+      - group: ""
+        name: peer-pods-cm
+        kind: ConfigMap
+        jsonPointers:
+        - /data/AZURE_IMAGE_ID # Required so the vm image doesn't get nuked.
 
     upstream:
       name: upstream
@@ -239,3 +245,5 @@ clusterGroup:
 #          operator: In
 #          values:
 #            - OpenShift
+
+
