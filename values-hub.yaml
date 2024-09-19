@@ -41,6 +41,7 @@ clusterGroup:
       name: rhods-operator
       # Fast is required for 2.9.0
       channel: fast
+      version: "2.13.0" # ensure we get the latest
       namespace: openshift-operators
 
     openshift-pipelines:
