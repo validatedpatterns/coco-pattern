@@ -33,7 +33,7 @@ spec:
                               --ServerApp.quit_button=False
                               --ServerApp.tornado_settings={"user":"kube-3aadmin","hub_host":"https://rhods-dashboard-redhat-ods-applications.apps.coco.nbpjz.azure.redhatworkshops.io","hub_prefix":"/projects/science-project"}
         - name: JUPYTER_IMAGE
-          value: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/pytorch:2024.1
+          value: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/tensorflow:2024.1
         - name: PIP_CERT
           value: /etc/pki/tls/custom-certs/ca-bundle.crt
         - name: REQUESTS_CA_BUNDLE
@@ -47,7 +47,7 @@ spec:
         envFrom:
         - secretRef:
             name: aws-connection-noobaa
-        image: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/pytorch:2024.1
+        image: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/tensorflow:2024.1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 3
