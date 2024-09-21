@@ -1,0 +1,13 @@
+
+# Reference the Hashicorp Vault backend for ESO
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+# Secret provisioned for the AWS Controller for Kubernetes - S3 
+htpasswordCreds:
+  key: secret/data/global/htpasswd
+
+
+global:
+  useExternalSecrets: true

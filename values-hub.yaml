@@ -126,6 +126,12 @@ clusterGroup:
       project: upstream
       path: charts/all/upstream
 
+    htpassword:
+      name: htpassword
+      namespace: openshift-config
+      project: test-config
+      path: charts/all/htpassword
+
     mcg:
       name: mcg
       namespace: openshift-storage
