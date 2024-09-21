@@ -71,7 +71,7 @@ clusterGroup:
   - upstream
   - openshift-storage
   - science-project
-  - test-project
+  - config
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -130,7 +130,7 @@ clusterGroup:
     htpassword:
       name: htpassword
       namespace: openshift-config
-      project: test-config
+      project: config
       path: charts/all/htpassword
 
     mcg:
