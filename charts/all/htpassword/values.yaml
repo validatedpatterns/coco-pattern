@@ -8,6 +8,8 @@ secretStore:
 htpasswordCreds:
   key: secret/data/global/htpasswd
 
+clusterAdmins:
+  - chris
 
 global:
   useExternalSecrets: true

@@ -126,7 +126,7 @@ clusterGroup:
       namespace: openshift-marketplace #upstream config
       project: upstream
       path: charts/all/upstream
-
+    # A secondary auth form is required when you have kubeadmin creds. A 'proper' user is required.
     htpassword:
       name: htpassword
       namespace: openshift-config
