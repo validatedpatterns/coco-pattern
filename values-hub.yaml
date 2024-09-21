@@ -71,6 +71,7 @@ clusterGroup:
   - upstream
   - openshift-storage
   - science-project
+  - test-project
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
