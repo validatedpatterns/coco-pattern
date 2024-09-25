@@ -8,7 +8,7 @@ spec:
   kbsAuthSecretName: kbs-auth-public-key
   kbsDeploymentType: AllInOneDeployment
   kbsRvpsRefValuesConfigMapName: rvps-reference-values
-  kbsSecretResources: ["kbsres1"]
+  kbsSecretResources: ["kbsres1", passphrase]
 #   kbsHttpsKeySecretName: kbs-https-key
 #   kbsHttpsCertSecretName: kbs-https-certificate
   kbsResourcePolicyConfigMapName: resource-policy

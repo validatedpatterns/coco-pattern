@@ -1,5 +1,19 @@
 # coco-pattern
-This pattern deploys an mvp confidential computing pattern with OpenShift AI
+This is a validated pattern for deploying confidential containers on OpenShift.
+
+The target operating model has two clusters: 
+
+- One in a "trusted" zone where the remote attestation, KMS and Key Broker infrastructure are deployed.
+- A second where a subset of workloads are deployed in confidential containers 
+
+**For the current version of this application the confidential containers assumes deployment to Azure**
+
+On the platform a few workloads are deployed:
+
+1. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
+2. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
+
+This is currently a WIP. Reach out to the authors via github issue with any questions.
 
 
 
@@ -32,7 +46,7 @@ To use this you need to update the canonical pull secret (oc get secret/pull-sec
         sku: rh-ocp-worker
         version: 413.92.2023101700
 ```
-6. If this didn't work make sure the machine sizes are upped signficantly
+6. If this didn't work make sure the machine sizes are upped significantly 
 7. 
 
 #### Setting up cluster to use pre-prod tags. Do this before deploying the validated pattern.
