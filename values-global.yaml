@@ -5,10 +5,11 @@ global:
     syncPolicy: Automatic
     installPlanApproval: Automatic
   # This defines whether or not to use upstream resources for CoCo.
-  cocoUpstream: true
   # Defines whether or not the hub cluster can be used for confidential containers
-  cocoConverged: true
-
+  coco:
+    azure:
+      enabled: true
+      defaultVMFlavour: "Standard_DC2as_v5"
 
   objectStorage:
     # Whether or not to use PVC storage

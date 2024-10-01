@@ -1,7 +1,0 @@
-global:
-  cocoUpstream: true
-  cocoConverged: true
-
-
-sandbox:
-  upstreamCatalogVersion: 1.7.0-22

@@ -29,33 +29,24 @@ To use this you need to update the canonical pull secret (oc get secret/pull-sec
 
 #### Install of OCP cluster on azure.
 
-**NOTE: Don't use the default node sizes. Parts of ODF are deployed and soak up a quite a bit of memory.**
+**NOTE: Don't use the default node sizes.. increase the node sizes such as below**
 
 1. Login to console.redhat.com
 2. Get the openshift installer
 3. Login to azure locally.
 4. `openshift-install create install-config`
+   1. Select azure
+   2. For Red Hatter's and partners using RHDP make sure you select the same region for your account that you selected in RHDP
 5. Change worker machine type e.g.
 ```yaml
   platform:
     azure:
-      type: Standard_D16s_v5
-      osImage:
-        publisher: redhat
-        offer: rh-ocp-worker
-        sku: rh-ocp-worker
-        version: 413.92.2023101700
+      type: Standard_D8s_v5
 ```
-6. If this didn't work make sure the machine sizes are upped significantly 
-7. 
+1. `mkdir ./ocp-install && mv openshift-install.yaml ./ocp-install`
+2. `openshift-install create cluster --dir=./ocp-install`
 
-#### Setting up cluster to use pre-prod tags. Do this before deploying the validated pattern.
-1. `oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' |
-base64 -d > authfile`
 
-2. `podman login --authfile authfile --username "(username)" --password "(password)" brew.registry.redhat.io`
-
-3. `oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=authfile`
 
 #### Configuring secrets / parms
 

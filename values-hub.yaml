@@ -1,3 +1,5 @@
+# This is currently configured as an 'all in one' deployment
+
 clusterGroup:
   name: hub
   isHubCluster: true
@@ -6,7 +8,7 @@ clusterGroup:
   - vault
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
-  - trustee-operator-system # Downstream
+  - trustee-operator-system
 
   # AI stuff 
   - redhat-ods-operator
@@ -17,26 +19,25 @@ clusterGroup:
   - openshift-serverless
   - knative-serving
 
+
   subscriptions:
+    # ACM is kept anticipating 
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
       channel: release-2.11
 
-    # sandbox:
-    #   name:
-    #   namespace: openshift-sandboxed-containers-operator
-    #   channel: stable
-
-    ## catalog dependence. I've defined this here, however, as you need to first install the external catalogs there may be some pain. 
-    sandbox-upstream:
+    sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
-      sources: osc-upstream-catalog
+      channel: stable
+      version: "1.7.0" # ask for latest
+
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
-      source: trustee-operator-catalog
+      source: redhat-operators
+      channel: stable
     rhoai:
       name: rhods-operator
       # Fast is required for 2.9.0
@@ -68,10 +69,9 @@ clusterGroup:
   - trustee
   - golang-external-secrets
   - sandbox
-  - upstream
   - openshift-storage
   - science-project
-  - config
+  - hello-openshift
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -121,12 +121,6 @@ clusterGroup:
         jsonPointers:
         - /data/AZURE_IMAGE_ID # Required so the vm image doesn't get nuked.
 
-    upstream:
-      name: upstream
-      namespace: openshift-marketplace #upstream config
-      project: upstream
-      path: charts/all/upstream
-    # A secondary auth form is required when you have kubeadmin creds. A 'proper' user is required.
     htpassword:
       name: htpassword
       namespace: openshift-config

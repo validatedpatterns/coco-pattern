@@ -12,3 +12,6 @@ authfile
 kubeconfig
 azure
 ocp-install*
+install-config.yaml
+azure-env.sh
+.openshift*
