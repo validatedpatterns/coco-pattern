@@ -11,8 +11,8 @@ spec:
     server: {{ .Values.letsencrypt.server }}
     email: {{ .Values.letsencrypt.email }}
     # Only use for persistent domains :)
-    # privateKeySecretRef:
-    #   name: validated-patterns-issuer-account-key
+    privateKeySecretRef:
+      name: validated-patterns-issuer-account-key
     solvers:
     - selector: {}
       dns01:
