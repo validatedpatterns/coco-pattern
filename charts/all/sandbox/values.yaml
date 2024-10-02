@@ -14,7 +14,7 @@ secretStore:
 
 
 sandbox:
-  deploy: false
+  deploy: true
   sshKey: secret/data/global/sshKey
   azure: true
   peerpodsCreds: secret/data/global/azure

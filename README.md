@@ -9,23 +9,24 @@ The target operating model has two clusters:
 **For the current version of this application the confidential containers assumes deployment to Azure**
 
 On the platform a few workloads are deployed:
+ 
+1. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
+   1. This is currently working out of the box (or close to)
 
-1. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
-2. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
+2. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
+   1. This currently is a working
+   
 
-This is currently a WIP. Reach out to the authors via github issue with any questions.
+
 
 
 
 ## Current constraints and assumptions
 - Currently is pre-release of `trustee` and `sandbox-containers v1.7.*` to the Red Hat operator hub
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
+- You must be able to get a lets-encrypt certificate
 
-## Using pre-release sandbox container operator
-Pre-release sandbox container operator is accessible only via Red Hat / partners on an authenticated registry.
-To use this you need to update the canonical pull secret (oc get secret/pull-secret -n openshift-config) with the extra registry.
-
-### Procedural steps
+### Bootstrapping
 
 #### Install of OCP cluster on azure.
 
