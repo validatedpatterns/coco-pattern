@@ -53,7 +53,7 @@ letsencrypt:
   - 1.1.1.1:53
 
   azure:
-    secretStoreKey: 'secrets/data/global/azure'
+    secretStoreKey: 'secret/data/global/azure'
 
 
 secretStore:
