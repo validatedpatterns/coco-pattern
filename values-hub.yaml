@@ -18,7 +18,7 @@ clusterGroup:
   - nvidia-gpu-operator
   - openshift-serverless
   - knative-serving
-
+  - cert-manager-operator
 
   subscriptions:
     # ACM is kept anticipating 
@@ -62,6 +62,10 @@ clusterGroup:
       namespace: openshift-operators
       name: servicemeshoperator
 
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
 
   projects:
   - hub
