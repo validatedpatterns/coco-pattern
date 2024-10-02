@@ -15,4 +15,4 @@ kbs:
   publicKey: secret/data/hub/kbsPublicKey
   privateKey: secret/data/global/kbsPrivateKey
   kbsres1: secret/data/hub/kbsres1
-  passphrase: secrete/data/hub/passphrase
+  passphrase: secret/data/hub/passphrase
