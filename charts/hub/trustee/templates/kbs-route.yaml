@@ -7,12 +7,11 @@ metadata:
   namespace: {{ .Values.kbs.deployNS }}
 spec:
   port:
-    targetPort: 8080-tcp
+    targetPort: 8080
   to:
     kind: Service
     name: kbs-service
     weight: 100
-  wildcardPolicy: None
   tls:
     terminitation: edge
     insecureEdgeTerminationPolicy: Redirect
