@@ -35,6 +35,8 @@ spec:
   acme:
     server: {{ .Values.letsencrypt.server }}
     email: {{ .Values.letsencrypt.email }}
+    privateKeySecretRef:
+      name: validated-patterns-issuer-account-key
     solvers:
     - dns01:
         azureDNS:
