@@ -12,15 +12,15 @@ global:
       defaultVMFlavour: "Standard_DC2as_v5"
 
   azure:
-    clientID: 'c6a4da9a-ce25-4c39-8c0b-c4fe3bc2087c'
-    subscriptionID: 'ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4'
-    tenantID: '64dc69e4-d083-49fc-9569-ebece1dd1408'
-    DNSResGroup: 'openenv-9sl24'
-    hostedZoneName: '9sl24.azure.redhatworkshops.io'
-    clusterResGroup: 'coco-rs5j5-rg'
-    clusterSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-rs5j5-rg/providers/Microsoft.Network/virtualNetworks/coco-rs5j5-vnet/subnets/coco-rs5j5-worker-subnet'
-    clusterNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-rs5j5-rg/providers/Microsoft.Network/networkSecurityGroups/coco-rs5j5-nsg'
-    clusterRegion: 'westus'
+    clientID: ''
+    subscriptionID: ''
+    tenantID: ''
+    DNSResGroup: ''
+    hostedZoneName: ''
+    clusterResGroup: ''
+    clusterSubnet: ''
+    clusterNSG: ''
+    clusterRegion: ''
 
   dscDeployed: false
 

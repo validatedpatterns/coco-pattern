@@ -14,16 +14,18 @@ On the platform a few workloads are deployed:
    1. This is currently working out of the box (or close to)
 
 2. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
-   1. This currently is a working
+   1. This currently is a work in progress.
    
 
 
 
 ## Current constraints and assumptions
-- Currently is pre-release of `trustee` and `sandbox-containers v1.7.*` to the Red Hat operator hub
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
+- Only known to work today with everything on one cluster. The goal is to fix this as soon as possible. 
 - You must be able to get a lets-encrypt certificate
-- 
+- RHOAI data science cluster must be disabled until required components are deployed.
+- Must be on 4.16.14 or later.
+
 
 ## Bootstrapping
 
@@ -48,61 +50,43 @@ On the platform a few workloads are deployed:
 
 
 
-#### Configuring secrets / parms
-
+#### Configuring secrets / params
+1. Setup `values-secret-coco-pattern.yaml` from the template
 1. If you have not previously, run `./scripts/gen-ssh-key-azure.sh`
 2. If you have not previously, run `./scripts/gen-kbs-keys.sh`
-3. Populate the azure details between those that must be known already (CLIENT_ID etc) and using, when logged into `az`, `sh ./get-azure-details.sh
+3. Populate the azure details between those that must be known already (CLIENT_ID etc) and using, when logged into `az`, `sh ./get-azure-details.sh`
 4. Update `charts/all/sandbox/values.yaml` with the appropriate azure details
 5. Recommended: Disable the kata config until system is up.
 
+#### required `values-global.yaml` configuration
+
+The following fields must be populated for 
+```yaml
+global:
+  azure:
+    clientID: ''
+    subscriptionID: ''
+    tenantID: ''
+    DNSResGroup: ''
+    hostedZoneName: ''
+    clusterResGroup: ''
+    clusterSubnet: ''
+    clusterNSG: ''
+    clusterRegion: ''
+```
+
 
 #### Install the pattern
-`./pattern.sh make install`
-After everything has come up.. deploy the kata config.
+1. `./pattern.sh make install` this *should* deploy all elements.
+2. If it does not:
+   1. Likely that the hello-openshift deployments timed out without the vm templates
 
-
-
- 
-
-# Label nodes:
-oc label node coco-kfrpp-worker-large-eastus1-k8fbn cluster.ocs.openshift.io/openshift-storage=""
-
-
-## Issues 
 
 
 ## Future work
+- Support spreading remote attestation and workload to separate clusters
+- Finish AI work .
 - Allow use of bare metal infrastructure with Intel TDX or AMD SEV-SMP
-
-
-## Global flags
-- 1. global.cocoUpstream = true - deploy trustee / sandbox containers from upstream`
-- 2. global.cocoConverged = true - operate on a single cluster that will be insecure.
-- 
-
-
-
-
-
-
-## Reference
-
-### Trustee
-- https://github.com/lmilleri/trustee-operator-install/tree/main
-- https://github.com/bpradipt/coco-install/tree/main/misc/kbs-operator-install
-
-
-## OSC / coco stack
-git clone https://github.com/bpradipt/coco-install
-cd coco-install/osc-image-deploy
-./install.sh
-
-## High level pattern topology
-
-- Hub cluster contains all privileged components (vault; kbs; AS etc)
-- 
-
 
 
 
