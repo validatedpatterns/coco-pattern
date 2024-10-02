@@ -1,6 +1,11 @@
 global:
   cocoUpstream: true
   cocoConverged: true
+  azure:
+    clusterResGroup: ''
+    clusterSubnet: ''
+    clusterNSG: ''
+    clusterRegion: ''
 
 secretStore:
   name: vault-backend
@@ -13,11 +18,6 @@ sandbox:
   sshKey: secret/data/global/sshKey
   azure: true
   peerpodsCreds: secret/data/global/azure
-  azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
   # Strongly advised to override in values-global.yaml or values-{cluster-group}.yaml
-  azureResGroup: ''
-  azureRegion: ''
-  azureSubnet: ''
-  azureNSG: ''

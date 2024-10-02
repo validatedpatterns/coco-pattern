@@ -19,6 +19,8 @@ clusterGroup:
   - openshift-serverless
   - knative-serving
   - cert-manager-operator
+  - cert-manager
+  - lets-encrypt
 
   subscriptions:
     # ACM is kept anticipating 
@@ -124,6 +126,12 @@ clusterGroup:
         kind: ConfigMap
         jsonPointers:
         - /data/AZURE_IMAGE_ID # Required so the vm image doesn't get nuked.
+
+    letsencrypt:
+      name: letsencrypt
+      namespace: letsencrypt
+      project: default
+      path: charts/all/letsencrypt
 
     htpassword:
       name: htpassword

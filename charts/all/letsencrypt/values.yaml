@@ -1,0 +1,61 @@
+# -- Dictionary of the global settings to configure this chart
+# @default -- depends on the individual settings
+global:
+  ## -- String containing the domain including the apps. prefix. Gets set by the Validated Pattern framework
+  localClusterDomain: "apps.example.com"
+
+
+# -- This section contains all the parameters for the letsencrypt chart in
+# order to request CA signed certificates in a Validated Pattern By default if
+# you include this chart you enable the letsencrypt charts on both the
+# *.apps.<domain> ingress and on the API endpoint
+# @default -- depends on the individual settings
+letsencrypt:
+  ## Override this if you are using a supported 3rd party DNS provider (e.g. cloudflare)
+  cloudProviderDNS: true
+  ## -- Boolean to enable this feature and request a wildcard cert for the default Infress (*.apps.domain) (defaults to True)
+  enabled: true
+  ## -- Boolean to enable letsencrypt certs on the API endpoint too (defaults to True)
+  api_endpoint: true
+
+  # -- String that defines the region used by the route53/dns01 resolver in cert-manager (required)
+  region: eu-central-1
+  # -- String containing the email used when requesting certificates to letsencrypt (required)
+  # These two lines need tweaking for every deployment. @example.com emails
+  # will be rejected by letsencrypt
+  email: chbutler@redhat.com
+
+  # -- String containing the letsencrypt ACME URL (Defaults to the staging server)
+  # By default we use the staging URL to avoid any ratelimiting while testing
+  # To switch to the production certificates signed by a recognized CA, please
+  # switch to the non-staging URL (see values.yaml)
+  #server: https://acme-staging-v02.api.letsencrypt.org/directory
+  server: https://acme-v02.api.letsencrypt.org/directory
+
+  # -- List of organization names to be put in a certificate (Defaults to [hybrid-cloud-patterns.io])
+  organizations:
+  - hybrid-cloud-patterns.io
+  # -- List of certificate uses. See API cert-manager.io/v1.KeyUsage (Defaults to [server auth])
+  usages:
+  - server auth
+
+  # -- Duration of the requested letsencrypt certificates (Defaults to 168h0m0s)
+  duration: "168h0m0s"
+  # -- How long before expiration date should the certs be renewed (Defaults to 28h0m0s)
+  renewBefore: "28h0m0s"
+
+  # -- List of DNS server (ip:port strings) to be used when doing DNS01 challenges (Defaults to [8.8.8.8:53, 1.1.1.1:53])
+  # These two are needed because the DNS01 ACME solver needs outside DNS
+  # servers and won't really work with openshift's internal split-view DNS servers
+  # https://cert-manager.io/docs/configuration/acme/dns01/#setting-nameservers-for-dns01-self-check
+  nameservers:
+  - 8.8.8.8:53
+  - 1.1.1.1:53
+
+  azure:
+    secretStoreKey: 'secrets/data/global/azureDNSCreds'
+
+
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
