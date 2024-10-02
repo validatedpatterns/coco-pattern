@@ -19,14 +19,13 @@ On the platform a few workloads are deployed:
 
 
 
-
-
 ## Current constraints and assumptions
 - Currently is pre-release of `trustee` and `sandbox-containers v1.7.*` to the Red Hat operator hub
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
 - You must be able to get a lets-encrypt certificate
+- 
 
-### Bootstrapping
+## Bootstrapping
 
 #### Install of OCP cluster on azure.
 
@@ -64,13 +63,16 @@ After everything has come up.. deploy the kata config.
 
 
 
+ 
+
 # Label nodes:
 oc label node coco-kfrpp-worker-large-eastus1-k8fbn cluster.ocs.openshift.io/openshift-storage=""
 
 
+## Issues 
+
 
 ## Future work
-- Update to mainstream `trustee` and `sandbox container operator`
 - Allow use of bare metal infrastructure with Intel TDX or AMD SEV-SMP
 
 
