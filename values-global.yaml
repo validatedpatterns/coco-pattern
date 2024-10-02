@@ -11,12 +11,15 @@ global:
       enabled: true
       defaultVMFlavour: "Standard_DC2as_v5"
 
+  dscDeployed: false
+
+
   objectStorage:
     # Whether or not to use PVC storage
     pvcStorage: true
     replicas: 3
     storagePool: 50Gi
-    backingStorageClass: "managed-csi"
+    backingStorageClass: "managed-csi" # push into override file
     # IF ODF exists we don't need to deploy an storage system
     existingODF: false
     odfStorageSystem: "ocs-external-storagecluster-storagesystem"
