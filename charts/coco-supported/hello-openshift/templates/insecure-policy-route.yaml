@@ -1,7 +1,7 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: standard
+  name: insecure-policy
 spec:
   port:
     targetPort: 8888
