@@ -17,6 +17,6 @@ data:
   AZURE_NSG_ID: "{{ .Values.global.azure.clusterNSG }}"
   DISABLECVM: "false"
   AZURE_IMAGE_ID: "" # This will get rewritten when the image is built
-  AA_KBC_PARAMS: "cc_kbc::http://kbs-service.trustee-operator-system.{{ .Values.global.hubClusterDomain }}"
+  AA_KBC_PARAMS: "cc_kbc::http://kbs-trustee-operator-system.{{ .Values.global.hubClusterDomain }}"
   PROXY_TIMEOUT: "5m"
 {{- end }}
