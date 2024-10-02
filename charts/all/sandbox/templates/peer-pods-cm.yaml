@@ -1,7 +1,6 @@
 {{- if .Values.sandbox.azure }}
-{{- if not .Values.sandbox.imageBuild }}
 ---
-# CJB Don't
+# Separated out to compo
 # apiVersion: v1
 # kind: ConfigMap
 # metadata:
@@ -10,17 +9,15 @@
 # data:
 #   CLOUD_PROVIDER: "azure"
 #   VXLAN_PORT: "9000"
-#   # AZURE_INSTANCE_SIZE: "Standard_DC2as_v5" # standard peer-pod
-#   AZURE_INSTANCE_SIZE: "Standard_B2als_v2" # CoCo peer pod
+#   AZURE_INSTANCE_SIZE: "Standard_DC2as_v5" # CoCo peer pod
+#   AZURE_INSTANCE_SIZES: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
 #   AZURE_RESOURCE_GROUP: "{{ .Values.sandbox.azureResGroup }}"
 #   AZURE_REGION: "{{ .Values.sandbox.azureRegion }}"
 #   AZURE_SUBNET_ID: "{{ .Values.sandbox.azureSubnet }}" 
 #   AZURE_NSG_ID: "{{ .Values.sandbox.azureNSG }}"
-#   DISABLECVM: "true" # CoCo requirement
-#   AZURE_IMAGE_ID: ""
-#   #DISABLE_CLOUD_CONFIG: "true"
+#   DISABLECVM: "false"
+#   AZURE_IMAGE_ID: "" # Note 
 #   #AA_KBC_PARAMS: "cc_kbc::https://kbs-service-kbs-operator-system.{{ .Values.global.hubClusterDomain }}"
 #   AA_KBC_PARAMS: "cc_kbc::http://kbs-service.trustee-operator-system.svc.cluster.local:8080"
 #   PROXY_TIMEOUT: "5m"
-{{- end }}
 {{- end }}

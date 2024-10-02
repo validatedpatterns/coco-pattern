@@ -20,6 +20,13 @@ global:
     # IF ODF exists we don't need to deploy an storage system
     existingODF: false
     odfStorageSystem: "ocs-external-storagecluster-storagesystem"
+
+
+sandbox:
+  azureResGroup: ''
+  azureRegion: ''
+  azureSubnet: ''
+  azureNSG: ''
 main:
   clusterGroupName: hub
   multiSourceConfig:
