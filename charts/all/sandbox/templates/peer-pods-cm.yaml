@@ -1,6 +1,5 @@
 {{- if and .Values.sandbox.azure .Values.sandbox.deploy }}
 ---
-Separated out to compo
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,6 +16,6 @@ data:
   AZURE_NSG_ID: "{{ .Values.global.azure.clusterNSG }}"
   DISABLECVM: "false"
   AZURE_IMAGE_ID: "" # This will get rewritten when the image is built
-  AA_KBC_PARAMS: "cc_kbc::http://kbs-trustee-operator-system.{{ .Values.global.hubClusterDomain }}"
+  AA_KBC_PARAMS: "cc_kbc::https://kbs-trustee-operator-system.{{ .Values.global.hubClusterDomain }}"
   PROXY_TIMEOUT: "5m"
 {{- end }}
