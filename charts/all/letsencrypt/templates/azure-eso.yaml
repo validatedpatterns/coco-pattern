@@ -19,6 +19,6 @@ spec:
   data:
   - secretKey: "client-secret"
     remoteRef: 
-      key: {{ .Values.letsencrypt.azure.secreStoreKey }}
+      key: {{ .Values.letsencrypt.azure.secretStoreKey }}
       property: AZURE_CLIENT_SECRET
 {{ end }}
