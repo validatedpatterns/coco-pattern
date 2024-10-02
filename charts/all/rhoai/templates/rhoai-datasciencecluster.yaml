@@ -1,3 +1,4 @@
+{{ if .Values.global.dscDeployed }}
 apiVersion: datasciencecluster.opendatahub.io/v1
 kind: DataScienceCluster
 metadata:
@@ -39,3 +40,4 @@ spec:
 {{ end }}
     kueue:
       managementState: Managed
+{{ end }}

@@ -5,9 +5,24 @@ global:
     syncPolicy: Automatic
     installPlanApproval: Automatic
   # This defines whether or not to use upstream resources for CoCo.
-  cocoUpstream: true
   # Defines whether or not the hub cluster can be used for confidential containers
-  cocoConverged: true
+  coco:
+    azure:
+      enabled: true
+      defaultVMFlavour: "Standard_DC2as_v5"
+
+  azure:
+    clientID: ''
+    subscriptionID: ''
+    tenantID: ''
+    DNSResGroup: ''
+    hostedZoneName: ''
+    clusterResGroup: ''
+    clusterSubnet: ''
+    clusterNSG: ''
+    clusterRegion: ''
+
+  dscDeployed: false
 
 
   objectStorage:
@@ -15,10 +30,11 @@ global:
     pvcStorage: true
     replicas: 3
     storagePool: 50Gi
-    backingStorageClass: "managed-csi"
+    backingStorageClass: "managed-csi" # push into override file
     # IF ODF exists we don't need to deploy an storage system
     existingODF: false
     odfStorageSystem: "ocs-external-storagecluster-storagesystem"
+
 main:
   clusterGroupName: hub
   multiSourceConfig:

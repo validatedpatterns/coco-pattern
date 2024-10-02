@@ -1,23 +1,23 @@
 global:
   cocoUpstream: true
   cocoConverged: true
+  azure:
+    clusterResGroup: ''
+    clusterSubnet: ''
+    clusterNSG: ''
+    clusterRegion: ''
 
 secretStore:
   name: vault-backend
   kind: ClusterSecretStore
 
 
+
 sandbox:
-  deploy: false
-  imageBuild: false
+  deploy: true
   sshKey: secret/data/global/sshKey
-  upstreamCatalogVersion: 1.7.0-22
   azure: true
   peerpodsCreds: secret/data/global/azure
-  azureConfig: secret/data/global/azureClusterMetadata
   # These variables today limit to one cluster
   # revise using imperative framework to infer from cluster vars
-  azureResGroup: 'coco-kfrpp-rg'
-  azureRegion: 'eastus'
-  azureSubnet: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-kfrpp-rg/providers/Microsoft.Network/virtualNetworks/coco-kfrpp-vnet/subnets/coco-kfrpp-worker-subnet'
-  azureNSG: '/subscriptions/ce3de9a8-39e2-4cb8-a5cc-369e7043f5f4/resourceGroups/coco-kfrpp-rg/providers/Microsoft.Network/networkSecurityGroups/coco-kfrpp-nsg'
+  # Strongly advised to override in values-global.yaml or values-{cluster-group}.yaml

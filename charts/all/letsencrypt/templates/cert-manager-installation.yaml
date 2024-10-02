@@ -1,0 +1,15 @@
+{{ if .Values.letsencrypt.enabled }}
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+spec:
+  managementState: "Managed"
+  unsupportedConfigOverrides:
+    # Here's an example to supply custom DNS settings.
+    # Use this if you are getting propagation errors or are unable to determine the correct NS in certmanager logs
+    controller:
+      args:
+        - "--dns01-recursive-nameservers={{ with index .Values.letsencrypt.nameservers 0 }}{{ . }}{{- end }},{{ with index .Values.letsencrypt.nameservers 1 }}{{ . }}{{- end }}"
+        - "--dns01-recursive-nameservers-only"
+{{- end }}

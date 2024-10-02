@@ -1,0 +1,24 @@
+{{ if and (eq .Values.global.clusterPlatform "Azure") .Values.letsencrypt.cloudProviderDNS }}
+---
+apiVersion: "external-secrets.io/v1beta1"
+kind: ExternalSecret
+metadata:
+  name: azure-creds-eso
+  namespace: cert-manager
+  annotations:
+        argocd.argoproj.io/sync-wave: "1"
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.secretStore.name }}
+    kind: {{ .Values.secretStore.kind }}
+  target:
+    name:  azuredns-config
+    namespace: cert-manager
+
+  data:
+  - secretKey: "client-secret"
+    remoteRef: 
+      key: {{ .Values.letsencrypt.azure.secretStoreKey }}
+      property: AZURE_CLIENT_SECRET
+{{ end }}
