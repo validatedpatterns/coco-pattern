@@ -15,3 +15,4 @@ ocp-install*
 install-config.yaml
 azure-env.sh
 .openshift*
+.DS_Store
