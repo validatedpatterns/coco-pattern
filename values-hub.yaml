@@ -9,6 +9,10 @@ clusterGroup:
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
   - trustee-operator-system
+  - hello-openshift
+  - cert-manager-operator
+  - cert-manager
+  - lets-encrypt
 
   # AI stuff 
   - redhat-ods-operator
@@ -18,9 +22,7 @@ clusterGroup:
   - nvidia-gpu-operator
   - openshift-serverless
   - knative-serving
-  - cert-manager-operator
-  - cert-manager
-  - lets-encrypt
+
 
   subscriptions:
     # ACM is kept anticipating 
@@ -133,11 +135,20 @@ clusterGroup:
       project: default
       path: charts/all/letsencrypt
 
+
+    hello-openshift:
+      name: hello-openshift
+      namespace: hello-openshift
+      project: hello-openshift
+      path: charts/coco-supported/hello-openshift
+      ## AI STUFF Beneath here
+
     htpassword:
       name: htpassword
       namespace: openshift-config
       project: config
       path: charts/all/htpassword
+
 
     mcg:
       name: mcg
