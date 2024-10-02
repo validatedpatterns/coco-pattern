@@ -1,3 +1,2 @@
 global:
-  coco:
-    runtimeClassName: kata-remote
+  runtimeClassName: kata-remote

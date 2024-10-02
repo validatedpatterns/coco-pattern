@@ -4,7 +4,7 @@ metadata:
   name: secure
 spec:
   port:
-    targetPort: 8888-tcp
+    targetPort: 8888
   to:
     kind: Service
     name: secure
