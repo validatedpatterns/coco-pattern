@@ -84,9 +84,9 @@ global:
 
 
 ## Future work
-- Support spreading remote attestation and workload to separate clusters
-- Finish AI work .
-- Allow use of bare metal infrastructure with Intel TDX or AMD SEV-SMP
+- Support spreading remote attestation and workload to separate clusters.
+- Finish AI work.
+- Allow use of bare metal infrastructure with Intel TDX or AMD SEV-SMP.
 
 
 
