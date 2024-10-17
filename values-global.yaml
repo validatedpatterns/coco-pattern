@@ -30,7 +30,7 @@ global:
     pvcStorage: true
     replicas: 3
     storagePool: 50Gi
-    backingStorageClass: "managed-csi" # push into override file
+    backingStorageClass: "gp3-csi" # push into override file
     # IF ODF exists we don't need to deploy an storage system
     existingODF: false
     odfStorageSystem: "ocs-external-storagecluster-storagesystem"
