@@ -19,7 +19,7 @@ global:
     DNSResGroup: 'openenv-r9n2w'
     hostedZoneName: 'r9n2w.azure.redhatworkshops.io'
     clusterResGroup: 'ocp-rcj9f-rg'
-    clusterSubnet: '"/subscriptions/18e6737a-b665-4e47-85d7-2aca4ce229d8/resourceGroups/ocp-rcj9f-rg/providers/Microsoft.Network/virtualNetworks/ocp-rcj9f-vnet/subnets/ocp-rcj9f-worker-subnet'
+    clusterSubnet: '/subscriptions/18e6737a-b665-4e47-85d7-2aca4ce229d8/resourceGroups/ocp-rcj9f-rg/providers/Microsoft.Network/virtualNetworks/ocp-rcj9f-vnet/subnets/ocp-rcj9f-worker-subnet'
     clusterNSG: '/subscriptions/18e6737a-b665-4e47-85d7-2aca4ce229d8/resourceGroups/ocp-rcj9f-rg/providers/Microsoft.Network/networkSecurityGroups/ocp-rcj9f-nsg'
     clusterRegion: 'southeastasia'
 
