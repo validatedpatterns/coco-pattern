@@ -12,15 +12,15 @@ global:
       defaultVMFlavour: "Standard_DC2as_v5"
 
   azure:
-    clientID: ''
-    subscriptionID: ''
-    tenantID: ''
-    DNSResGroup: ''
-    hostedZoneName: ''
-    clusterResGroup: ''
-    clusterSubnet: ''
-    clusterNSG: ''
-    clusterRegion: ''
+    clientID: 'f302b3ef-07b2-45f4-8348-774029c3647d'
+    subscriptionID: '18e6737a-b665-4e47-85d7-2aca4ce229d8'
+    tenantID: 'redhat0.onmicrosoft.com'
+    DNSResGroup: 'openenv-r9n2w'
+    hostedZoneName: 'r9n2w.azure.redhatworkshops.io'
+    clusterResGroup: 'ocp-rcj9f-rg'
+    clusterSubnet: '"/subscriptions/18e6737a-b665-4e47-85d7-2aca4ce229d8/resourceGroups/ocp-rcj9f-rg/providers/Microsoft.Network/virtualNetworks/ocp-rcj9f-vnet/subnets/ocp-rcj9f-worker-subnet'
+    clusterNSG: '/subscriptions/18e6737a-b665-4e47-85d7-2aca4ce229d8/resourceGroups/ocp-rcj9f-rg/providers/Microsoft.Network/networkSecurityGroups/ocp-rcj9f-nsg'
+    clusterRegion: 'southeastasia'
 
   dscDeployed: false
 
