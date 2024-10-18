@@ -73,6 +73,7 @@ clusterGroup:
 
   projects:
   - hub
+  - config
   - vault
   - trustee
   - golang-external-secrets
