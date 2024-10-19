@@ -1,7 +1,7 @@
 # This is currently configured as an 'all in one' deployment
 
 clusterGroup:
-  name: hub
+  name: allInOne
   isHubCluster: true
   namespaces:
   - open-cluster-management
@@ -75,6 +75,7 @@ clusterGroup:
   - hub
   - vault
   - trustee
+  - auth
   - golang-external-secrets
   - sandbox
   - openshift-storage
@@ -146,7 +147,7 @@ clusterGroup:
     htpassword:
       name: htpassword
       namespace: openshift-config
-      project: config
+      project: auth
       path: charts/all/htpassword
 
 

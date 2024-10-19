@@ -30,12 +30,15 @@ global:
     pvcStorage: true
     replicas: 3
     storagePool: 50Gi
-    backingStorageClass: "gp3-csi" # push into override file
+    backingStorageClass: ""
     # IF ODF exists we don't need to deploy an storage system
     existingODF: false
     odfStorageSystem: "ocs-external-storagecluster-storagesystem"
 
 main:
-  clusterGroupName: hub
+  # WARNING
+  # This default configuration uses a single cluster on azure.
+  # It funamentally violates the separation of duties.
+  clusterGroupName: allInOne
   multiSourceConfig:
     enabled: true

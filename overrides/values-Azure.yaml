@@ -6,6 +6,11 @@
 # for all the limitations around it
 
 
+global:
+  objectStorage:
+    backingStorageClass: "managed-storage"
+
+
 # letsencrypt:
 #   enabled: true
 #   api_endpoint: true
@@ -24,7 +29,3 @@
 #       # Using 'default' as that exists everywhere
 #       project: default
 #       path: common/letsencrypt
-
-global:
-  objectStorage:
-    backingStorageClass: "gp3-csi"
