@@ -22,7 +22,7 @@ global:
     clusterNSG: ''
     clusterRegion: ''
 
-  dscDeployed: true
+  dscDeployed: false
 
 
   objectStorage:
