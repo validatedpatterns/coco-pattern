@@ -24,7 +24,6 @@ global:
 
   dscDeployed: false
 
-
   objectStorage:
     # Whether or not to use PVC storage
     pvcStorage: true
@@ -39,6 +38,6 @@ main:
   # WARNING
   # This default configuration uses a single cluster on azure.
   # It funamentally violates the separation of duties.
-  clusterGroupName: allInOne
+  clusterGroupName: singlecluster
   multiSourceConfig:
     enabled: true

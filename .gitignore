@@ -16,3 +16,4 @@ install-config.yaml
 azure-env.sh
 .openshift*
 .DS_Store
+openshift-install
