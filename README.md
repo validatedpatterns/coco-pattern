@@ -16,8 +16,7 @@ On the platform a few workloads are deployed:
 2. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
    1. This currently is a work in progress.
    
-
-
+3. 
 
 ## Current constraints and assumptions
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
@@ -25,6 +24,23 @@ On the platform a few workloads are deployed:
 - You must be able to get a lets-encrypt certificate
 - RHOAI data science cluster must be disabled until required components are deployed.
 - Must be on 4.16.14 or later.
+
+
+## validated pattern flavours 
+**Today the demo has one flavour**. 
+A number are planned based on various different hub cluster-groups.
+You can change between behaviour by configuring [`global.main.clusterGroupName`](https://validatedpatterns.io/learn/values-files/) key in the `values-global.yaml` file. 
+
+
+
+`values-simple.yaml`: or the `simple` cluster group is the default for the pattern.
+It deploys a hello-openshift application 3 times: 
+- A standard pod
+- A kata container with peer-pods
+- A confidential kata-container
+
+`values-ai.yaml`: Is currently a work in progress. 
+
 
 
 ## Bootstrapping
@@ -64,15 +80,15 @@ The following fields must be populated for
 ```yaml
 global:
   azure:
-    clientID: ''
-    subscriptionID: ''
-    tenantID: ''
-    DNSResGroup: ''
-    hostedZoneName: ''
-    clusterResGroup: ''
-    clusterSubnet: ''
-    clusterNSG: ''
-    clusterRegion: ''
+    clientID: '' # Azure service principal ID
+    subscriptionID: '' # azure subscription UUID
+    tenantID: '' # tenant ID - will look like a name
+    DNSResGroup: '' # resource group where DNS Zone is hosted
+    hostedZoneName: '' # Hosted zone name. Will be a dns entry in azure dns you have access to. Check in the azure portal
+    clusterResGroup: '' # resource group for the cluster
+    clusterSubnet: '' # subnet for the worker node
+    clusterNSG: '' # network security group for the worker node
+    clusterRegion: '' # named azure region
 ```
 
 

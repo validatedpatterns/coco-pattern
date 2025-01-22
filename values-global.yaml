@@ -37,7 +37,7 @@ global:
 main:
   # WARNING
   # This default configuration uses a single cluster on azure.
-  # It funamentally violates the separation of duties.
-  clusterGroupName: singlecluster
+  # It fundamentally violates the separation of duties.
+  clusterGroupName: simple
   multiSourceConfig:
     enabled: true

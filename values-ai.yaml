@@ -1,7 +1,8 @@
 # This is currently configured as an 'all in one' deployment in one cluster.
+# This is to demo openshift ai functionality with confidential containers.
 
 clusterGroup:
-  name: simple
+  name: ai
   isHubCluster: true
   namespaces:
   - open-cluster-management
@@ -13,6 +14,15 @@ clusterGroup:
   - cert-manager-operator
   - cert-manager
   - lets-encrypt
+
+  # AI stuff 
+  - redhat-ods-operator
+  - openshift-pipelines
+  - openshift-storage
+  - openshift-nfd
+  - nvidia-gpu-operator
+  - openshift-serverless
+  - knative-serving
 
   subscriptions:
     # ACM is kept anticipating 
@@ -32,6 +42,29 @@ clusterGroup:
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
+    rhoai:
+      name: rhods-operator
+      # Fast is required for 2.9.0
+      channel: fast
+      version: "2.13.0" # ensure we get the latest
+      namespace: openshift-operators
+
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators
+
+    odf:
+      name: odf-operator
+      namespace: openshift-storage
+
+    serverless:
+      channel: stable
+      name: serverless-operator
+
+    servicemesh:
+      channel: stable
+      namespace: openshift-operators
+      name: servicemeshoperator
 
     cert-manager:
       name: openshift-cert-manager-operator
@@ -115,6 +148,34 @@ clusterGroup:
       namespace: openshift-config
       project: auth
       path: charts/all/htpassword
+
+    mcg:
+      name: mcg
+      namespace: openshift-storage
+      project: openshift-storage
+      path: charts/hub/mcg
+
+    rhoai:
+      name: rhoai
+      namespace: redhat-ods-operator
+      project: hub
+      path: charts/all/rhoai
+
+    science-project:
+      name: science-project
+      namespace: default # creates a project
+      project: science-project
+      path: charts/hub/science-project
+      # chartVersion: 0.1.*
+      # sources:
+      # sources:
+      # - ref: patternref
+      #   repoURL: https://github.com/foo/multicloud-gitops
+      #   targetRevision: test2
+      # - chart: acm
+      #   repoURL: https://charts.validatedpatterns.io/ # default
+      #   targetRevision: 0.1.*
+
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
