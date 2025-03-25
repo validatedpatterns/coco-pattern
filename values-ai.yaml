@@ -13,7 +13,7 @@ clusterGroup:
   - hello-openshift
   - cert-manager-operator
   - cert-manager
-  - lets-encrypt
+  - letsencrypt
 
   # AI stuff 
   - redhat-ods-operator

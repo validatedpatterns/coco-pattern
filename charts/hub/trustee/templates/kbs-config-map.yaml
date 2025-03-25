@@ -7,8 +7,6 @@ data:
   kbs-config.json: |
     {
         "insecure_http" : true,
-        "private_key": "/etc/https-key/https.key",
-        "certificate": "/etc/https-cert/https.crt",
         "sockets": ["0.0.0.0:8080"],
         "auth_public_key": "/etc/auth-secret/publicKey",
         "attestation_token_config": {

@@ -8,20 +8,22 @@ The target operating model has two clusters:
 
 **For the current version of this application the confidential containers assumes deployment to Azure**
 
-On the platform a few workloads are deployed:
+On the platform a a sample workload is deployed
  
 1. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
-   1. This is currently working out of the box (or close to)
+   1. This is currently working out of the box (or close to).
+
+Future work includes:
 
 2. Red Hat OpenShift AI is deployed where a multi-layer perceptron to predict fraud is deployed as a confidential workload for inference
-   1. This currently is a work in progress.
-   
-3. 
+2. Enirnonments which will work sucessfully across multiple cloud providers
+
 
 ## Current constraints and assumptions
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods
-- Only known to work today with everything on one cluster. The goal is to fix this as soon as possible. 
-- You must be able to get a lets-encrypt certificate
+- Only known to work today with everything on one cluster. The work to expand this is in flight
+- You must be able to get a lets-encrypt certificate. This means the service credentials in openshift must be able to manipulate the dns zone used by OpenSift.
+- 
 - RHOAI data science cluster must be disabled until required components are deployed.
 - Must be on 4.16.14 or later.
 
@@ -43,11 +45,38 @@ It deploys a hello-openshift application 3 times:
 
 
 
-## Bootstrapping
+## Setup instructions
 
-#### Install of OCP cluster on azure.
+### Default single cluster setup with `values-simple.yaml`
 
+#### Configuring required secrets / parameters
+The secrets here secure Trustee and the peer-pod vms. Mostly they are for demonstration purposes. 
+This only has to be done once.
+
+1. Run `sh scripts/gen-secrets.sh`
+
+#### Install on an OCP cluster on azure using Red Hat Demo Platform
+
+Red Hat a demo platform. This allows easy access for Red Hat associates and partners to ephemeral cloud resources. The pattern is known to work with this setup.
+1. Get the [openshift installer](https://console.redhat.com/openshift/downloads)
+   1. **NOTE: openshift installer must be updated regularly if you want to automatically provision the latest versions of OCP**
+2. Get access to an [Azure Subscription Based Blank Open Environment](https://catalog.demo.redhat.com/catalog?category=Open_Environments&search=azure&item=babylon-catalog-prod%2Fazure-gpte.open-environment-azure-subscription.prod).
+3. Import the required azure environmental variables (see coded block):
+   ```
+      export CLIENT_ID=
+      export PASSWORD=
+      export TENANT=
+      export SUBSCRIPTION=
+      export RESOURCEGROUP=
+  ```
+1. Run the wrapper install script 
+  1. `sh ./rhdp/wrapper.sh`
+1. You *should* be done
+  1. You *may* need to recreate the hello world peer-pods depending on timeouts.
+
+#### Install azure *not* usign Red Hat Demo platform
 **NOTE: Don't use the default node sizes.. increase the node sizes such as below**
+
 
 1. Login to console.redhat.com
 2. Get the openshift installer
@@ -63,41 +92,16 @@ It deploys a hello-openshift application 3 times:
 ```
 1. `mkdir ./ocp-install && mv openshift-install.yaml ./ocp-install`
 2. `openshift-install create cluster --dir=./ocp-install`
+3. Once installed:
+  1. Login to `oc`
+  2. `./pattern.sh make install 
 
 
+### Multi cluster setup
+TBD
 
-#### Configuring secrets / params
-1. Setup `values-secret-coco-pattern.yaml` from the template
-1. If you have not previously, run `./scripts/gen-ssh-key-azure.sh`
-2. If you have not previously, run `./scripts/gen-kbs-keys.sh`
-3. Populate the azure details between those that must be known already (CLIENT_ID etc) and using, when logged into `az`, `sh ./get-azure-details.sh`
-4. Update `charts/all/sandbox/values.yaml` with the appropriate azure details
-5. Recommended: Disable the kata config until system is up.
-
-#### required `values-global.yaml` configuration
-
-The following fields must be populated for 
-```yaml
-global:
-  azure:
-    clientID: '' # Azure service principal ID
-    subscriptionID: '' # azure subscription UUID
-    tenantID: '' # tenant ID - will look like a name
-    DNSResGroup: '' # resource group where DNS Zone is hosted
-    hostedZoneName: '' # Hosted zone name. Will be a dns entry in azure dns you have access to. Check in the azure portal
-    clusterResGroup: '' # resource group for the cluster
-    clusterSubnet: '' # subnet for the worker node
-    clusterNSG: '' # network security group for the worker node
-    clusterRegion: '' # named azure region
-```
-
-
-#### Install the pattern
-1. `./pattern.sh make install` this *should* deploy all elements.
-2. If it does not:
-   1. Likely that the hello-openshift deployments timed out without the vm templates
-
-
+### Multi-cluster setup with AI
+TBD
 
 ## Future work
 - Support spreading remote attestation and workload to separate clusters.

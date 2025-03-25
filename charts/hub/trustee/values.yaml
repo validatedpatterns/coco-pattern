@@ -12,6 +12,7 @@ kbs:
     enabled: false
   certAuth:
     enabled: false
+  securityPolicy: secret/data/hub/securityPolicyConfig
   publicKey: secret/data/hub/kbsPublicKey
   privateKey: secret/data/global/kbsPrivateKey
   kbsres1: secret/data/hub/kbsres1

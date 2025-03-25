@@ -12,20 +12,20 @@ clusterGroup:
   - hello-openshift
   - cert-manager-operator
   - cert-manager
-  - lets-encrypt
+  - letsencrypt
 
   subscriptions:
     # ACM is kept anticipating 
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.11
+      channel: release-2.12
 
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       channel: stable
-      version: "1.7.0" # ask for latest
+      version: "1.8.1" # ask for latest
 
     trustee:
       name: trustee-operator
@@ -42,11 +42,8 @@ clusterGroup:
   - hub
   - vault
   - trustee
-  - auth
   - golang-external-secrets
   - sandbox
-  - openshift-storage
-  - science-project
   - hello-openshift
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
@@ -59,11 +56,6 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      ignoreDifferences:
-      - group: internal.open-cluster-management.io
-        kind: ManagedClusterInfo
-        jsonPointers:
-        - /spec/loggingCA
 
     vault:
       name: vault
@@ -81,7 +73,7 @@ clusterGroup:
 
     trustee:
       name: trustee
-      namespace: kbs-operator-system #upstream config
+      namespace: trustee-operator-system #upstream config
       project: trustee
       path: charts/hub/trustee
 
@@ -90,17 +82,11 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/all/sandbox
-      ignoreDifferences:
-      - group: ""
-        name: peer-pods-cm
-        kind: ConfigMap
-        jsonPointers:
-        - /data/AZURE_IMAGE_ID # Required so the vm image doesn't get nuked.
 
     letsencrypt:
       name: letsencrypt
       namespace: letsencrypt
-      project: default
+      project: hub
       path: charts/all/letsencrypt
 
     hello-openshift:
@@ -108,13 +94,6 @@ clusterGroup:
       namespace: hello-openshift
       project: hello-openshift
       path: charts/coco-supported/hello-openshift
-      ## AI STUFF Beneath here
-
-    htpassword:
-      name: htpassword
-      namespace: openshift-config
-      project: auth
-      path: charts/all/htpassword
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
@@ -124,12 +103,22 @@ clusterGroup:
     # For additional overrides that apply to the jobs, please refer to
     # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
     jobs:
-    - name: hello-world
-      # ansible playbook to be run
-      playbook: common/ansible/playbooks/hello-world/hello-world.yaml
-      # per playbook timeout in seconds
-      timeout: 234
-      # verbosity: "-v"
+    - name: install-deps
+      playbook: ansible/install-deps.yaml
+      verbosity: -vvv
+      timeout: 3600
+    - name: configure-azure-dns
+      playbook: ansible/configure-issuer.yaml
+      # this image has not been changes. TBD would make sense 
+      #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
+      verbosity: -vvv
+      timeout: 3600
+    # - name: hello-world
+    #   # ansible playbook to be run
+    #   playbook: common/ansible/playbooks/hello-world/hello-world.yaml
+    #   # per playbook timeout in seconds
+    #   timeout: 234
+    #   # verbosity: "-v"
   managedClusterGroups:
     exampleRegion:
       name: group-one

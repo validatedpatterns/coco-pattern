@@ -1,0 +1,12 @@
+- name: Retrieve Credentials for AAP on OpenShift
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Install required collection
+    ansible.builtin.command:
+      cmd: ansible-galaxy collection install azure.azcollection
+  - name: Install a Python package
+    ansible.builtin.command:
+      cmd: pip install --user -r ~/.ansible/collections/ansible_collections/azure/azcollection/requirements.txt

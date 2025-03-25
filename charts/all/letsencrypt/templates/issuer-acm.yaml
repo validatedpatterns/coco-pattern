@@ -1,0 +1,77 @@
+{{ if .Values.letsencrypt.enabled }}
+{{ if and (eq .Values.global.clusterPlatform "Azure") .Values.letsencrypt.cloudProviderDNS }}
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: azure-cluster-issuer-policy
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: azure-cluster-issuer
+      spec:
+        remediationAction: enforce
+        severity: medium
+        object-templates:
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: cert-manager.io/v1
+            kind: ClusterIssuer
+            metadata:
+              name: validated-patterns-issuer
+            spec:
+              acme:
+                server: {{ .Values.letsencrypt.server }}
+                email: {{ .Values.letsencrypt.email }}
+                privateKeySecretRef:
+                  name: validated-patterns-issuer-account-key
+                solvers:
+                - dns01:
+                    azureDNS:
+                      # This info is also available in CM's however it's easier to get from the secret
+                      clientID: '{{ `{{ fromSecret "openshift-cloud-controller-manager" "azure-cloud-credentials" "azure_client_id" | base64dec }}` }}'
+                      clientSecretSecretRef:
+                      # The following is the secret we created in Kubernetes. Issuer will use this to present challenge to Azure DNS.
+                        name: azuredns-config
+                        key: client-secret
+                      subscriptionID: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}'
+                      tenantID: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).tenantId }}` }}'
+                      resourceGroupName: '{{ `{{ fromConfigMap "imperative" "dnsinfo" "resource_group" }}` }}'
+                      hostedZoneName: '{{ `{{ fromConfigMap "imperative" "dnsinfo" "hosted_zone" }}` }}'
+                      # Azure Cloud Environment, default to AzurePublicCloud
+                      environment: AzurePublicCloud
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: azure-issuer-placement-binding
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+placementRef:
+  name: azure-issuer-placement-rule
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+  - name: azure-cluster-issuer-policy
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: azure-issuer-placement-rule
+spec:
+  clusterConditions:
+    - status: 'True'
+      type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchLabels:
+      cloud: Azure
+---
+{{- end }}
+{{- end }}

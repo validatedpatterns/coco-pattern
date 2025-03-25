@@ -3,6 +3,17 @@
 ## Forked from https://github.com/validatedpatterns/letsencrypt-chart
 
 
+## Design for Azure
+Cert-manager needs the azure resource group for a zone in order to manage the DNS. 
+Unfortunately this is a little tricky to get.
+
+To get this running on azure two compromises have been made
+1. The required information (managed_zone_name and managed_zone resource group) can be obtained via the ansible imperative framework. 
+
+2. The imperative framework is limited terms of feedback / logging. Please test carefully.
+
+3. If the credentials can see more than one managed zone there may be issues. It presumes one.
+
 
 
 

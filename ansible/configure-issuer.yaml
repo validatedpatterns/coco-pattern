@@ -1,0 +1,50 @@
+---
+- name: Retrieve Credentials for AAP on OpenShift
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+  tasks:
+  - name: Get Azure credentials
+    kubernetes.core.k8s_info:
+      kind: Secret
+      namespace: openshift-cloud-controller-manager
+      name: azure-cloud-credentials
+    register: azure_credentials
+    retries: 20
+    delay: 5
+  - name: List DNS zones
+    azure.azcollection.azure_rm_dnszone_info:
+      #resource_group: "{{ azure_credentials['data']['re'] }}" # don't pass if 
+      auth_source: "auto"
+      subscription_id: "{{ azure_credentials.resources[0]['data']['azure_subscription_id'] | b64decode }}"
+      client_id: "{{ azure_credentials.resources[0]['data']['azure_client_id'] | b64decode }}"
+      secret: "{{ azure_credentials.resources[0]['data']['azure_client_secret'] | b64decode }}"
+      tenant: "{{ azure_credentials.resources[0]['data']['azure_tenant_id'] | b64decode }}"
+    register: dns_zones
+  # FIXME: This assumes only one dns zone is present. we should be matching against available dns zones.
+  - name: Split the Path
+    set_fact:
+      path_parts: "{{ dns_zones.ansible_info.azure_dnszones[0].id.split('/') }}"
+  - name: Find the Resource Group Name
+    set_fact:
+      resource_group: "{{ path_parts[4] }}"
+  - name: Get hosted zone
+    set_fact:
+      hosted_zone: "{{ dns_zones.ansible_info.azure_dnszones[0].name }}"
+  - name: "Set k8s cm"
+    kubernetes.core.k8s:
+      api_version: v1
+      kind: ConfigMap
+      resource_definition:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: dnsinfo
+          namespace: imperative
+        data:
+          resource_group: "{{ resource_group }}"
+          hosted_zone: "{{ hosted_zone }}"
+      state: present

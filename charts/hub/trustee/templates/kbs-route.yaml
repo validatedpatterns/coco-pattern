@@ -13,5 +13,5 @@ spec:
     name: kbs-service
     weight: 100
   tls:
-    terminitation: edge
+    termination: edge
     insecureEdgeTerminationPolicy: Redirect

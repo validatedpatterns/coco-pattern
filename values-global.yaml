@@ -11,19 +11,7 @@ global:
       enabled: true
       defaultVMFlavour: "Standard_DC2as_v5"
 
-  azure:
-    clientID: ''
-    subscriptionID: ''
-    tenantID: ''
-    DNSResGroup: ''
-    hostedZoneName: ''
-    clusterResGroup: ''
-    clusterSubnet: ''
-    clusterNSG: ''
-    clusterRegion: ''
-
-  dscDeployed: false
-
+  # this is required for object storage using OCP AI
   objectStorage:
     # Whether or not to use PVC storage
     pvcStorage: true
@@ -41,3 +29,4 @@ main:
   clusterGroupName: simple
   multiSourceConfig:
     enabled: true
+    clusterGroupChartVersion: 0.9.*
