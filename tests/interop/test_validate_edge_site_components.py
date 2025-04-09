@@ -167,7 +167,7 @@ def test_validate_argocd_applications_health_edge_site(openshift_dyn_client):
 
             logger.info(f"Status for {app_name} : {app_health} : {app_sync}")
 
-            if "Healthy" != app_health or "Synced" != app_sync:
+            if app_health != "Healthy" or app_sync != "Synced":
                 logger.info(f"Dumping failed resources for app: {app_name}")
                 unhealthy_apps.append(app_name)
                 try:

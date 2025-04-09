@@ -13,6 +13,8 @@ clusterGroup:
   - cert-manager-operator
   - cert-manager
   - letsencrypt
+  - kbs-access
+  - encrypted-storage
 
   subscriptions:
     # ACM is kept anticipating 
@@ -44,7 +46,7 @@ clusterGroup:
   - trustee
   - golang-external-secrets
   - sandbox
-  - hello-openshift
+  - workloads
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -92,8 +94,26 @@ clusterGroup:
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
-      project: hello-openshift
+      project: workloads
       path: charts/coco-supported/hello-openshift
+
+    kbs-access:
+      name: kbs-access
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access
+
+    encrypted-storage:
+      name: encrypted-storage
+      namespace: encrypted-storage
+      project: workloads
+      path: charts/coco-supported/encrypted-storage
+
+    image-build:
+      name: image-build
+      namespace: kbs-access
+      projects: workloads
+      path: charts/coco-supported/image-build
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm

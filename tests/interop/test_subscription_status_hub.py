@@ -62,7 +62,7 @@ def test_subscription_status_hub(openshift_dyn_client):
                 "git@gitlab.cee.redhat.com:mpqe/mps/vp/operator-versions.git"
             )
             clone = subprocess.run(
-                ["git", "clone", operator_versions_repo], capture_output=True, text=True
+                ["git", "clone", operator_versions_repo], capture_output=True, text=True, check=False
             )
             logger.info(clone.stdout)
             logger.info(clone.stderr)
@@ -106,12 +106,12 @@ def test_subscription_status_hub(openshift_dyn_client):
                 logger.info(f"CWD: {cwd}")
 
                 logger.info("Push new operator list")
-                subprocess.run(["git", "add", previousfile], cwd=cwd)
+                subprocess.run(["git", "add", previousfile], cwd=cwd, check=False)
                 subprocess.run(
                     ["git", "commit", "-m", "Update operator versions list"],
-                    cwd=cwd,
+                    cwd=cwd, check=False,
                 )
-                subprocess.run(["git", "push"], cwd=cwd)
+                subprocess.run(["git", "push"], cwd=cwd, check=False)
 
         logger.info("PASS: Subscription status check passed")
 
