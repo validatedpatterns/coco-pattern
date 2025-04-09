@@ -7,7 +7,7 @@ spec:
   source:
     type: Git
     git:
-      uri: {{ .Values.gitRepository }}
+      uri: {{ .Values.global.repoURL }}
     contextDir: charts/all/image-build
   strategy:
     type: Docker                      
