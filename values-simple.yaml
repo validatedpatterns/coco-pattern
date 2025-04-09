@@ -112,7 +112,7 @@ clusterGroup:
     image-build:
       name: image-build
       namespace: kbs-access
-      projects: workloads
+      project: workloads
       path: charts/coco-supported/image-build
 
   imperative:
