@@ -4,7 +4,7 @@ import os
 app = Flask(__name__)
 
 # Define the path to the file you want to serve
-FILE_PATH = os.environ("FILEPATH")
+FILE_PATH = os.environ['FILEPATH']
 
 @app.route("/")
 def serve_file():
