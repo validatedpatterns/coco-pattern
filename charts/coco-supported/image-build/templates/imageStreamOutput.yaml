@@ -1,0 +1,8 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: python-stream
+  namespace: kbs-access
+spec:
+  lookupPolicy:
+    local: false

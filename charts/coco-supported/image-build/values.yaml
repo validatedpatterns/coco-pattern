@@ -1,0 +1,10 @@
+
+
+
+gitRepository: "https://github.com/butler54/rhoai-custom-image.git" # must be updated to fork the repository
+
+sourceImageName: "s2i-minimal-notebook" # See the readme for finding the correct source image names
+sourceImageTag: "2024.1"
+
+targetImageName: "my-custom-image" # no spaces
+targetImageDescription: "This is a custom image with a few extra packages"

@@ -1,0 +1,16 @@
+# Proxy image stream to flatten the stream to the 'latest' tag.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: python-ubi
+  namespace: kbs-access
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - name: latest
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi9/python-311:latest
+    referencePolicy:
+      type: Source

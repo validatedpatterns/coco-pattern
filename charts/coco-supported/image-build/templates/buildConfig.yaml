@@ -1,0 +1,25 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: custom-image-build
+  namespace: kbs-access
+spec:
+  source:
+    type: Git
+    git:
+      uri: {{ .Values.gitRepository }}
+    contextDir: charts/all/image-build
+  strategy:
+    type: Docker                      
+    dockerStrategy:
+      dockerfilePath: Containerfile
+      from:
+        kind: ImageStreamTag  
+        name: python-ubi:latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: python-stream:latest
+  triggers:
+  - type: ImageChange
+  - type: ConfigChange
