@@ -8,6 +8,7 @@ spec:
     type: Git
     git:
       uri: {{ .Values.global.repoURL }}
+      ref: {{ .Values.global.targetRevision }}
     contextDir: charts/coco-supported/image-build
   strategy:
     type: Docker                      
