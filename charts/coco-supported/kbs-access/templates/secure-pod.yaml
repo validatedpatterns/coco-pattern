@@ -19,16 +19,6 @@ spec:
       envFrom:
       - configMapRef:
           name: kbsref
-      securityContext:
-        privileged: false
-        allowPrivilegeEscalation: false
-        runAsNonRoot: true
-        runAsUser: 1001
-        capabilities:
-          drop:
-            - ALL
-        seccompProfile:
-          type: RuntimeDefault
   initContainers:
   - name: curl
     image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
