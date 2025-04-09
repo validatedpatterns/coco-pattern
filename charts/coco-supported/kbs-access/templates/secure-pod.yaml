@@ -10,7 +10,7 @@ spec:
   #runtimeClassName: kata-remote
   containers:
     - name: python-access
-      image: image-registry.openshift-image-registry.svc:5000/kbs-access/python-stream
+      image: image-registry.openshift-image-registry.svc:5000/kbs-access/python-stream:latest
       ports:
         - containerPort: 5000
       volumeMounts:
