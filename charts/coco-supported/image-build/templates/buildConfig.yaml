@@ -8,7 +8,7 @@ spec:
     type: Git
     git:
       uri: {{ .Values.global.repoURL }}
-    contextDir: charts/all/image-build
+    contextDir: charts/coco-supported/image-build
   strategy:
     type: Docker                      
     dockerStrategy:
