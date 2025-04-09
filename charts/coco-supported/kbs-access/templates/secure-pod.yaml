@@ -7,7 +7,7 @@ metadata:
   annotations:
     peerpods: "true"
 spec:
-  runtimeClassName: kata-remote
+  #runtimeClassName: kata-remote
   containers:
     - name: python-access
       image: image-registry.openshift-image-registry.svc:5000/kbs-access/python-stream
@@ -20,9 +20,15 @@ spec:
       - configMapRef:
           name: kbsref
   initContainers:
-  - name: curl
+  # - name: curl
+  #   image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
+  #   command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key1 > /output/kbsres1.txt']
+  #   volumeMounts:
+  #   - name: output-volume
+  #     mountPath: /output
+  - name: hi
     image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
-    command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key1 > /output/kbsres1.txt']
+    command: ['sh', '-c', 'echo "hi" > /output/kbsres1.txt']
     volumeMounts:
     - name: output-volume
       mountPath: /output
