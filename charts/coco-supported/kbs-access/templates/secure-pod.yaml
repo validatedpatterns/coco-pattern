@@ -9,10 +9,16 @@ metadata:
 spec:
   runtimeClassName: kata-remote
   containers:
-    - name: hello-openshift
-      image: quay.io/openshift/origin-hello-openshift
+    - name: python-access
+      image: image-registry.openshift-image-registry.svc:5000/kbs-access/python-stream
       ports:
-        - containerPort: 8888
+        - containerPort: 5000
+      volumeMounts:
+      - name: output-volume
+        mountPath: /output
+      envFrom:
+      - configMapRef:
+          name: kbsref
       securityContext:
         privileged: false
         allowPrivilegeEscalation: false
@@ -23,4 +29,14 @@ spec:
             - ALL
         seccompProfile:
           type: RuntimeDefault
+  initContainers:
+  - name: curl
+    image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
+    command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key1 > /output/kbsres1.txt']
+    volumeMounts:
+    - name: output-volume
+      mountPath: /output
+  volumes:
+  - name: output-volume
+    emptyDir: {}
 
