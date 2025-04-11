@@ -20,18 +20,18 @@ spec:
       - configMapRef:
           name: kbsref
   initContainers:
-  # - name: curl
-  #   image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
-  #   command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key1 > /output/kbsres1.txt']
-  #   volumeMounts:
-  #   - name: output-volume
-  #     mountPath: /output
-  - name: hi
+  - name: curl
     image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
-    command: ['sh', '-c', 'echo "hi" > /output/kbsres1.txt']
+    command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key1 > /output/kbsres1.txt']
     volumeMounts:
     - name: output-volume
       mountPath: /output
+  # - name: hi
+  #   image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
+  #   command: ['sh', '-c', 'echo "hi" > /output/kbsres1.txt']
+  #   volumeMounts:
+  #   - name: output-volume
+  #     mountPath: /output
   volumes:
   - name: output-volume
     emptyDir: {}
