@@ -92,7 +92,7 @@ clusterGroup:
       project: hub
       path: charts/all/letsencrypt
       overrides:
-      - name: global.letsencrypt.enabled
+      - name: letsencrypt.enabled
         value: false
     hello-openshift:
       name: hello-openshift
