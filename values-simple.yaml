@@ -83,7 +83,7 @@ clusterGroup:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
-      path: charts/all/sandbox
+      path: charts/coco-supported/sandbox
 
     letsencrypt:
       name: letsencrypt
