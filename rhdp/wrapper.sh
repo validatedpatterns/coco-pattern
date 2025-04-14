@@ -67,17 +67,18 @@ echo "openshift-install done"
 echo "---------------------"
 echo "setting up secrets"
 
+bash ./scripts/gen-secrets.sh
 
 
-# sleep 60
-# echo "---------------------"
-# echo "pattern install"
-# echo "---------------------"
-# export KUBECONFIG=`pwd`/openshift-install/auth/kubeconfig
+sleep 60
+echo "---------------------"
+echo "pattern install"
+echo "---------------------"
+export KUBECONFIG=`pwd`/openshift-install/auth/kubeconfig
 
 
-# ./pattern.sh make install
-# echo "---------------------"
-# echo "pattern install done"
-# echo "---------------------"
+./pattern.sh make install
+echo "---------------------"
+echo "pattern install done"
+echo "---------------------"
 
