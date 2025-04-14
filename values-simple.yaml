@@ -47,6 +47,7 @@ clusterGroup:
   - golang-external-secrets
   - sandbox
   - workloads
+  - default
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
