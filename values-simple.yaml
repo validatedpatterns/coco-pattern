@@ -90,7 +90,9 @@ clusterGroup:
       namespace: letsencrypt
       project: hub
       path: charts/all/letsencrypt
-
+      overrides:
+      - name: global.letsencrypt.enabled
+        value: false
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift

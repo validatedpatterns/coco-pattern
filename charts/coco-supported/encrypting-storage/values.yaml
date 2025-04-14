@@ -1,3 +1,7 @@
 global:
   coco:
     runtimeClassName: kata-remote
+
+  encrypted-storage:
+    blockStorageClass:
+    volSize: 10Gi
