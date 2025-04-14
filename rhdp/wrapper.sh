@@ -67,9 +67,10 @@ echo "openshift-install done"
 echo "---------------------"
 echo "setting up secrets"
 
+bash ./scripts/gen-secrets.sh
 
 
-# sleep 60
+sleep 60
 echo "---------------------"
 echo "pattern install"
 echo "---------------------"
