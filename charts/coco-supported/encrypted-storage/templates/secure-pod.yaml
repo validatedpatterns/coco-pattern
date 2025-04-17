@@ -32,8 +32,6 @@ spec:
     volumeMounts:
     - name: secrets
       mountPath: /secrets
-    - name: secure-mount
-      mountPath: /secure
   - name: format-disk and mount disk
     image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
     securityContext:
