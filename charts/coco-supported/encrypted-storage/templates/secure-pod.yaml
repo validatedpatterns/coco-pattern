@@ -56,9 +56,6 @@ spec:
     volumeMounts:
     - name: secrets
       mountPath: /secrets
-    - name: secure-mount
-      mountPath: /mnt/secure
-
   volumes:
   - name: secrets
     emptyDir: {}
