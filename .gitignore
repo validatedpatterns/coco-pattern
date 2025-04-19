@@ -17,3 +17,4 @@ azure-env.sh
 .openshift*
 .DS_Store
 openshift-install
+node_modules/
