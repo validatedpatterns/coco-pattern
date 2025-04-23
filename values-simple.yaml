@@ -32,6 +32,7 @@ clusterGroup:
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
+      version: "0.2.0"
 
     cert-manager:
       name: openshift-cert-manager-operator
