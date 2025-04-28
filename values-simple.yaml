@@ -13,6 +13,9 @@ clusterGroup:
   - cert-manager-operator
   - cert-manager
   - letsencrypt
+  - kbs-access
+  - encrypted-storage
+  - experiment
 
   subscriptions:
     # ACM is kept anticipating 
@@ -25,14 +28,13 @@ clusterGroup:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       channel: stable
-      version: "1.8.1" # ask for latest
-
+      version: "1.9.*" # 1.9.* matches with trustee 0.3.*
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
-      version: "0.2.0"
+      version: "0.3.*"
 
     cert-manager:
       name: openshift-cert-manager-operator
@@ -45,7 +47,8 @@ clusterGroup:
   - trustee
   - golang-external-secrets
   - sandbox
-  - hello-openshift
+  - workloads
+  - default
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -82,19 +85,46 @@ clusterGroup:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
-      path: charts/all/sandbox
+      path: charts/coco-supported/sandbox
 
     letsencrypt:
       name: letsencrypt
       namespace: letsencrypt
       project: hub
       path: charts/all/letsencrypt
-
+      # Default to 'safe' for ARO
+      overrides:
+      - name: letsencrypt.enabled
+        value: false
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
-      project: hello-openshift
+      project: workloads
       path: charts/coco-supported/hello-openshift
+
+    kbs-access:
+      name: kbs-access
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access
+
+    encrypted-storage:
+      name: encrypted-storage
+      namespace: encrypted-storage
+      project: workloads
+      path: charts/coco-supported/encrypted-storage
+
+    image-build:
+      name: image-build
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/image-build
+
+    experiment:
+      name: experiment
+      namespace: experiment
+      project: workloads
+      path: charts/hub/experiment
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
@@ -114,12 +144,6 @@ clusterGroup:
       #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
       verbosity: -vvv
       timeout: 3600
-    # - name: hello-world
-    #   # ansible playbook to be run
-    #   playbook: common/ansible/playbooks/hello-world/hello-world.yaml
-    #   # per playbook timeout in seconds
-    #   timeout: 234
-    #   # verbosity: "-v"
   managedClusterGroups:
     exampleRegion:
       name: group-one
@@ -129,80 +153,3 @@ clusterGroup:
       helmOverrides:
       - name: clusterGroup.isHubCluster
         value: false
-        # Before enabling cluster provisioning, ensure AWS and/or Azure
-        #   credentials and OCP pull secrets are defined in Vault.
-        #   See values-secret.yaml.template
-        #
-        #clusterPools:
-        #  exampleAWSPool:
-        #    name: aws-ap
-        #    openshiftVersion: 4.10.18
-        #    baseDomain: blueprints.rhecoeng.com
-        #    platform:
-        #      aws:
-        #        region: ap-southeast-2
-        #    clusters:
-        #    - One
-        #
-        #  exampleAzurePool:
-        #    name: azure-us
-        #    openshiftVersion: 4.10.18
-        #    baseDomain: blueprints.rhecoeng.com
-        #    platform:
-        #      azure:
-        #        baseDomainResourceGroupName: dojo-dns-zones
-        #        region: eastus
-        #    clusters:
-        #    - Two
-        #    - Three
-        #  To have apps in multiple flavors, use namespaces and use helm overrides as appropriate
-        #
-        #    pipelines:
-        #      name: pipelines
-        #      namespace: production
-        #      project: datacenter
-        #      path: applications/pipeline
-        #      repoURL: https://github.com/you/applications.git
-        #      targetRevision: stable
-        #      overrides:
-        #      - name: myparam
-        #        value: myparam
-        #
-        #    pipelines_staging:
-        #    - name: pipelines
-        #      namespace: staging
-        #      project: datacenter
-        #      path: applications/pipeline
-        #      repoURL: https://github.com/you/applications.git
-        #      targetRevision: main
-        #
-        #   Additional applications
-        #   Be sure to include additional resources your apps will require
-        #   +X machines
-        #   +Y RAM
-        #   +Z CPU
-        #    vendor-app:
-        #      name: vendor-app
-        #      namespace: default
-        #      project: vendor
-        #      path: path/to/myapp
-        #      repoURL: https://github.com/vendor/applications.git
-        #      targetRevision: main
-
-        #  managedSites:
-        #    factory:
-        #      name: factory
-        #      # repoURL: https://github.com/dagger-refuse-cool/manuela-factory.git
-        #      targetRevision: main
-        #      path: applications/factory
-        #      helmOverrides:
-        #      - name: site.isHubCluster
-        #        value: false
-        #      clusterSelector:
-        #        matchExpressions:
-        #        - key: vendor
-        #          operator: In
-        #          values:
-        #            - OpenShift
-
-

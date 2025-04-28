@@ -1,0 +1,79 @@
+{{- if and .Values.sandbox.azure .Values.sandbox.deploy }}
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: peerpods-cm-policy
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: peerpods-cm-cp
+      spec:
+        remediationAction: enforce
+        severity: medium
+        object-templates:
+        # this doesn't work 
+        # - complianceType: musthave
+        #   objectDefinition:
+        #     apiVersion: v1
+        #     kind: ConfigMap
+        #     metadata:
+        #       name: peer-pods-cm
+        #       namespace: openshift-sandboxed-containers-operator
+        #     data:
+        #       AZURE_IMAGE_ID: "" # This will get rewritten when the image is built
+
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: peer-pods-cm
+              namespace: openshift-sandboxed-containers-operator
+            data:
+              CLOUD_PROVIDER: "azure"
+              VXLAN_PORT: "9000"
+              AZURE_IMAGE_ID: '{{ `{{if (lookup "v1" "ConfigMap" "openshift-sandboxed-containers-operator" "peer-pods-cm").metadata.name }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "peer-pods-cm" "AZURE_IMAGE_ID" }}{{ else }}{{ end }}` }}'
+              AZURE_INSTANCE_SIZE: "{{ .Values.global.coco.azure.defaultVMFlavour }}" 
+              AZURE_INSTANCE_SIZES: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
+              AZURE_RESOURCE_GROUP: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetResourceGroup }}` }}'
+              AZURE_REGION: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).location }}` }}'
+              AZURE_SUBNET_ID: '/subscriptions/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}/resourceGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetResourceGroup }}` }}/providers/Microsoft.Network/virtualNetworks/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetName }}` }}/subnets/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subnetName }}` }}'
+              AZURE_NSG_ID: '/subscriptions/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}/resourceGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).resourceGroup }}` }}/providers/Microsoft.Network/networkSecurityGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).securityGroupName }}` }}'
+              DISABLECVM: "false"
+              PROXY_TIMEOUT: "5m"
+              INITDATA: '{{ tpl ( .Files.Get "initdata.toml.tpl") . | b64enc }}'
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: peerpods-placement-binding
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+placementRef:
+  name: peerpods-placement-rule
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+  - name: peerpods-cm-policy
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: peerpods-placement-rule
+spec:
+  clusterConditions:
+    - status: 'True'
+      type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchLabels:
+      cloud: Azure
+---
+{{- end }}

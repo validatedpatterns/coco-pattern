@@ -47,6 +47,8 @@ fi
 
 if [ ! -f "${HOME}/.ssh/id_rsa" ]; then
    echo "An rsa ssh key is required at ~/.ssh/id_rsa"
+   echo "e.g. ssh-keygen -t rsa -b 4096"
+   echo "TBC: Update to support other key types"
    exit 1
 fi
 

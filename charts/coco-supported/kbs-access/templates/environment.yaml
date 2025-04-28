@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kbsref
+  namespace: kbs-access
+data:
+  FILEPATH: "/output/kbsres1.txt"

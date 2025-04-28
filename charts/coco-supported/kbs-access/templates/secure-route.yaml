@@ -1,0 +1,12 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: secure
+spec:
+  port:
+    targetPort: 5000
+  to:
+    kind: Service
+    name: secure
+    weight: 100
+  wildcardPolicy: None

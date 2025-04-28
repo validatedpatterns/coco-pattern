@@ -1,0 +1,6 @@
+apiVersion: v2
+description: Demonstrates accessing keys within the KBS.
+keywords:
+- pattern
+name: kbs-access
+version: 0.0.1
