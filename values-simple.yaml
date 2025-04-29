@@ -16,6 +16,8 @@ clusterGroup:
   - kbs-access
   - encrypted-storage
   - experiment
+  - ripple
+  
 
   subscriptions:
     # ACM is kept anticipating 
