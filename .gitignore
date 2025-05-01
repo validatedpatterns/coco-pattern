@@ -18,3 +18,4 @@ azure-env.sh
 .DS_Store
 openshift-install
 node_modules
+.envrc

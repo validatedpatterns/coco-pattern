@@ -76,10 +76,10 @@ sleep 60
 echo "---------------------"
 echo "pattern install"
 echo "---------------------"
-export KUBECONFIG=`pwd`/openshift-install/auth/kubeconfig
+#export KUBECONFIG=`pwd`/openshift-install/auth/kubeconfig
 
 
-./pattern.sh make install
+#./pattern.sh make install
 echo "---------------------"
 echo "pattern install done"
 echo "---------------------"
