@@ -26,6 +26,7 @@ Future work includes:
 - Only known to work today with everything on one cluster. The work to expand this is in flight.
 - If not using ARO you must either provide your own CA signed certs, or use let's encrypt.
 - Must be on 4.16.14 or later.
+**- Users must provide a NAT Gateway attached to the worker node subnet when using Azure.**
 
 ## Major versions
 
@@ -39,6 +40,7 @@ This limits support to OpenShift 4.16 and higher.
 The pattern has been tested on Azure for two installation methods:
 1. Installing onto an ARO cluster
 2. Self managed OpenShift install using the `openshift-install` CLI. **REQUIRES ADDITIONAL CONFIGURATION**
+
 
 ### `1.0.0`
 1.0.0 supports OpenShift Sandboxed containers version `1.8.1` along with Trustee version `0.2.0`.
@@ -77,6 +79,10 @@ The secrets here secure Trustee and the peer-pod vms. Mostly they are for demons
 This only has to be done once.
 
 1. Run `sh scripts/gen-secrets.sh`
+
+#### Check your cluster on Azure has a NAT gateway attached
+OpenShift does not require a NAT gateway by default, however, peer-pods do require a NAT gateway attached to the worker node subnet.
+
 
 #### Configuring let's encrypt.
 
