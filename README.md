@@ -26,7 +26,9 @@ Future work includes:
 - Only known to work today with everything on one cluster. The work to expand this is in flight.
 - If not using ARO you must either provide your own CA signed certs, or use let's encrypt.
 - Must be on 4.16.14 or later.
-**- Users must provide a NAT Gateway attached to the worker node subnet when using Azure.**
+
+> [!IMPORTANT]
+> Users must provide a NAT Gateway attached to the worker node subnet when using Azure.
 
 ## Major versions
 
@@ -39,8 +41,10 @@ This limits support to OpenShift 4.16 and higher.
 
 The pattern has been tested on Azure for two installation methods:
 1. Installing onto an ARO cluster
-2. Self managed OpenShift install using the `openshift-install` CLI. **REQUIRES ADDITIONAL CONFIGURATION**
+2. Self managed OpenShift install using the `openshift-install` CLI.
 
+> [!IMPORTANT]
+> You need an external CA signed certificate for to be added (e.g. with let's encrypt) to a self-managed install
 
 ### `1.0.0`
 1.0.0 supports OpenShift Sandboxed containers version `1.8.1` along with Trustee version `0.2.0`.
@@ -70,8 +74,11 @@ It deploys a hello-openshift application 3 times:
 The instructions here presume you have a cluster. See further down for provisioning instructions for a cluster.
 
 #### Fork and Clone the GitHub repo
-1. Following [standard validated patterns workflow](https://validatedpatterns.io/learn/workflow/) fork the repository and clone to your development enviroment which has `podman` and `git`
+1. Following [standard validated patterns workflow](https://validatedpatterns.io/learn/workflow/) fork the repository and clone to your development environment which has `podman` and `git`
 2. If using a particular version (e.g. `1.0.0`) checkout the correct tag.
+
+> [!TIP]
+> Forking is essential as the validated pattern uses ArgoCD to reconcile it's state against your remote (forked) repository. 
 
 
 #### Configuring required secrets / parameters
@@ -80,11 +87,19 @@ This only has to be done once.
 
 1. Run `sh scripts/gen-secrets.sh`
 
+> [!NOTE]
+> Once generated this script will not override secrets. Be careful when doing multiple tests.
+
 #### Check your cluster on Azure has a NAT gateway attached
 OpenShift does not require a NAT gateway by default, however, peer-pods do require a NAT gateway attached to the worker node subnet.
 
-
+> [!NOTE]
+> 
 #### Configuring let's encrypt.
+
+> [!IMPORTANT]
+> Ensure you have password login available to the cluster. Let's encrypt will replace the API certificate in addition to the certificates to user with routes.
+
 
 Trustee requires a trusted CA issued certificate. Let's Encrypt is included for environments without a trusted cert on OpenShift's routes.
 
@@ -114,11 +129,14 @@ If you need a Let's Encrypt certificate to be issued the `letsencrypt` applicati
         value: true  
 ```
 
-This *must* first be pushed before deploying the pattern onto the cluster 
+> [!WARNING]
+> Configuration changes are only effective once committed and pushed to your remote repository.
 
 #### Installing onto a cluster
 Once you configuration is pushed (if required) `./pattern.sh make install` to provision a cluster. 
 
+> [!TIP]
+> The branch and default origin you have checked-out in your local repository is used to determine what ArgoCD and the patterns operator should reconcile against. Typical choices are to use the main for your fork.
 
 ## Cluster setup (if not already setup)
 
