@@ -156,7 +156,8 @@ Red Hat a demo platform. This allows easy access for Red Hat associates and part
   ```
 1. Ensure Let's encrypt 
 1. Run the wrapper install script 
-  1. `sh ./rhdp/wrapper.sh`
+  1. `bash ./rhdp/wrapper.sh azure-region-code`
+  2. Where azure region code is `eastasia`, `useast2` etc.
 1. You *should* be done
   1. You *may* need to recreate the hello world peer-pods depending on timeouts.
 

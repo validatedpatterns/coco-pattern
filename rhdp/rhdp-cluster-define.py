@@ -84,8 +84,10 @@ def print():
     rprint("Run openshift install .")
 
 
-def run(region: Annotated[str, typer.Argument()] = "eastasia"):
-    """warpper function for cli parsing as required"""
+def run(region: Annotated[str, typer.Argument(help="Azure region code")]):
+    """
+    Region flag requires an azure region key which can be (authoritatively) requested with: "az account list-locations -o table".
+    """
     validate_dir()
     cleanup(pathlib.Path.cwd())
     setup_install(

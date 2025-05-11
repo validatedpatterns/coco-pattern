@@ -1,4 +1,14 @@
+
+#!/usr/bin/env bash
 set -e 
+
+if [ "$#" -ne 1 ]; then
+    echo "Error: Exactly one argument is required."
+    echo "Usage: $0 {azure-region-code}"
+    echo "Example: $0 eastasia"
+    exit 1
+fi
+AZUREREGION=$1
 
 echo "Run from the root directory of the project"
 echo "\n"
@@ -56,7 +66,7 @@ fi
 echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
-python3 rhdp/rhdp-cluster-define.py
+python3 rhdp/rhdp-cluster-define.py ${AZUREREGION}
 echo "---------------------"
 echo "cluster defined"
 echo "---------------------"
