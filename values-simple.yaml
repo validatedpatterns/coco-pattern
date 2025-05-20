@@ -95,7 +95,7 @@ clusterGroup:
       # Default to 'safe' for ARO
       overrides:
       - name: letsencrypt.enabled
-        value: true
+        value: false
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift

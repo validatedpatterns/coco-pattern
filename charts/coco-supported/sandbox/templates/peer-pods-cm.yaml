@@ -17,16 +17,6 @@ spec:
         remediationAction: enforce
         severity: medium
         object-templates:
-        # this doesn't work 
-        # - complianceType: musthave
-        #   objectDefinition:
-        #     apiVersion: v1
-        #     kind: ConfigMap
-        #     metadata:
-        #       name: peer-pods-cm
-        #       namespace: openshift-sandboxed-containers-operator
-        #     data:
-        #       AZURE_IMAGE_ID: "" # This will get rewritten when the image is built
 
         - complianceType: mustonlyhave
           objectDefinition:

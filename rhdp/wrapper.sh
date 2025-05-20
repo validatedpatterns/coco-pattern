@@ -44,7 +44,7 @@ sleep 10
 echo "---------------------"
 echo "Installing python dependencies"
 echo "---------------------"
-pip3 install -r rhdp/requirements.txt
+pip install -r rhdp/requirements.txt
 echo "---------------------"
 echo "requirements installed"
 echo "---------------------"
