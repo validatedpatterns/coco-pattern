@@ -25,3 +25,7 @@ spec:
           secretKeyRef:
             name: sealed-secret
             key: secret
+  volumes:
+    - name: secret-volume
+      secret:
+        secretName: sealed-secret  
