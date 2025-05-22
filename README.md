@@ -27,9 +27,6 @@ Future work includes:
 - If not using ARO you must either provide your own CA signed certs, or use let's encrypt.
 - Must be on 4.16.14 or later.
 
-> [!IMPORTANT]
-> Users must provide a NAT Gateway attached to the worker node subnet when using Azure.
-
 ## Major versions
 
 ### `2.*`
@@ -90,11 +87,6 @@ This only has to be done once.
 > [!NOTE]
 > Once generated this script will not override secrets. Be careful when doing multiple tests.
 
-#### Check your cluster on Azure has a NAT gateway attached
-OpenShift does not require a NAT gateway by default, however, peer-pods do require a NAT gateway attached to the worker node subnet.
-
-> [!NOTE]
-> 
 #### Configuring let's encrypt.
 
 > [!IMPORTANT]
@@ -148,6 +140,7 @@ Red Hat a demo platform. This allows easy access for Red Hat associates and part
 2. Get access to an [Azure Subscription Based Blank Open Environment](https://catalog.demo.redhat.com/catalog?category=Open_Environments&search=azure&item=babylon-catalog-prod%2Fazure-gpte.open-environment-azure-subscription.prod).
 3. Import the required azure environmental variables (see coded block):
    ```
+      export GUID=
       export CLIENT_ID=
       export PASSWORD=
       export TENANT=

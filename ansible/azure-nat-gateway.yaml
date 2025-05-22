@@ -1,0 +1,89 @@
+---
+
+- name: Configure Azure NAT Gateway
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+    resource_prefix: "coco"
+  tasks:
+    - name: Get Azure credentials
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: openshift-cloud-controller-manager
+        name: azure-cloud-credentials
+      register: azure_credentials
+      retries: 20
+      delay: 5
+
+    - name: Get Azure credentials
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        namespace: openshift-cloud-controller-manager
+        name: cloud-conf
+      register: azure_cloud_conf
+      retries: 20
+      delay: 5
+
+    - name: Set facts
+      ansible.builtin.set_fact:
+        azure_subscription_id: "{{ (azure_cloud_conf.resources[0]['data']['cloud.conf'] | from_json)['subscriptionId'] }}"
+        azure_tenant_id: "{{ (azure_cloud_conf.resources[0]['data']['cloud.conf'] | from_json)['tenantId'] }}"
+        azure_resource_group: "{{ (azure_cloud_conf.resources[0]['data']['cloud.conf'] | from_json)['vnetResourceGroup'] }}"
+        azure_client_id: "{{ azure_credentials.resources[0]['data']['azure_client_id'] | b64decode }}"
+        azure_client_secret: "{{ azure_credentials.resources[0]['data']['azure_client_secret'] | b64decode }}"
+        azure_vnet: "{{ (azure_cloud_conf.resources[0]['data']['cloud.conf'] | from_json)['vnetName'] }}"
+        azure_subnet: "{{ (azure_cloud_conf.resources[0]['data']['cloud.conf'] | from_json)['subnetName'] }}"
+        coco_public_ip_name: "{{ resource_prefix }}-pip"
+        coco_nat_gateway_name: "{{ resource_prefix }}-nat-gateway"
+      no_log: true
+
+    - name: Create Public IP for NAT Gateway
+      azure_rm_publicipaddress:
+        subscription_id: "{{ azure_subscription_id }}"
+        tenant: "{{ azure_tenant_id }}"
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_client_secret }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ coco_public_ip_name }}"
+        sku: "standard"
+        allocation_method: "static"
+
+    - name: Retrieve Public IP for NAT Gateway
+      azure_rm_publicipaddress_info:
+        subscription_id: "{{ azure_subscription_id }}"
+        tenant: "{{ azure_tenant_id }}"
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_client_secret }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ coco_public_ip_name }}"
+      register: coco_gw_public_ip
+
+    - name: Create NAT Gateway
+      azure.azcollection.azure_rm_natgateway:
+        subscription_id: "{{ azure_subscription_id }}"
+        tenant: "{{ azure_tenant_id }}"
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_client_secret }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ coco_nat_gateway_name }}"
+        idle_timeout_in_minutes: 10
+        sku:
+          name: standard
+        public_ip_addresses:
+          - "{{ coco_gw_public_ip.publicipaddresses[0].id }}"
+      register: coco_natgw
+
+    - name: Update the worker subnet to associate NAT gateway
+      azure.azcollection.azure_rm_subnet:
+        subscription_id: "{{ azure_subscription_id }}"
+        tenant: "{{ azure_tenant_id }}"
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_client_secret }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "{{ azure_subnet }}"
+        virtual_network_name: "{{ azure_vnet }}"
+        nat_gateway: "{{ coco_nat_gateway_name }}"
+...

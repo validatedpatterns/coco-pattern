@@ -126,6 +126,10 @@ clusterGroup:
       #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
       verbosity: -vvv
       timeout: 3600
+    - name: configure-azure-nat-gateway
+      playbook: ansible/azure-nat-gateway.yaml
+      verbosity: -vvv
+      timeout: 3600
   managedClusterGroups:
     exampleRegion:
       name: group-one
