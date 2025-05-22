@@ -4,4 +4,4 @@ metadata:
   name: kbsref-sealed
   namespace: kbs-access
 data:
-  FILEPATH: "/output/kbsres1.txt"
+  FILEPATH: "/sealed/myvalue"
