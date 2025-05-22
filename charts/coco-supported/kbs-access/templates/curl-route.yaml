@@ -1,0 +1,12 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: curl
+spec:
+  port:
+    targetPort: 5000
+  to:
+    kind: Service
+    name: curl
+    weight: 100
+  wildcardPolicy: None

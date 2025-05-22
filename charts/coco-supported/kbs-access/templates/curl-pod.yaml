@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: secure
+  name: curl
   labels:
-    app: secure
+    app: curl
   annotations:
     peerpods: "true"
 spec:
@@ -18,7 +18,7 @@ spec:
         mountPath: /output
       envFrom:
       - configMapRef:
-          name: kbsref
+          name: kbsref-curl
   initContainers:
   - name: curl
     image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
@@ -26,12 +26,6 @@ spec:
     volumeMounts:
     - name: output-volume
       mountPath: /output
-  # - name: hi
-  #   image: registry.redhat.io/ubi9/ubi:latest # Lightweight image with curl installed
-  #   command: ['sh', '-c', 'echo "hi" > /output/kbsres1.txt']
-  #   volumeMounts:
-  #   - name: output-volume
-  #     mountPath: /output
   volumes:
   - name: output-volume
     emptyDir: {}

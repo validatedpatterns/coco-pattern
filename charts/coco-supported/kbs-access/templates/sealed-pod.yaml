@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sealed
+  labels:
+    app: sealed
+  annotations:
+    peerpods: "true"
+spec:
+  runtimeClassName: kata-remote
+  containers:
+    - name: python-access
+      image: ghcr.io/butler54/kbs-access-app:latest
+      ports:
+        - containerPort: 5000
+      envFrom:
+      - configMapRef:
+          name: kbsref-sealed
+      volumeMounts:
+      - name: secret-volume
+        mountPath: "sealed/myvalue"
+      env:
+      - name: PROTECTED_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: sealed-secret
+            key: secret

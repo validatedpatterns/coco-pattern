@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: secure
+  name: sealed
 spec:
   ports:
   - name: 5000-tcp
@@ -9,6 +9,6 @@ spec:
     protocol: TCP
     targetPort: 5000
   selector:
-    app: secure
+    app: sealed
   sessionAffinity: None
   type: ClusterIP
