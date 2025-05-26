@@ -6,6 +6,7 @@ metadata:
     app: sealed
   annotations:
     peerpods: "true"
+    io.katacontainers.config.agent.policy: '{{ tpl ( .Files.Get "insecure-policy.rego") . | b64enc }}'
 spec:
   runtimeClassName: kata-remote
   containers:
