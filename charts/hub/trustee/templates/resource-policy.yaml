@@ -6,4 +6,11 @@ metadata:
 data:
   policy.rego: |
     package policy
-    default allow = true
+    import rego.v1
+    default allow = false
+    allow if {
+      input["submods"]["cpu"]["ear.status"] != "contraindicated"
+      input["submods"]["cpu"]["ear.trustworthiness-vector"]["configuration"] == 2
+      input["submods"]["cpu"]["ear.trustworthiness-vector"]["hardware"] == 2
+      input["submods"]["cpu"]["ear.trustworthiness-vector"]["executables"] == 3
+    }

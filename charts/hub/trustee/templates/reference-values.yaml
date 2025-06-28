@@ -7,19 +7,225 @@ metadata:
   namespace: {{ .Values.kbs.deployNS }}
 data:
   reference-values.json: |
-      [
-      ]
-
-# No reference values yet
-    # [
-    #   {
-    #     "name": "sample.svn",
-    #     "expired": "2025-01-01T00:00:00Z",
-    #     "hash-value": [
-    #       {
-    #         "alg": "sha256",
-    #         "value": "1"
-    #       }
-    #     ]
-    #   }
-    # ]
+    [
+     {
+        "name": "tdx_pcr11",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "25f988b8b92a8394ee6c2413fe7bde77929ec143151df0a582f52d6c7ccba94c"
+          }
+        ]
+     },
+     {
+        "name": "tdx_pcr12",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "ab45624dae8e56a3b7835ece6d95d764ff675806778a1a716004cdff886f8f30"
+          }
+        ]
+     },
+     {
+        "name": "init_data",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "f754f893653bb36dafbb2b5c12de2a88f1725374ad59df818e84622c7f7bead1"
+          }
+        ]
+     },
+     {
+        "name": "rtmr_1",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+     },
+     {
+        "name": "rtmr_2",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+     },
+     {
+        "name": "mr_seam",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "9790d89a10210ec6968a773cee2ca05b5aa97309f36727a968527be4606fc19e6f73acce350946c9d46a9bf7a63f8430"
+          }
+        ]
+     },
+     {
+        "name": "tcb_svn",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "04010700000000000000000000000000"
+          }
+        ]
+     },
+     {
+        "name": "mr_td",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "a6c9a329848900230bc81678b81d0d64ae88e20be8f73c848da7e2bd025558ef38b5319096e6d78633a3f2a3a804f729"
+          }
+        ]
+     },
+     {
+        "name": "xfam",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "e718060000000000"
+          }
+        ]
+     },
+     {
+        "name": "measurement",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "Cwa8qBJimP2freTTrrpvAZVbEQEyAhPY4fZGgSn9z4qtt0CAGmcS+Otz96qQZ92k"
+          }
+        ]
+     },
+     {
+        "name": "tcb_bootloader",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "4"
+          }
+        ]
+     },
+     {
+        "name": "tcb_microcode",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "219"
+          }
+        ]
+     },
+     {
+        "name": "tcb_snp",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "24"
+          }
+        ]
+     },
+     {
+        "name": "tcb_tee",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "0"
+          }
+        ]
+     },
+     {
+        "name": "smt_enabled",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "1"
+          }
+        ]
+     },
+     {
+        "name": "tsme_enabled",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "0"
+          }
+        ]
+     },
+     {
+        "name": "abi_major",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "0"
+          }
+        ]
+     },
+     {
+        "name": "abi_minor",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "31"
+          }
+        ]
+     },
+     {
+        "name": "single_socket",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "0"
+          }
+        ]
+     },
+     {
+        "name": "smt_allowed",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "1"
+          }
+        ]
+     },
+     {
+        "name": "snp_pcr11",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "25f988b8b92a8394ee6c2413fe7bde77929ec143151df0a582f52d6c7ccba94c"
+          }
+        ]
+     },
+     {
+        "name": "snp_pcr12",
+        "expiration": "2025-09-09T00:00:00Z",
+        "hash-value": [
+          {
+                "alg": "sha256",
+                "value": "ab45624dae8e56a3b7835ece6d95d764ff675806778a1a716004cdff886f8f30"
+          }
+        ]
+     }
+    ]
