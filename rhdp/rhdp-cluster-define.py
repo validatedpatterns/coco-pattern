@@ -49,7 +49,7 @@ def setup_install(
     pull_secret = pull_secret_path.expanduser().read_text()
     rhdp_dir = pattern_dir / "rhdp"
     jinja_env = Environment(
-        loader=FileSystemLoader(searchpath= rhdp_dir), autoescape=select_autoescape()
+        loader=FileSystemLoader(searchpath=rhdp_dir), autoescape=select_autoescape()
     )
     config_template = jinja_env.get_template("install-config.yaml.j2")
     output_text = config_template.render(
@@ -86,7 +86,8 @@ def print():
 
 def run(region: Annotated[str, typer.Argument(help="Azure region code")]):
     """
-    Region flag requires an azure region key which can be (authoritatively) requested with: "az account list-locations -o table".
+    Region flag requires an azure region key which can be (authoritatively)
+    requested with: "az account list-locations -o table".
     """
     validate_dir()
     cleanup(pathlib.Path.cwd())

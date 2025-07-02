@@ -1,23 +1,19 @@
 # letsencrypt
 
-## Forked from https://github.com/validatedpatterns/letsencrypt-chart
-
+## Forked from [Validated patterns lets encrypt chart.](https://github.com/validatedpatterns/letsencrypt-chart)
 
 ## Design for Azure
-Cert-manager needs the azure resource group for a zone in order to manage the DNS. 
+
+Cert-manager needs the azure resource group for a zone in order to manage the DNS.
 Unfortunately this is a little tricky to get.
 
-To get this running on azure two compromises have been made
-1. The required information (managed_zone_name and managed_zone resource group) can be obtained via the ansible imperative framework. 
+To get this running on azure three compromises have been made:
+
+1. The required information (managed_zone_name and managed_zone resource group) can be obtained via the ansible imperative framework.
 
 2. The imperative framework is limited terms of feedback / logging. Please test carefully.
 
 3. If the credentials can see more than one managed zone there may be issues. It presumes one.
-
-
-
-
-
 
 ![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.16.0](https://img.shields.io/badge/AppVersion-1.16.0-informational?style=flat-square)
 
@@ -27,7 +23,7 @@ A Helm chart to add letsencrypt support to Validated Patterns.
 
 ## Maintainers
 
-| Name | Email | Url |
+| Name | Email | URL |
 | ---- | ------ | --- |
 | Validated Patterns Team | <validatedpatterns@googlegroups.com> |  |
 
@@ -62,7 +58,7 @@ clusterGroup:
 | letsencrypt.certmanagerChannel | string | `"stable-v1"` | String the channel to install cert-manager from (Defaults to "stable-v1") |
 | letsencrypt.duration | string | `"168h0m0s"` | Duration of the requested letsencrypt certificates (Defaults to 168h0m0s) |
 | letsencrypt.email | string | `"test@example.com"` | String containing the email used when requesting certificates to letsencrypt (required) These two lines need tweaking for every deployment. @example.com emails will be rejected by letsencrypt |
-| letsencrypt.nameservers | list | `["8.8.8.8:53","1.1.1.1:53"]` | List of DNS server (ip:port strings) to be used when doing DNS01 challenges (Defaults to [8.8.8.8:53, 1.1.1.1:53]) These two are needed because the DNS01 ACME solver needs outside DNS servers and won't really work with openshift's internal split-view DNS servers https://cert-manager.io/docs/configuration/acme/dns01/#setting-nameservers-for-dns01-self-check |
+| letsencrypt.nameservers | list | `["8.8.8.8:53","1.1.1.1:53"]` | List of DNS server (ip:port strings) to be used when doing DNS01 challenges (Defaults to [8.8.8.8:53, 1.1.1.1:53]) These two are needed because the DNS01 ACME solver needs outside DNS servers and won't really work with openshift's internal split-view DNS servers [see](https://cert-manager.io/docs/configuration/acme/dns01/#setting-nameservers-for-dns01-self-check) |
 | letsencrypt.organizations | list | `["hybrid-cloud-patterns.io"]` | List of organization names to be put in a certificate (Defaults to [hybrid-cloud-patterns.io]) |
 | letsencrypt.region | string | `"eu-central-1"` | String that defines the region used by the route53/dns01 resolver in cert-manager (required) |
 | letsencrypt.renewBefore | string | `"28h0m0s"` | How long before expiration date should the certs be renewed (Defaults to 28h0m0s) |

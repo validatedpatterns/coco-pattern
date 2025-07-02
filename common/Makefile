@@ -4,6 +4,14 @@ ifneq ($(origin TARGET_SITE), undefined)
   TARGET_SITE_OPT=--set main.clusterGroupName=$(TARGET_SITE)
 endif
 
+# Set this to true if you want to skip any origin validation
+DISABLE_VALIDATE_ORIGIN ?= false
+ifeq ($(DISABLE_VALIDATE_ORIGIN),true)
+  VALIDATE_ORIGIN := 
+else
+  VALIDATE_ORIGIN := validate-origin
+endif
+
 # This variable can be set in order to pass additional helm arguments from the
 # the command line. I.e. we can set things without having to tweak values files
 EXTRA_HELM_OPTS ?=
@@ -17,14 +25,15 @@ EXTRA_PLAYBOOK_OPTS ?=
 # INDEX_IMAGES=registry-proxy.engineering.redhat.com/rh-osbs/iib:394248,registry-proxy.engineering.redhat.com/rh-osbs/iib:394249
 INDEX_IMAGES ?=
 
-# This is to ensure that whether we start with a git@ or https:// URL, we end up with an https:// URL
-# This is because we expect to use tokens for repo authentication as opposed to SSH keys
-TARGET_REPO=$(shell git ls-remote --get-url --symref $(TARGET_ORIGIN) | sed -e 's/.*URL:[[:space:]]*//' -e 's%^git@%%' -e 's%^https://%%' -e 's%:%/%' -e 's%^%https://%')
 # git branch --show-current is also available as of git 2.22, but we will use this for compatibility
 TARGET_BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
 
 #default to the branch remote
 TARGET_ORIGIN ?= $(shell git config branch.$(TARGET_BRANCH).remote)
+
+# This is to ensure that whether we start with a git@ or https:// URL, we end up with an https:// URL
+# This is because we expect to use tokens for repo authentication as opposed to SSH keys
+TARGET_REPO=$(shell git ls-remote --get-url --symref $(TARGET_ORIGIN) | sed -e 's/.*URL:[[:space:]]*//' -e 's%^git@%%' -e 's%^https://%%' -e 's%:%/%' -e 's%^%https://%')
 
 UUID_FILE ?= ~/.config/validated-patterns/pattern-uuid
 UUID_HELM_OPTS ?=
@@ -73,7 +82,7 @@ preview-%:
 	@common/scripts/preview.sh $(CLUSTERGROUP) $* $(TARGET_REPO) $(TARGET_BRANCH)
 
 .PHONY: operator-deploy
-operator-deploy operator-upgrade: validate-prereq validate-origin validate-cluster ## runs helm install
+operator-deploy operator-upgrade: validate-prereq $(VALIDATE_ORIGIN) validate-cluster ## runs helm install
 	@common/scripts/deploy-pattern.sh $(NAME) $(PATTERN_INSTALL_CHART) $(HELM_OPTS)
 
 .PHONY: uninstall

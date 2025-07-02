@@ -18,7 +18,7 @@
       retries: 20
       delay: 5
 
-    - name: Get Azure credentials
+    - name: Get Azure configuration
       kubernetes.core.k8s_info:
         kind: ConfigMap
         namespace: openshift-cloud-controller-manager
@@ -41,7 +41,7 @@
       no_log: true
 
     - name: Create Public IP for NAT Gateway
-      azure_rm_publicipaddress:
+      azure.azcollection.azure_rm_publicipaddress:
         subscription_id: "{{ azure_subscription_id }}"
         tenant: "{{ azure_tenant_id }}"
         client_id: "{{ azure_client_id }}"
@@ -52,7 +52,7 @@
         allocation_method: "static"
 
     - name: Retrieve Public IP for NAT Gateway
-      azure_rm_publicipaddress_info:
+      azure.azcollection.azure_rm_publicipaddress_info:
         subscription_id: "{{ azure_subscription_id }}"
         tenant: "{{ azure_tenant_id }}"
         client_id: "{{ azure_client_id }}"
@@ -86,4 +86,3 @@
         name: "{{ azure_subnet }}"
         virtual_network_name: "{{ azure_vnet }}"
         nat_gateway: "{{ coco_nat_gateway_name }}"
-...

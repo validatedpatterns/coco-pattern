@@ -19,3 +19,4 @@ azure-env.sh
 openshift-install
 node_modules
 .envrc
+.ansible/

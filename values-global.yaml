@@ -10,18 +10,6 @@ global:
     azure:
       enabled: true
       defaultVMFlavour: "Standard_DC2as_v5"
-
-  # this is required for object storage using OCP AI
-  objectStorage:
-    # Whether or not to use PVC storage
-    pvcStorage: true
-    replicas: 3
-    storagePool: 50Gi
-    backingStorageClass: ""
-    # IF ODF exists we don't need to deploy an storage system
-    existingODF: false
-    odfStorageSystem: "ocs-external-storagecluster-storagesystem"
-
 main:
   # WARNING
   # This default configuration uses a single cluster on azure.

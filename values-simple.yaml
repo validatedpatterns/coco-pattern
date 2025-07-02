@@ -15,8 +15,6 @@ clusterGroup:
   - letsencrypt
   - kbs-access
   - encrypted-storage
-  - experiment
-
   subscriptions:
     # ACM is kept anticipating 
     acm:

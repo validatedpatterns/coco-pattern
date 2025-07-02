@@ -66,7 +66,7 @@ fi
 echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
-python3 rhdp/rhdp-cluster-define.py ${AZUREREGION}
+python rhdp/rhdp-cluster-define.py ${AZUREREGION}
 echo "---------------------"
 echo "cluster defined"
 echo "---------------------"

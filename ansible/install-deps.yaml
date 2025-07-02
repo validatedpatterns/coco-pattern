@@ -4,9 +4,11 @@
   hosts: localhost
   gather_facts: false
   tasks:
-  - name: Install required collection
-    ansible.builtin.command:
-      cmd: ansible-galaxy collection install azure.azcollection
-  - name: Install a Python package
-    ansible.builtin.command:
-      cmd: pip install --user -r ~/.ansible/collections/ansible_collections/azure/azcollection/requirements.txt
+    - name: Ensure collection is installed
+      community.general.ansible_galaxy_install:
+        type: collection
+        name: azure.azcollection
+    - name: Install a Python package
+      ansible.builtin.pip:
+        requirements: "~/.ansible/collections/ansible_collections/azure/azcollection/requirements.txt"
+        extra_args: --user
