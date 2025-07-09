@@ -12,9 +12,7 @@ clusterGroup:
   - hello-openshift
   - cert-manager-operator
   - cert-manager
-  - letsencrypt
   - kbs-access
-  - encrypted-storage
   subscriptions:
     # ACM is kept anticipating 
     acm:
@@ -84,16 +82,6 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/coco-supported/sandbox
-
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      # Default to 'safe' for ARO
-      overrides:
-      - name: letsencrypt.enabled
-        value: false
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
@@ -105,7 +93,16 @@ clusterGroup:
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access
-
+    custom-init:
+      name: custom-init
+      namespace: custom-init
+      project: workloads
+      path: charts/coco-supported/custom-init
+    route:
+      name: routingtest
+      namespace: routetest
+      project: workloads
+      path: charts/all/routingtests
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
@@ -118,8 +115,6 @@ clusterGroup:
       playbook: ansible/install-deps.yaml
       verbosity: -vvv
       timeout: 3600
-    - name: configure-azure-dns
-      playbook: ansible/configure-issuer.yaml
       # this image has not been changes. TBD would make sense 
       #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
       verbosity: -vvv

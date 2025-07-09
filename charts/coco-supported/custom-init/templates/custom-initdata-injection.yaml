@@ -1,0 +1,79 @@
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: custominit-pod-policy
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+  - objectDefinition:
+      apiVersion: policy.open-cluster-management.io/v1
+      kind: ConfigurationPolicy
+      metadata:
+        name: custominit-pod-cp
+      spec:
+        remediationAction: enforce
+        severity: medium
+        object-templates:
+
+        - complianceType: mustonlyhave
+          objectDefinition:
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              name: custom
+              namespace: custom-init
+              labels:
+                app: custom
+              annotations:
+                io.katacontainers.config.runtime.cc_init_data: '{{ `{{if (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec.defaultCertificate.name }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "initdata-placeholder" "initdata" | base64dec | replace "acmmagickey_trustee_cert" (fromSecret "openshift-ingress" (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec.defaultCertificate.name "tls.crt" | base64dec) | base64enc }}{{ else }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "initdata-placeholder" "initdata" | base64dec | replace "acmmagickey_trustee_cert" (fromSecret "openshift-ingress" "router-certs-default" "tls.crt" | base64dec) | base64enc }}{{ end }}` }}'
+                peerpods: "true"
+            spec:
+              runtimeClassName: kata-remote
+              containers:
+                - name: hello-openshift
+                  image: quay.io/openshift/origin-hello-openshift
+                  ports:
+                    - containerPort: 8888
+                  securityContext:
+                    privileged: false
+                    allowPrivilegeEscalation: false
+                    runAsNonRoot: true
+                    runAsUser: 1001
+                    capabilities:
+                      drop:
+                        - ALL
+                    seccompProfile:
+                      type: RuntimeDefault
+
+
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: custominit-placement-binding
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+placementRef:
+  name: custominit-placement-rule
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+  - name: custominit-pod-policy
+    kind: Policy
+    apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: custominit-placement-rule
+spec:
+  clusterConditions:
+    - status: 'True'
+      type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchLabels:
+      cloud: Azure
+---
+{{- end }}

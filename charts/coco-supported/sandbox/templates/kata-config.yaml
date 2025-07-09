@@ -7,4 +7,5 @@ metadata:
   name: default-kata-config
 spec:
   enablePeerPods: true
+  logLevel: debug
 {{ end }}

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom
+  namespace: custom-init
+spec:
+  ports:
+  - name: 8888-tcp
+    port: 8888
+    protocol: TCP
+    targetPort: 8888
+  selector:
+    app: custom
+  sessionAffinity: None
+  type: ClusterIP

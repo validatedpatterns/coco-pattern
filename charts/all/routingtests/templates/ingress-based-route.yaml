@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test
+spec:
+  ingressClassName: openshift-default
+  rules:
+  - host: test.test.coco.t9t8p.azure.redhatworkshops.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: standard
+            port:
+              number: 8888
+        path: /
+        pathType: Prefix

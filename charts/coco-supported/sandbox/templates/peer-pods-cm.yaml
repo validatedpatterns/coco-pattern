@@ -28,7 +28,12 @@ spec:
             data:
               CLOUD_PROVIDER: "azure"
               VXLAN_PORT: "9000"
+              # IF 
+{{- if .Values.sandbox.peerPodImage }}
+              AZURE_IMAGE_ID: {{ .Values.sandbox.peerPodImage }}
+{{- else }}
               AZURE_IMAGE_ID: '{{ `{{if (lookup "v1" "ConfigMap" "openshift-sandboxed-containers-operator" "peer-pods-cm").metadata.name }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "peer-pods-cm" "AZURE_IMAGE_ID" }}{{ else }}{{ end }}` }}'
+{{- end }}
               AZURE_INSTANCE_SIZE: "{{ .Values.global.coco.azure.defaultVMFlavour }}" 
               AZURE_INSTANCE_SIZES: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
               AZURE_RESOURCE_GROUP: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetResourceGroup }}` }}'
@@ -37,7 +42,8 @@ spec:
               AZURE_NSG_ID: '/subscriptions/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}/resourceGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).resourceGroup }}` }}/providers/Microsoft.Network/networkSecurityGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).securityGroupName }}` }}'
               DISABLECVM: "false"
               PROXY_TIMEOUT: "5m"
-              INITDATA: '{{ tpl ( .Files.Get "initdata.toml.tpl") . | b64enc }}'
+              INITDATA: '{{ `{{if (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec.defaultCertificate.name }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "initdata-placeholder" "initdata" | base64dec | replace "acmmagickey_trustee_cert" (fromSecret "openshift-ingress" (lookup "operator.openshift.io/v1" "IngressController" "openshift-ingress-operator" "default").spec.defaultCertificate.name "tls.crt" | base64dec) | base64enc }}{{ else }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "initdata-placeholder" "initdata" | base64dec | replace "acmmagickey_trustee_cert" (fromSecret "openshift-ingress" "router-certs-default" "tls.crt" | base64dec) | base64enc }}{{ end }}` }}'
+
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding

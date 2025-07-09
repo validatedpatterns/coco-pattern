@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: initdata-placeholder
+data:
+  initdata: '{{ tpl ( .Files.Get "initdata.toml.tpl") . | b64enc }}' # keep as b64
+
+

@@ -1,0 +1,8 @@
+apiVersion: v2
+description: A Helm chart which uses ACM to deploy a pod with custom init data including inferring the certificate.
+keywords:
+- pattern
+- upstream
+- sandbox
+name: custom-init
+version: 0.0.1
