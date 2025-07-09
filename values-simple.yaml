@@ -4,15 +4,15 @@ clusterGroup:
   name: simple
   isHubCluster: true
   namespaces:
-  - open-cluster-management
-  - vault
-  - golang-external-secrets
-  - openshift-sandboxed-containers-operator
-  - trustee-operator-system
-  - hello-openshift
-  - cert-manager-operator
-  - cert-manager
-  - kbs-access
+    - open-cluster-management
+    - vault
+    - golang-external-secrets
+    - openshift-sandboxed-containers-operator
+    - trustee-operator-system
+    - hello-openshift
+    - cert-manager-operator
+    - cert-manager
+    - kbs-access
   subscriptions:
     # ACM is kept anticipating 
     acm:
@@ -38,17 +38,17 @@ clusterGroup:
       channel: stable-v1
 
   projects:
-  - hub
-  - vault
-  - trustee
-  - golang-external-secrets
-  - sandbox
-  - workloads
-  - default
-  # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
-  # We can use self-referential variables because the chart calls the tpl function with these variables defined
+    - hub
+    - vault
+    - trustee
+    - golang-external-secrets
+    - sandbox
+    - workloads
+    - default
+    # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
+    # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
-  - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+    - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   applications:
     acm:
       name: acm
@@ -111,24 +111,20 @@ clusterGroup:
     # For additional overrides that apply to the jobs, please refer to
     # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
     jobs:
-    - name: install-deps
-      playbook: ansible/install-deps.yaml
-      verbosity: -vvv
-      timeout: 3600
-      # this image has not been changes. TBD would make sense 
-      #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
-      verbosity: -vvv
-      timeout: 3600
-    - name: configure-azure-nat-gateway
-      playbook: ansible/azure-nat-gateway.yaml
-      verbosity: -vvv
-      timeout: 3600
+      - name: install-deps
+        playbook: ansible/install-deps.yaml
+        verbosity: -vvv
+        timeout: 3600
+      - name: configure-azure-nat-gateway
+        playbook: ansible/azure-nat-gateway.yaml
+        verbosity: -vvv
+        timeout: 3600
   managedClusterGroups:
     exampleRegion:
       name: group-one
       acmlabels:
-      - name: clusterGroup
-        value: group-one
+        - name: clusterGroup
+          value: group-one
       helmOverrides:
-      - name: clusterGroup.isHubCluster
-        value: false
+        - name: clusterGroup.isHubCluster
+          value: false
