@@ -26,16 +26,14 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       source: redhat-operators
       channel: stable
-      # TODO: Resolve a mechanism to allow install plans to be pinned but not have to manually approve them the first time
-      # installPlanApproval: Manual 
+      installPlanApproval: Manual 
       csv: sandboxed-containers-operator.v1.10.1
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
-      # TODO: Resolve a mechanism to allow install plans to be pinned but not have to manually approve them the first time
-      # installPlanApproval: Manual
+      installPlanApproval: Manual
       csv: trustee-operator.v0.4.1
 
       

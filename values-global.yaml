@@ -4,6 +4,7 @@ global:
     useCSV: false
     syncPolicy: Automatic
     installPlanApproval: Automatic
+    autoApproveManualInstallPlans: true
   # This defines whether or not to use upstream resources for CoCo.
   # Defines whether or not the hub cluster can be used for confidential containers
   coco:
