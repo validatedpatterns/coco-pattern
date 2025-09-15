@@ -1,4 +1,4 @@
-- name: Collect AWS facts and set secrurity group policies
+- name: gzip initdata
   become: false
   connection: local
   hosts: localhost

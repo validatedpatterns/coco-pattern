@@ -56,7 +56,7 @@
 
     - name: Calculate days until expiry
       ansible.builtin.set_fact:
-        days_until_expiry: "{{ ((cert_info.not_after | to_datetime('%Y%m%d%H%M%SZ')) - ansible_date_time.epoch | int | to_datetime('%s')).days }}"
+        days_until_expiry: "{{ ((cert_info.not_after | to_datetime('%Y%m%d%H%M%SZ')) - now()).days }}"
       when: existing_secret.resources | length > 0
 
     - name: Set fact to generate new certificate if expiring soon
