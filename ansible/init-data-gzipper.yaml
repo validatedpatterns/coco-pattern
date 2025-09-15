@@ -1,4 +1,4 @@
-- name: gzip initdata
+- name: Gzip initdata
   become: false
   connection: local
   hosts: localhost
