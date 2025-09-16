@@ -8,6 +8,7 @@ clusterGroup:
   - openshift-sandboxed-containers-operator
   - hello-openshift
   - kbs-access
+  - cert-manager-operator
   subscriptions:
     # ACM is kept anticipating 
     sandbox:

@@ -10,6 +10,40 @@ if [ "$#" -ne 1 ]; then
 fi
 AZUREREGION=$1
 
+echo "---------------------"
+echo "Validating configuration"
+echo "---------------------"
+
+# Check if values-global.yaml exists
+if [ ! -f "values-global.yaml" ]; then
+    echo "ERROR: values-global.yaml file not found in current directory"
+    echo "Please run this script from the root directory of the project"
+    exit 1
+fi
+
+# Check if yq is available
+if ! command -v yq &> /dev/null; then
+    echo "ERROR: yq is required but not installed"
+    echo "Please install yq: https://github.com/mikefarah/yq#install"
+    exit 1
+fi
+
+# Extract clusterGroupName from values-global.yaml using yq
+CLUSTER_GROUP_NAME=$(yq eval '.main.clusterGroupName' values-global.yaml)
+
+if [ "$CLUSTER_GROUP_NAME" != "simple" ]; then
+    echo "ERROR: Incorrect clusterGroupName configuration"
+    echo "Expected: simple"
+    echo "Found: $CLUSTER_GROUP_NAME"
+    echo ""
+    echo "Please update values-global.yaml:"
+    echo "  main:"
+    echo "    clusterGroupName: simple"
+    exit 1
+fi
+
+echo "Configuration validation passed: clusterGroupName = $CLUSTER_GROUP_NAME"
+
 echo "Run from the root directory of the project"
 echo "\n"
 echo "Ensuring azure environment is installed"
@@ -86,7 +120,7 @@ sleep 60
 echo "---------------------"
 echo "pattern install"
 echo "---------------------"
-export KUBECONFIG=`pwd`/openshift-install/auth/kubeconfig
+export KUBECONFIG="$(pwd)/openshift-install/auth/kubeconfig"
 
 
 ./pattern.sh make install
