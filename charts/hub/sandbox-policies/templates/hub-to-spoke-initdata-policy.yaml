@@ -3,6 +3,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   name: hub-to-spoke-initdata-policy
+  namespace: imperative
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
@@ -14,6 +15,7 @@ spec:
       kind: ConfigurationPolicy
       metadata:
         name: hub-to-spoke-initdata-cp
+        namespace: imperative
       spec:
         remediationAction: enforce
         severity: medium
@@ -36,6 +38,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
   name: hub-to-spoke-initdata-placement-binding
+  namespace: imperative
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 placementRef:
@@ -52,6 +55,7 @@ apiVersion: apps.open-cluster-management.io/v1
 kind: PlacementRule
 metadata:
   name: hub-to-spoke-initdata-placement-rule
+  namespace: imperative
 spec:
   clusterConditions:
     - status: 'True'
