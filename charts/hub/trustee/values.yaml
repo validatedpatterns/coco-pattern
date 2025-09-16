@@ -1,19 +1,32 @@
-global:
-  cocoUpstream: true
+# Chart-specific values
+# Common values are inherited from values-global.yaml
 
+
+
+# Secret store configuration (overridden by values-global.yaml)
 secretStore:
-  name: vault-backend
-  kind: ClusterSecretStore
+  name: ""
+  kind: ""
 
+# KBS (Key Broker Service) configuration
 kbs:
   # Do you do internal HTTPS for the KBS
-  deployNS: trustee-operator-system
   https:
     enabled: false
   certAuth:
     enabled: false
+  
+  # Static secret (remains unchanged)
   securityPolicy: secret/data/hub/securityPolicyConfig
+  
+  # Static TLS-related secrets (different structure, remain static)
   publicKey: secret/data/hub/kbsPublicKey
   privateKey: secret/data/global/kbsPrivateKey
-  kbsres1: secret/data/hub/kbsres1
-  passphrase: secret/data/hub/passphrase
+  
+  # Dynamic secret resources list - add new secrets here
+  # Each entry generates an ESO and gets added to kbsSecretResources
+  secretResources:
+    - name: "kbsres1"
+      key: "secret/data/hub/kbsres1"
+    - name: "passphrase"
+      key: "secret/data/hub/passphrase"

@@ -1,26 +1,15 @@
 # This is currently configured as an 'all in one' deployment in one cluster.
 
 clusterGroup:
-  name: simple
-  isHubCluster: true
+  name: untrusted-spoke
+  isHubCluster: false
   namespaces:
-  - open-cluster-management
-  - vault
   - golang-external-secrets
   - openshift-sandboxed-containers-operator
-  - trustee-operator-system
   - hello-openshift
-  - cert-manager-operator
-  - cert-manager
-  - letsencrypt
   - kbs-access
-  - encrypted-storage
   subscriptions:
     # ACM is kept anticipating 
-    acm:
-      name: advanced-cluster-management
-      namespace: open-cluster-management
-      channel: release-2.13
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
@@ -28,13 +17,6 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual 
       csv: sandboxed-containers-operator.v1.10.1
-    trustee:
-      name: trustee-operator
-      namespace: trustee-operator-system
-      source: redhat-operators
-      channel: stable
-      installPlanApproval: Manual
-      csv: trustee-operator.v0.4.1
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -53,19 +35,6 @@ clusterGroup:
   sharedValueFiles:
   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   applications:
-    acm:
-      name: acm
-      namespace: open-cluster-management
-      project: hub
-      chart: acm
-      chartVersion: 0.1.*
-
-    vault:
-      name: vault
-      namespace: vault
-      project: vault
-      chart: hashicorp-vault
-      chartVersion: 0.1.*
 
     secrets-operator:
       name: golang-external-secrets
@@ -74,33 +43,12 @@ clusterGroup:
       chart: golang-external-secrets
       chartVersion: 0.1.*
 
-    trustee:
-      name: trustee
-      namespace: trustee-operator-system #upstream config
-      project: trustee
-      path: charts/hub/trustee
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/coco-supported/sandbox
-    sandbox-policies:
-      name: sandbox-policies
-      namespace: openshift-sandboxed-containers-operator #upstream config
-      project: sandbox
-      path: charts/hub/sandbox-policies
 
-    # Letsencrypt is not required anymore for trustee.
-    # It's only here if you need it for your needs.
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      # Default to 'safe' for ARO
-      overrides:
-      - name: letsencrypt.enabled
-        value: false
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
@@ -125,21 +73,7 @@ clusterGroup:
       playbook: ansible/install-deps.yaml
       verbosity: -vvv
       timeout: 3600
-    - name: configure-azure-dns
-      playbook: ansible/configure-issuer.yaml
-      # this image has not been changes. TBD would make sense 
-      #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
-      verbosity: -vvv
-      timeout: 3600
     - name: configure-azure-nat-gateway
       playbook: ansible/azure-nat-gateway.yaml
-      verbosity: -vvv
-      timeout: 3600
-    - name: gen-certificate
-      playbook: ansible/gen-certificate.yaml
-      verbosity: -vvv
-      timeout: 3600
-    - name: init-data-gzipper
-      playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
       timeout: 3600

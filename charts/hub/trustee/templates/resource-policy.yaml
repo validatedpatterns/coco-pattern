@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: resource-policy
-  namespace: {{ .Values.kbs.deployNS }}
+  namespace: trustee-operator-system
 data:
   policy.rego: |
     package policy

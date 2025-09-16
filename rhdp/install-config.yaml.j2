@@ -19,16 +19,16 @@ controlPlane:
   replicas: 3
 metadata:
   creationTimestamp: null
-  name: coco
+  name: {{ cluster_name }}
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: {{ cluster_network_cidr }}
     hostPrefix: 23
   machineNetwork:
-  - cidr: 10.0.0.0/16
+  - cidr: {{ machine_network_cidr }}
   networkType: OVNKubernetes
   serviceNetwork:
-  - 172.30.0.0/16
+  - {{ service_network_cidr }}
 platform:
   azure:
     baseDomainResourceGroupName: {{ RESOURCEGROUP }}

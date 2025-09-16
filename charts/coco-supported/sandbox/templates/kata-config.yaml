@@ -1,4 +1,3 @@
-{{ if .Values.sandbox.deploy }}
 apiVersion: kataconfiguration.openshift.io/v1
 kind: KataConfig
 metadata:
@@ -6,5 +5,4 @@ metadata:
     argocd.argoproj.io/sync-wave: "100"
   name: default-kata-config
 spec:
-  enablePeerPods: true
-{{ end }}
+  enablePeerPods: {{ if or (eq .Values.global.clusterPlatform "Azure") (eq .Values.global.clusterPlatform "AWS") }}true{{ else }}false{{ end }}

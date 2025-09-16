@@ -1,4 +1,3 @@
-{{- if and .Values.sandbox.azure .Values.sandbox.deploy }}
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
@@ -30,14 +29,14 @@ spec:
               VXLAN_PORT: "9000"
               AZURE_IMAGE_ID: '{{ `{{if (lookup "v1" "ConfigMap" "openshift-sandboxed-containers-operator" "peer-pods-cm").metadata.name }}{{ fromConfigMap "openshift-sandboxed-containers-operator" "peer-pods-cm" "AZURE_IMAGE_ID" }}{{ else }}{{ end }}` }}'
               AZURE_INSTANCE_SIZE: "{{ .Values.global.coco.azure.defaultVMFlavour }}" 
-              AZURE_INSTANCE_SIZES: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
+              AZURE_INSTANCE_SIZES: "{{ .Values.global.coco.azure.VMFlavours }}" 
               AZURE_RESOURCE_GROUP: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetResourceGroup }}` }}'
               AZURE_REGION: '{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).location }}` }}'
               AZURE_SUBNET_ID: '/subscriptions/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}/resourceGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetResourceGroup }}` }}/providers/Microsoft.Network/virtualNetworks/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).vnetName }}` }}/subnets/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subnetName }}` }}'
               AZURE_NSG_ID: '/subscriptions/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).subscriptionId }}` }}/resourceGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).resourceGroup }}` }}/providers/Microsoft.Network/networkSecurityGroups/{{ `{{ (fromJson (fromConfigMap "openshift-cloud-controller-manager" "cloud-conf" "cloud.conf" | toLiteral)).securityGroupName }}` }}'
               DISABLECVM: "false"
               PROXY_TIMEOUT: "5m"
-              INITDATA: '{{ `{{if (lookup "v1" "ConfigMap" "imperative" "initdata").metadata.name }}{{ fromConfigMap "imperative" "initdata" "INITDATA" }}{{ else }}{{ end }}` }}'
+              INITDATA: '{{ `{{ fromConfigMap "imperative" "initdata" "INITDATA" }}` }}'
 
 ---
 apiVersion: policy.open-cluster-management.io/v1
@@ -67,4 +66,3 @@ spec:
     matchLabels:
       cloud: Azure
 ---
-{{- end }}

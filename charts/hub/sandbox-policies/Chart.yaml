@@ -1,0 +1,6 @@
+apiVersion: v2
+description: Deploy and configure policies for sandboxed containers and propagate data from the hub cluster to the managed clusters.
+keywords:
+- pattern
+name: sandbox-policies
+version: 0.0.1

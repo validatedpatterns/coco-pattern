@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kbs-config
-  namespace: {{ .Values.kbs.deployNS }}
+  namespace: trustee-operator-system
 data:
   kbs-config.toml: |
     [http_server]

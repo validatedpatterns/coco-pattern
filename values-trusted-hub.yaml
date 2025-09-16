@@ -1,33 +1,22 @@
 # This is currently configured as an 'all in one' deployment in one cluster.
 
 clusterGroup:
-  name: simple
+  name: trusted-hub
   isHubCluster: true
   namespaces:
   - open-cluster-management
   - vault
   - golang-external-secrets
-  - openshift-sandboxed-containers-operator
   - trustee-operator-system
-  - hello-openshift
   - cert-manager-operator
+  - openshift-sandboxed-containers-operator
   - cert-manager
-  - letsencrypt
-  - kbs-access
-  - encrypted-storage
   subscriptions:
     # ACM is kept anticipating 
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
       channel: release-2.13
-    sandbox:
-      name: sandboxed-containers-operator
-      namespace: openshift-sandboxed-containers-operator
-      source: redhat-operators
-      channel: stable
-      installPlanApproval: Manual 
-      csv: sandboxed-containers-operator.v1.10.1
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
@@ -79,39 +68,12 @@ clusterGroup:
       namespace: trustee-operator-system #upstream config
       project: trustee
       path: charts/hub/trustee
-    sandbox:
-      name: sandbox
-      namespace: openshift-sandboxed-containers-operator #upstream config
-      project: sandbox
-      path: charts/coco-supported/sandbox
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       path: charts/hub/sandbox-policies
 
-    # Letsencrypt is not required anymore for trustee.
-    # It's only here if you need it for your needs.
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      # Default to 'safe' for ARO
-      overrides:
-      - name: letsencrypt.enabled
-        value: false
-    hello-openshift:
-      name: hello-openshift
-      namespace: hello-openshift
-      project: workloads
-      path: charts/coco-supported/hello-openshift
-
-    kbs-access:
-      name: kbs-access
-      namespace: kbs-access
-      project: workloads
-      path: charts/coco-supported/kbs-access
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
@@ -125,16 +87,6 @@ clusterGroup:
       playbook: ansible/install-deps.yaml
       verbosity: -vvv
       timeout: 3600
-    - name: configure-azure-dns
-      playbook: ansible/configure-issuer.yaml
-      # this image has not been changes. TBD would make sense 
-      #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
-      verbosity: -vvv
-      timeout: 3600
-    - name: configure-azure-nat-gateway
-      playbook: ansible/azure-nat-gateway.yaml
-      verbosity: -vvv
-      timeout: 3600
     - name: gen-certificate
       playbook: ansible/gen-certificate.yaml
       verbosity: -vvv
@@ -143,3 +95,12 @@ clusterGroup:
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
       timeout: 3600
+  managedClusterGroups:
+    untrusted-spoke:
+      name: untrusted-spoke
+      acmlabels:
+      - name: clusterGroup
+        value: untrusted-spoke
+      helmOverrides:
+      - name: clusterGroup.isHubCluster
+        value: false

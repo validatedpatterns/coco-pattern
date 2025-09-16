@@ -2,13 +2,17 @@ apiVersion: confidentialcontainers.org/v1alpha1
 kind: KbsConfig
 metadata:
   name: kbsconfig
-  namespace: {{ .Values.kbs.deployNS }}
+  namespace: trustee-operator-system
 spec:
   kbsConfigMapName: kbs-config
   kbsAuthSecretName: kbs-auth-public-key
   kbsDeploymentType: AllInOneDeployment
   kbsRvpsRefValuesConfigMapName: rvps-reference-values
-  kbsSecretResources: ["kbsres1", "passphrase", "security-policy"]
+  kbsSecretResources: 
+    {{- range .Values.kbs.secretResources }}
+    - "{{ .name }}"
+    {{- end }}
+    - "security-policy"
   kbsHttpsKeySecretName: kbs-https-key
   kbsHttpsCertSecretName: kbs-https-certificate
   kbsResourcePolicyConfigMapName: resource-policy

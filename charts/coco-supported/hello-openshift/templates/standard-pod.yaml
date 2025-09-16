@@ -5,7 +5,6 @@ metadata:
   labels:
     app: standard
 spec:
-  runtimeClassName: {{ .Values.global.runtimeClass }}
   containers:
     - name: hello-openshift
       image: quay.io/openshift/origin-hello-openshift

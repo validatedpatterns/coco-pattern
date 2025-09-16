@@ -1,4 +1,4 @@
-{{ if .Values.sandbox.azure }}
+{{ if eq .Values.global.clusterPlatform "Azure" }}
 ---
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
@@ -19,5 +19,4 @@ spec:
   dataFrom:
   - extract:
       key: {{ .Values.sandbox.sshKey }}
-
 {{ end }}

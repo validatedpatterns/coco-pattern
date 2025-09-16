@@ -4,7 +4,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   name: rvps-reference-values
-  namespace: {{ .Values.kbs.deployNS }}
+  namespace: trustee-operator-system
 data:
   reference-values.json: |
       [

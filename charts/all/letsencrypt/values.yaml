@@ -3,6 +3,8 @@
 global:
   ## -- String containing the domain including the apps. prefix. Gets set by the Validated Pattern framework
   localClusterDomain: "apps.example.com"
+  ## -- String defining the cluster platform: "Azure" or "AWS" (overridden by values-global.yaml)
+  clusterPlatform: ""
 
 
 # -- This section contains all the parameters for the letsencrypt chart in
@@ -55,7 +57,7 @@ letsencrypt:
   azure:
     secretStoreKey: 'secret/data/global/azure'
 
-
+# Secret store configuration (overridden by values-global.yaml)
 secretStore:
-  name: vault-backend
-  kind: ClusterSecretStore
+  name: ""
+  kind: ""

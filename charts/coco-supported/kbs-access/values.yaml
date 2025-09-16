@@ -1,3 +1,7 @@
+# Chart-specific values
+# Common values are inherited from values-global.yaml
+
+# Global values used by this chart (overridden by values-global.yaml)
 global:
   coco:
-    runtimeClassName: kata-remote
+    runtimeClassName: ""  # Runtime class for confidential containers
