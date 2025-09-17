@@ -1,4 +1,4 @@
-{{ if .Values.sandbox.azure }}
+{{- if and (ne .Values.global.secretStore.backend "none") (.Values.sandbox.azure) }}
 ---
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
