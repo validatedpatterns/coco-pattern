@@ -1,0 +1,20 @@
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: {{ .Values.lvmCluster.name | default "lvmcluster" }}
+  namespace: openshift-storage
+spec:
+  storage:
+    deviceClasses:
+    - name: {{ .Values.lvmCluster.deviceClass | default "vg1" }}
+      thinPoolConfig:
+        name: {{ .Values.lvmCluster.thinPoolName | default "thin-pool-1" }}
+        sizePercent: {{ .Values.lvmCluster.thinPoolSizePercent | default 90 }}
+        overprovisionRatio: {{ .Values.lvmCluster.overprovisionRatio | default 10 }}
+      deviceSelector:
+        paths:
+        - /dev/nvme*
+        - /dev/sd*  
+        - /dev/vd*
+        optionalPaths:
+        - /dev/xvd*

@@ -1,0 +1,49 @@
+- name: Set LVM Storage Class as Default
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    lvm_storage_class_name: "lvms-vg1"  # This is the default name created by LVMS operator
+  tasks:
+    - name: Wait for LVM storage class to be created
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: "{{ lvm_storage_class_name }}"
+      register: lvm_storage_class
+      until: lvm_storage_class.resources | length > 0
+      retries: 60  # Wait up to 10 minutes
+      delay: 10
+
+    - name: Get all existing storage classes
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+      register: ansible_storage_classes
+
+    - name: Remove default annotation from other storage classes
+      kubernetes.core.k8s:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: "{{ item.metadata.name }}"
+        definition:
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: null
+      loop: "{{ ansible_storage_classes.resources }}"
+      when: 
+        - item.metadata.name != lvm_storage_class_name
+        - item.metadata.annotations is defined
+        - item.metadata.annotations['storageclass.kubernetes.io/is-default-class'] == "true"
+
+    - name: Set LVM storage class as default
+      kubernetes.core.k8s:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: "{{ lvm_storage_class_name }}"
+        definition:
+          metadata:
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+        state: present

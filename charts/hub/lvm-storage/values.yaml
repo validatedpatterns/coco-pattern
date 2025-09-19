@@ -1,0 +1,17 @@
+# LVM Storage configuration
+lvmCluster:
+  name: "lvmcluster"
+  deviceClass: "vg1"
+  thinPoolName: "thin-pool-1"
+  thinPoolSizePercent: 90
+  overprovisionRatio: 10
+  
+  # Optional: Node selector to target specific nodes
+  # nodeSelector:
+  #   kubernetes.io/arch: amd64
+  
+  # Optional: Device selector - if not specified, will auto-discover
+  # deviceSelector:
+  #   paths:
+  #   - "/dev/nvme1n1"
+  #   - "/dev/sdb"

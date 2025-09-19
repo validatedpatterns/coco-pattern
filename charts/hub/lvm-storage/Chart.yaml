@@ -1,0 +1,8 @@
+apiVersion: v2
+description: Deploy and configure LVMS storage for baremetal cluster with automatic disk detection
+keywords:
+- pattern
+- storage
+- lvm
+name: lvm-storage
+version: 0.0.1

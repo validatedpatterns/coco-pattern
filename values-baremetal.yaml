@@ -1,0 +1,141 @@
+# This is currently configured as an 'all in one' deployment in one cluster.
+
+clusterGroup:
+  name: baremetal
+  isHubCluster: true
+  namespaces:
+  - open-cluster-management
+  - vault
+  - golang-external-secrets
+  - openshift-sandboxed-containers-operator
+  - trustee-operator-system
+  - hello-openshift
+  - cert-manager-operator
+  - cert-manager
+  - kbs-access
+  - openshift-storage
+  subscriptions:
+    # ACM is kept anticipating 
+    acm:
+      name: advanced-cluster-management
+      namespace: open-cluster-management
+      channel: release-2.13
+    sandbox:
+      name: sandboxed-containers-operator
+      namespace: openshift-sandboxed-containers-operator
+      source: redhat-operators
+      channel: stable
+      installPlanApproval: Manual 
+      csv: sandboxed-containers-operator.v1.10.1
+    trustee:
+      name: trustee-operator
+      namespace: trustee-operator-system
+      source: redhat-operators
+      channel: stable
+      installPlanApproval: Manual
+      csv: trustee-operator.v0.4.1
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+    lvm-operator:
+      name: lvms-operator
+      namespace: openshift-storage
+      source: redhat-operators
+      channel: stable-4.19
+      installPlanApproval: Automatic
+
+  projects:
+  - hub
+  - vault
+  - trustee
+  - golang-external-secrets
+  - sandbox
+  - workloads
+  - default
+  # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
+  # We can use self-referential variables because the chart calls the tpl function with these variables defined
+  sharedValueFiles:
+  - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+  applications:
+    acm:
+      name: acm
+      namespace: open-cluster-management
+      project: hub
+      chart: acm
+      chartVersion: 0.1.*
+
+    vault:
+      name: vault
+      namespace: vault
+      project: vault
+      chart: hashicorp-vault
+      chartVersion: 0.1.*
+
+    secrets-operator:
+      name: golang-external-secrets
+      namespace: golang-external-secrets
+      project: golang-external-secrets
+      chart: golang-external-secrets
+      chartVersion: 0.1.*
+
+    trustee:
+      name: trustee
+      namespace: trustee-operator-system 
+      project: trustee
+      path: charts/hub/trustee
+      
+    lvm-storage:
+      name: lvm-storage
+      namespace: openshift-storage
+      project: hub
+      path: charts/hub/lvm-storage
+    # sandbox:
+    #   name: sandbox
+    #   namespace: openshift-sandboxed-containers-operator 
+    #   project: sandbox
+    #   path: charts/coco-supported/sandbox
+    # sandbox-policies:
+    #   name: sandbox-policies
+    #   namespace: openshift-sandboxed-containers-operator #upstream config
+    #   project: sandbox
+    #   path: charts/hub/sandbox-policies
+
+    # Letsencrypt is not required anymore for trustee.
+    # It's only here if you need it for your needs.
+    # hello-openshift:
+    #   name: hello-openshift
+    #   namespace: hello-openshift
+    #   project: workloads
+    #   path: charts/coco-supported/hello-openshift
+
+    # kbs-access:
+    #   name: kbs-access
+    #   namespace: kbs-access
+    #   project: workloads
+    #   path: charts/coco-supported/kbs-access
+
+  imperative:
+    # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
+    # The default schedule is every 10 minutes: imperative.schedule
+    # Total timeout of all jobs is 1h: imperative.activeDeadlineSeconds
+    # imagePullPolicy is set to always: imperative.imagePullPolicy
+    # For additional overrides that apply to the jobs, please refer to
+    # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
+    jobs:
+    - name: install-deps
+      playbook: ansible/install-deps.yaml
+      verbosity: -vvv
+      timeout: 3600
+    - name: gen-certificate
+      playbook: ansible/gen-certificate.yaml
+      verbosity: -vvv
+      timeout: 3600
+    - name: init-data-gzipper
+      playbook: ansible/init-data-gzipper.yaml
+      verbosity: -vvv
+      timeout: 3600
+    - name: set-default-storage-class
+      playbook: ansible/set-default-storage-class.yaml
+      verbosity: -vvv
+      timeout: 1800
