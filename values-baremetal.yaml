@@ -1,4 +1,6 @@
 # This is currently configured as an 'all in one' deployment in one cluster.
+global:
+  compactCluster: true #Assuming SNO or compact cluster for now
 
 clusterGroup:
   name: baremetal
@@ -14,6 +16,7 @@ clusterGroup:
   - cert-manager
   - kbs-access
   - openshift-storage
+  - openshift-nfd
   subscriptions:
     # ACM is kept anticipating 
     acm:
@@ -44,6 +47,10 @@ clusterGroup:
       source: redhat-operators
       channel: stable-4.19
       installPlanApproval: Automatic
+    nfd:
+      name: nfd
+      namespace: openshift-nfd
+      channel: stable
 
   projects:
   - hub

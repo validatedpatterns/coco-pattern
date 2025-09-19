@@ -6,3 +6,8 @@ metadata:
   name: default-kata-config
 spec:
   enablePeerPods: {{ if or (eq .Values.global.clusterPlatform "Azure") (eq .Values.global.clusterPlatform "AWS") }}true{{ else }}false{{ end }}
+  {{ if .Values.global.compactCluster }}
+  kataConfigPoolSelector:
+    matchLabels:
+      node-role.kubernetes.io/master: ""
+  {{- end }}

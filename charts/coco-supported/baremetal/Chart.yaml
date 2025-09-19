@@ -1,0 +1,8 @@
+apiVersion: v2
+description: Components to support baremetal clusters.
+keywords:
+- pattern
+- upstream
+- sandbox
+name: baremetal
+version: 0.0.1

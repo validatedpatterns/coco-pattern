@@ -122,6 +122,8 @@ echo "---------------------"
 echo "openshift-install"
 echo "---------------------"
 openshift-install create cluster --dir=./openshift-install
+
+
 echo "openshift-install done"
 echo "---------------------"
 echo "setting up secrets"

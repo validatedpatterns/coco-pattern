@@ -4,6 +4,7 @@
 # Global values used by this chart (overridden by values-global.yaml)
 global:
   clusterPlatform: ""  # Cluster platform: "Azure" or "AWS"
+  compactCluster: false # used to flag deployment to master nodes
 
 # Secret store configuration (overridden by values-global.yaml)
 secretStore:

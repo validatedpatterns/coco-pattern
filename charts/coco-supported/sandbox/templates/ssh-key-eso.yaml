@@ -1,4 +1,4 @@
-{{ if eq .Values.global.clusterPlatform "Azure" }}
+#{{ if eq .Values.global.clusterPlatform "Azure" }} This selector doens't work but it also doens't hurt.
 ---
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
@@ -19,4 +19,4 @@ spec:
   dataFrom:
   - extract:
       key: {{ .Values.sandbox.sshKey }}
-{{ end }}
+#{{ end }}

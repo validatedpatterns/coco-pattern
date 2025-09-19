@@ -7,3 +7,8 @@ metadata:
   namespace: openshift-sandboxed-containers-operator
 data:
   confidential: "true"
+  {{ if eq .Values.clusterGroup.name "baremetal" }}
+  layeredImageDeployment: "true"
+  {{- else }}
+  confidential: "true"
+  {{- end }}
