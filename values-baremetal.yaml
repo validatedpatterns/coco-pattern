@@ -17,6 +17,7 @@ clusterGroup:
   - kbs-access
   - openshift-storage
   - openshift-nfd
+  - baremetal
   subscriptions:
     # ACM is kept anticipating 
     acm:
@@ -97,11 +98,16 @@ clusterGroup:
       namespace: openshift-storage
       project: hub
       path: charts/hub/lvm-storage
-    # sandbox:
-    #   name: sandbox
-    #   namespace: openshift-sandboxed-containers-operator 
-    #   project: sandbox
-    #   path: charts/coco-supported/sandbox
+    baremetal:
+      name: baremetal
+      namespace: baremetal
+      project: hub
+      path: charts/coco-supported/baremetal
+    sandbox:
+      name: sandbox
+      namespace: openshift-sandboxed-containers-operator 
+      project: sandbox
+      path: charts/coco-supported/sandbox
     # sandbox-policies:
     #   name: sandbox-policies
     #   namespace: openshift-sandboxed-containers-operator #upstream config
