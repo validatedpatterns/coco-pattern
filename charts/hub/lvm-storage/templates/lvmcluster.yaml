@@ -7,7 +7,3 @@ spec:
   storage:
     deviceClasses:
     - name: {{ .Values.lvmCluster.deviceClass | default "vg1" }}
-      thinPoolConfig:
-        name: {{ .Values.lvmCluster.thinPoolName | default "thin-pool-1" }}
-        sizePercent: {{ .Values.lvmCluster.thinPoolSizePercent | default 90 }}
-        overprovisionRatio: {{ .Values.lvmCluster.overprovisionRatio | default 10 }}
