@@ -11,10 +11,3 @@ spec:
         name: {{ .Values.lvmCluster.thinPoolName | default "thin-pool-1" }}
         sizePercent: {{ .Values.lvmCluster.thinPoolSizePercent | default 90 }}
         overprovisionRatio: {{ .Values.lvmCluster.overprovisionRatio | default 10 }}
-      deviceSelector:
-        paths:
-        - /dev/nvme*
-        - /dev/sd*  
-        - /dev/vd*
-        optionalPaths:
-        - /dev/xvd*
