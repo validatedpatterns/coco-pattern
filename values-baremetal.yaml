@@ -108,11 +108,6 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator 
       project: sandbox
       path: charts/coco-supported/sandbox
-    # sandbox-policies:
-    #   name: sandbox-policies
-    #   namespace: openshift-sandboxed-containers-operator #upstream config
-    #   project: sandbox
-    #   path: charts/hub/sandbox-policies
 
     # Letsencrypt is not required anymore for trustee.
     # It's only here if you need it for your needs.
