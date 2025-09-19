@@ -1,6 +1,18 @@
 
 #!/usr/bin/env bash
-set -e 
+set -e
+
+# Function to detect available python binary
+get_python_cmd() {
+    if command -v python3 &> /dev/null; then
+        echo "python3"
+    elif command -v python &> /dev/null; then
+        echo "python"
+    else
+        echo "ERROR: Neither python3 nor python is available" >&2
+        exit 1
+    fi
+} 
 
 if [ "$#" -ne 1 ]; then
     echo "Error: Exactly one argument is required."
@@ -100,7 +112,8 @@ fi
 echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
-python rhdp/rhdp-cluster-define.py ${AZUREREGION}
+PYTHON_CMD=$(get_python_cmd)
+$PYTHON_CMD rhdp/rhdp-cluster-define.py ${AZUREREGION}
 echo "---------------------"
 echo "cluster defined"
 echo "---------------------"
