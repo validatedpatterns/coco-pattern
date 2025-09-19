@@ -12,7 +12,7 @@
         kind: StorageClass
         name: "{{ lvm_storage_class_name }}"
       register: lvm_storage_class
-      until: lvm_storage_class.resources | length > 0
+      until: lvm_storage_class.resources is defined and lvm_storage_class.resources | length > 0
       retries: 60  # Wait up to 10 minutes
       delay: 10
 
