@@ -52,6 +52,11 @@ clusterGroup:
       name: nfd
       namespace: openshift-nfd
       channel: stable
+    intel-device:
+      name: intel-device-plugins-operator
+      namespace: openshift-operators
+      channel: alpha
+      source: certified-operators
 
   projects:
   - hub
