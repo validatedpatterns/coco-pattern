@@ -1,2 +1,2 @@
 [hypervisor.qemu]
-kernel_params="agent.aa_kbc_params=cc_kbc::https://kbs-trustee-operator-system.{{ .Values.hub_domain }}"
+kernel_params="agent.aa_kbc_params=cc_kbc::https://kbs-trustee-operator-system.{{ .Values.hubClusterDomain }}"
