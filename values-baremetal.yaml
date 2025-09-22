@@ -18,6 +18,7 @@ clusterGroup:
   - openshift-storage
   - openshift-nfd
   - baremetal
+  - intel-dcap
   subscriptions:
     # ACM is kept anticipating 
     acm:
