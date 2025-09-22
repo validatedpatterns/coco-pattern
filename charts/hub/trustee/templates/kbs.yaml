@@ -18,9 +18,10 @@ spec:
   kbsResourcePolicyConfigMapName: resource-policy
 
   # TDX specific configuration (optional)
-  # tdxConfigSpec:
-  #   kbsTdxConfigMapName: tdx-config
-
+{{ if eq .Values.clusterGroup.name "baremetal" }}
+  tdxConfigSpec:
+    kbsTdxConfigMapName: tdx-config
+{{ end }}
   # IBM SE specific configuration (optional)
   # ibmSEConfigSpec:
   #   certStorePvc: <persistent-volume-claim>
