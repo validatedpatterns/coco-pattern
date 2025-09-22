@@ -1,0 +1,51 @@
+---
+# ServiceAccount for Intel DCAP Registration Flow
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: intel-dcap-registration-flow
+  namespace: intel-dcap
+---
+# Security Context Constraint for Intel DCAP Registration Flow
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: intel-dcap-registration-scc
+  annotations:
+    kubernetes.io/description: "SCC for Intel DCAP Registration Flow requiring privileged access to EFI variables"
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: true
+allowedCapabilities:
+- DAC_OVERRIDE
+- SETGID
+- SETUID
+- SYS_ADMIN
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETPCAP
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:intel-dcap:intel-dcap-registration-flow
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- hostPath
+- persistentVolumeClaim
+- projected
+- secret

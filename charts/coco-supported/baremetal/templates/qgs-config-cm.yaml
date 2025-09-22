@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qgs-config
+  namespace: intel-dcap
+data:
+  qgs.conf: |
+    port = 4050
+    number_threads = 4

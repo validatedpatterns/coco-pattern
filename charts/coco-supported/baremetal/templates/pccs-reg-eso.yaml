@@ -1,0 +1,24 @@
+---
+apiVersion: "external-secrets.io/v1beta1"
+kind: ExternalSecret
+metadata:
+  name: pccs-registration-eso
+  namespace: intel-dcap
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.secretStore.name }}
+    kind: {{ .Values.secretStore.kind }}
+  target:
+    name: pccs-registration
+    template:
+      type: Opaque
+      data:
+        USER_TOKEN: "{{ `{{ .user_token }}` }}"
+        PCCS_URL: "{{ .Values.pccs.url | default \"https://pccs-service.intel-dcap.svc.cluster.local:8042\" }}"
+        SECURE_CERT: "{{ .Values.pccs.secureCert | default false }}"
+  data:
+    - secretKey: user_token
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: api_key
