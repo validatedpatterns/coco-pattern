@@ -58,10 +58,10 @@ spec:
       remoteRef:
         key: 'secret/data/hub/pccs'
         property: api_key
-    - secretKey: cluster_https_proxy
-      remoteRef:
-        key: 'secret/data/hub/pccs'
-        property: https_proxy
+    # - secretKey: cluster_https_proxy
+    #   remoteRef:
+    #     key: 'secret/data/hub/pccs'
+    #     property: https_proxy
     - secretKey: pccs_user_token_hash
       remoteRef:
         key: 'secret/data/hub/pccs'
