@@ -15,7 +15,7 @@ spec:
       type: Opaque
       data:
         USER_TOKEN: "{{ `{{ .user_token }}` }}"
-        PCCS_URL: "{{ .Values.pccs.url | default `https://pccs-service.intel-dcap.svc.cluster.local:8042` }}"
+        PCCS_URL: "https://pccs-service.intel-dcap.svc.cluster.local:8042"
         SECURE_CERT: "{{ .Values.pccs.secureCert | default false }}"
   data:
     - secretKey: user_token
