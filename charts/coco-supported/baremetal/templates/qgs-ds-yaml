@@ -15,6 +15,7 @@ spec:
       annotations:
         sgx.intel.com/quote-provider: tdx-qgs
     spec:
+      serviceAccountName: tdx-qgs-service-account
       nodeSelector:
         intel.feature.node.kubernetes.io/tdx: 'true'
       hostNetwork: true
