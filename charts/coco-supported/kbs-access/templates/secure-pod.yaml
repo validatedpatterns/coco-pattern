@@ -5,7 +5,12 @@ metadata:
   labels:
     app: secure
   annotations:
+{{ if eq .Values.clusterGroup.name "baremetal" }}
+    io.katacontainers.config.hypervisor.default_vcpus: "2"
+    io.katacontainers.config.hypervisor.default_memory: "8192"
+{{ else }}  
     peerpods: "true"
+{{ end }}
 spec:
 {{ if eq .Values.clusterGroup.name "baremetal" }}
   runtimeClassName: kata-cc
