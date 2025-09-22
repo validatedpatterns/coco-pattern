@@ -123,11 +123,11 @@ clusterGroup:
     #   project: workloads
     #   path: charts/coco-supported/hello-openshift
 
-    # kbs-access:
-    #   name: kbs-access
-    #   namespace: kbs-access
-    #   project: workloads
-    #   path: charts/coco-supported/kbs-access
+    kbs-access:
+      name: kbs-access
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm

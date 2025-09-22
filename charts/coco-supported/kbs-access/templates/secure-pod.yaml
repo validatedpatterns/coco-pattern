@@ -7,7 +7,11 @@ metadata:
   annotations:
     peerpods: "true"
 spec:
+{{ if eq .Values.clusterGroup.name "baremetal" }}
+  runtimeClassName: kata-cc
+{{ else }}  
   runtimeClassName: kata-remote
+{{ end }}
   containers:
     - name: python-access
       image: ghcr.io/butler54/kbs-access-app:latest
