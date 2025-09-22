@@ -14,6 +14,7 @@ spec:
         app: pccs
         trustedservices.intel.com/cache: pccs
     spec:
+      serviceAccountName: pccs-service-account
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
