@@ -1,0 +1,80 @@
+# Notes: 
+# Proxy is currently left blank leave it this way for now.
+---
+apiVersion: "external-secrets.io/v1beta1"
+kind: ExternalSecret
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  name: pccs-config-eso
+  namespace: intel-dcap
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.secretStore.name }}
+    kind: {{ .Values.secretStore.kind }}
+  target:
+    name: pccs-config
+    template:
+      type: Opaque
+      data:
+        default.json: |
+          {
+            "HTTPS_PORT" : 8042,
+            "hosts" : "0.0.0.0",
+            "uri": "https://api.trustedservices.intel.com/sgx/certification/v4/",
+            "ApiKey" : "{{ "{{ .pccs_api_key }}" }}",
+            "proxy" : "",
+            "RefreshSchedule": "0 0 1 * * *",
+            "UserTokenHash" : "{{ "{{ .pccs_user_token_hash }}" }}",
+            "AdminTokenHash" : "{{ "{{ .pccs_admin_token_hash }}" }}",
+            "CachingFillMode" : "LAZY",
+            "OPENSSL_FIPS_MODE" : false,
+            "LogLevel" : "info",
+            "DB_CONFIG" : "sqlite",
+            "sqlite" : {
+              "database" : "pccs_db",
+              "username" : "{{ "{{ .pccs_db_username }}" }}",
+              "password" : "{{ "{{ .pccs_db_password }}" }}",
+              "options" : {
+                "host": "localhost",
+                "dialect": "sqlite",
+                "pool": {
+                  "max": 5,
+                  "min": 0,
+                  "acquire": 30000,
+                  "idle": 10000
+                },
+                "define": {
+                  "freezeTableName": true
+                },
+                "logging" : true,
+                "storage": "/var/cache/pccs/pckcache.db"
+              }
+            }
+          }
+  data:
+    - secretKey: pccs_api_key
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: api_key
+    - secretKey: cluster_https_proxy
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: https_proxy
+    - secretKey: pccs_user_token_hash
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: user_token_hash
+    - secretKey: pccs_admin_token_hash
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: admin_token_hash
+    - secretKey: pccs_db_username
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: db_username
+    - secretKey: pccs_db_password
+      remoteRef:
+        key: 'secret/data/hub/pccs'
+        property: db_password

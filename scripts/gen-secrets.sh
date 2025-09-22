@@ -47,3 +47,22 @@ if [ ! -f "${VALUES_FILE}" ]; then
     echo "No values file was found copying template.. please review before deploying"
     cp "${SCRIPT_DIR}/../values-secret.yaml.template" "${VALUES_FILE}"
 fi
+
+
+## Setup for baremetal
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout ${COCO_SECRETS_DIR}/pccs_private.pem -out ${COCO_SECRETS_DIR}/pccs_certificate.pem -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=pccs-service.intel-dcap.svc.cluster.local"
+
+
+if [ ! -f "${COCO_SECRETS_DIR}/pccs_user_token" ]; then
+    echo "Creating pccs user token"
+    openssl rand -base64 32 > ${COCO_SECRETS_DIR}/pccs_user_token
+fi
+# Always do the hash
+echo -n "${COCO_SECRETS_DIR}/pccs_user_token" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_user_token_hash
+
+if [ ! -f "${COCO_SECRETS_DIR}/pccs_admin_token" ]; then
+    echo "Creating pccs admin token"
+    openssl rand -base64 32 > ${COCO_SECRETS_DIR}/pccs_admin_token
+fi
+# Always do the hash
+echo -n "${COCO_SECRETS_DIR}/pccs_admin_token" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_admin_token_hash

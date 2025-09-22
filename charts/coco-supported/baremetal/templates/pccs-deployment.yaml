@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pccs
+  namespace: intel-dcap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pccs
+  template:
+    metadata:
+      labels:
+        app: pccs
+        trustedservices.intel.com/cache: pccs
+    spec:
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+        # Prefer to schedule on the same node as existing PCCS pods
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: pccs
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+       - name: init-seclabel
+         image: registry.access.redhat.com/ubi9/ubi:latest
+         command: ["sh", "-c", "chcon -Rt container_file_t /var/cache/pccs"]
+         volumeMounts:
+         - name: host-database
+           mountPath: /var/cache/pccs
+         securityContext:
+           runAsUser: 0
+           runAsGroup: 0
+           privileged: true  # Required for chcon to work on host files
+      containers:
+        - name: pccs
+          image: quay.io/openshift_sandboxed_containers/dcap/pccs:0.2.0
+          ports:
+            - containerPort: 8042
+              name: pccs-port
+          volumeMounts:
+            - name: pccs-tls
+              mountPath: /opt/intel/pccs/ssl_key
+              readOnly: true
+            - name: pccs-config
+              mountPath: /opt/intel/pccs/config
+              readOnly: true
+            - name: host-database
+              mountPath: /var/cache/pccs/
+          securityContext:
+            runAsUser: 0
+      volumes:
+        - name: pccs-tls
+          secret:
+            secretName: pccs-tls
+        - name: pccs-config
+          secret:
+            secretName: pccs-config
+        - name: host-database
+          hostPath:
+            path: /var/cache/pccs/
+            type: DirectoryOrCreate
