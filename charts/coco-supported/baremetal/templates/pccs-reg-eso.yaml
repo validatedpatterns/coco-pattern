@@ -16,7 +16,7 @@ spec:
       data:
         USER_TOKEN: "{{ `{{ .user_token }}` }}"
         PCCS_URL: "https://pccs-service.intel-dcap.svc.cluster.local:8042"
-        SECURE_CERT: false
+        SECURE_CERT: "false"
   data:
     - secretKey: user_token
       remoteRef:
