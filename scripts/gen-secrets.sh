@@ -57,14 +57,18 @@ fi
 
 if [ ! -f "${COCO_SECRETS_DIR}/pccs_user_token" ]; then
     echo "Creating pccs user token"
-    openssl rand -base64 32 > ${COCO_SECRETS_DIR}/pccs_user_token
+    echo "usertoken" > ${COCO_SECRETS_DIR}/pccs_user_token
 fi
 # Always do the hash
-cat "${COCO_SECRETS_DIR}/pccs_user_token" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_user_token_hash
+echo "Hi"
+echo $(which sha512sum)
+echo ${COCO_SECRETS_DIR}/pccs_user_token_hash
+PCCS_USER_TOKEN_HASH=$(echo -n "usertoken" | sha512sum | tr -d '[:space:]-')
+echo -n "usertoken" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_user_token_hash
 
 if [ ! -f "${COCO_SECRETS_DIR}/pccs_admin_token" ]; then
     echo "Creating pccs admin token"
-    openssl rand -base64 32 > ${COCO_SECRETS_DIR}/pccs_admin_token
+    echo "admintoken" > ${COCO_SECRETS_DIR}/pccs_admin_token
 fi
 # Always do the hash
-cat "${COCO_SECRETS_DIR}/pccs_admin_token" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_admin_token_hash
+echo -n "admintoken" | sha512sum | tr -d '[:space:]-' > ${COCO_SECRETS_DIR}/pccs_admin_token_hash
