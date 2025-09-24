@@ -13,8 +13,10 @@ spec:
     - "{{ .name }}"
     {{- end }}
     - "security-policy"
+  {{- if ne .Values.clusterGroup.name "baremetal" }}
   kbsHttpsKeySecretName: kbs-https-key
   kbsHttpsCertSecretName: kbs-https-certificate
+  {{- end }}
   kbsResourcePolicyConfigMapName: resource-policy
 
   # TDX specific configuration (optional)
