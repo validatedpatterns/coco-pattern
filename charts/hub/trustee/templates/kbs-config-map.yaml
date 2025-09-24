@@ -7,7 +7,7 @@ data:
   kbs-config.toml: |
     [http_server]
     sockets = ["0.0.0.0:8080"]
-{{ if eq .Values.global.clusterGroup.name "baremetal" }}
+{{ if eq .Values.clusterGroup.name "baremetal" }}
     insecure_http = true
 {{ else }}
     insecure_http = false

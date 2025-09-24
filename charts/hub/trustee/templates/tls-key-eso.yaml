@@ -1,5 +1,5 @@
 ---
-{{ if not (eq .Values.global.clusterGroup.name "baremetal") }}
+{{ if not (eq .Values.clusterGroup.name "baremetal") }}
 apiVersion: "external-secrets.io/v1beta1"
 kind: ExternalSecret
 metadata: 
