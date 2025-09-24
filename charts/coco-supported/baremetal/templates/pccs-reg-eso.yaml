@@ -21,4 +21,4 @@ spec:
     - secretKey: user_token
       remoteRef:
         key: 'secret/data/hub/pccs'
-        property: api_key
+        property: user_token
