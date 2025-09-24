@@ -12,5 +12,7 @@ spec:
     kind: Service
     name: kbs-service
     weight: 100
+{{- if ne .Values.clusterGroup.name "baremetal" }}
   tls:
     termination: passthrough
+{{- end }}

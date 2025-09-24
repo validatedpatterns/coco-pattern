@@ -141,14 +141,15 @@ clusterGroup:
       playbook: ansible/install-deps.yaml
       verbosity: -vvv
       timeout: 3600
-    - name: gen-certificate
-      playbook: ansible/gen-certificate.yaml
-      verbosity: -vvv
-      timeout: 3600
-    - name: init-data-gzipper
-      playbook: ansible/init-data-gzipper.yaml
-      verbosity: -vvv
-      timeout: 3600
+    # As of 2025-09-24 we cannot easily inject initdata into the bm initd shim.
+    # - name: gen-certificate
+    #   playbook: ansible/gen-certificate.yaml
+    #   verbosity: -vvv
+    #   timeout: 3600
+    # - name: init-data-gzipper
+    #   playbook: ansible/init-data-gzipper.yaml
+    #   verbosity: -vvv
+    #   timeout: 3600
     - name: set-default-storage-class
       playbook: ansible/set-default-storage-class.yaml
       verbosity: -vvv

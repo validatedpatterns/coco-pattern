@@ -7,9 +7,13 @@ data:
   kbs-config.toml: |
     [http_server]
     sockets = ["0.0.0.0:8080"]
+{{ if eq .Values.global.clusterGroup.name "baremetal" }}
+    insecure_http = true
+{{ else }}
     insecure_http = false
     private_key = "/etc/https-key/tls.key"
     certificate = "/etc/https-cert/tls.crt"
+{{ end }}
     [admin]
     insecure_api = true
     auth_public_key = "/etc/auth-secret/publicKey"
