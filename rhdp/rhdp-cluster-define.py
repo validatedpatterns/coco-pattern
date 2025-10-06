@@ -5,7 +5,7 @@ import json
 import os
 import pathlib
 import shutil
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
