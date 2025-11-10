@@ -7,6 +7,7 @@ global:
     autoApproveManualInstallPlans: true
   # This defines whether or not to use upstream resources for CoCo.
   # Defines whether or not the hub cluster can be used for confidential containers
+  # For disconnected deployments, see values-disconnected.yaml
   coco:
     azure:
       enabled: true
@@ -18,4 +19,4 @@ main:
   clusterGroupName: simple
   multiSourceConfig:
     enabled: true
-    clusterGroupChartVersion: 0.9.*
+    clusterGroupChartVersion: 0.9.6

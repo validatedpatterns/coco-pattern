@@ -58,21 +58,21 @@ clusterGroup:
       namespace: open-cluster-management
       project: hub
       chart: acm
-      chartVersion: 0.1.*
+      chartVersion: 0.1.4
 
     vault:
       name: vault
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      chartVersion: 0.1.*
+      chartVersion: 0.1.4
 
     secrets-operator:
       name: golang-external-secrets
       namespace: golang-external-secrets
       project: golang-external-secrets
       chart: golang-external-secrets
-      chartVersion: 0.1.*
+      chartVersion: 0.1.4
 
     trustee:
       name: trustee

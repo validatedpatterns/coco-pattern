@@ -9,6 +9,11 @@ The target operating model has two clusters:
 
 The current version of this application the confidential containers assumes deployment to Azure.
 
+## Deployment Options
+
+- **Standard (Connected) Deployment**: Requires internet access from the cluster ([Installation Guide](#setup-instructions))
+- **Disconnected Deployment**: For air-gapped or restricted network environments ([Disconnected Guide](docs/DISCONNECTED.md))
+
 On the platform a sample workload is deployed:
 
 1. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).

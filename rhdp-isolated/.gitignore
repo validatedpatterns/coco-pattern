@@ -1,0 +1,14 @@
+# Infrastructure outputs (contains sensitive data)
+infrastructure-outputs.env
+
+# Terraform state and variables
+terraform/
+!terraform/*.tf
+!terraform/*.md
+!terraform/.gitignore
+!terraform/*.example
+
+# Temporary files
+*.tmp
+*.log
+

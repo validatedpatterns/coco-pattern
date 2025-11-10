@@ -1,0 +1,49 @@
+additionalTrustBundlePolicy: Proxyonly
+additionalTrustBundle: |
+{{ additional_trust_bundle | indent(2, True) }}
+apiVersion: v1
+baseDomain: {{ GUID }}.azure.redhatworkshops.io
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    azure:
+      type: Standard_D8s_v5
+  replicas: 3
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    azure:
+      type: Standard_D8s_v5
+  replicas: 3
+metadata:
+  creationTimestamp: null
+  name: coco
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  azure:
+    baseDomainResourceGroupName: {{ RESOURCEGROUP }}
+    cloudName: AzurePublicCloud
+    outboundType: UserDefinedRouting
+    region: {{ region }}
+    virtualNetwork: {{ vnet_name }}
+    controlPlaneSubnet: {{ master_subnet_name }}
+    computeSubnet: {{ worker_subnet_name }}
+    networkResourceGroupName: {{ RESOURCEGROUP }}
+publish: External
+pullSecret: '{{ pull_secret }}'
+sshKey: '{{ ssh_key }}'
+imageDigestSources:
+{{ image_digest_sources | indent(2, True) }}
+

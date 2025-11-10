@@ -1,0 +1,104 @@
+# oc-mirror ImageSet Configuration for Disconnected CoCo Pattern
+# This configuration mirrors all images needed for OpenShift 4.20 with CoCo capabilities
+#
+# Usage: oc-mirror --config=imageset-config.yaml --workspace file:///var/cache/oc-mirror/workspace docker://YOUR_ACR_URL --v2
+
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v2alpha1
+mirror:
+  # OpenShift Platform Images
+  platform:
+    graph: true
+    channels:
+    - name: stable-4.20
+      type: ocp
+      minVersion: 4.20.0
+      # Uncomment to limit to specific version
+      # maxVersion: 4.20.x
+
+  # Red Hat Operator Catalog
+  operators:
+  - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.20
+    packages:
+      # OpenShift Sandboxed Containers (CoCo runtime)
+      - name: sandboxed-containers-operator
+        channels:
+          - name: stable-1.10
+      
+      # OpenShift GitOps (ArgoCD for patterns)
+      - name: openshift-gitops-operator
+        channels:
+          - name: latest
+      
+      # Advanced Cluster Management
+      - name: advanced-cluster-management
+        channels:
+          - name: release-2.12
+      
+      # Multicluster Engine
+      - name: multicluster-engine
+        channels:
+          - name: stable-2.7
+      
+      # Cert Manager (for certificate management)
+      - name: cert-manager
+        channels:
+          - name: stable-v1
+      
+      # Local Volume Manager Storage (for storage)
+      - name: lvms-operator
+        channels:
+          - name: stable-4.20
+
+  # Community Operator Catalog
+  - catalog: registry.redhat.io/redhat/community-operator-index:v4.20
+    packages:
+      # Validated Patterns Operator
+      - name: patterns-operator
+        channels:
+          - name: fast
+
+  # Additional Images
+  additionalImages:
+  # Base images
+  - name: registry.redhat.io/ubi9/ubi-minimal:latest
+  - name: registry.redhat.io/ubi9/ubi:latest
+  - name: registry.redhat.io/ubi8/ubi-minimal:latest
+  - name: registry.access.redhat.com/ubi8/httpd-24:1-226
+  
+  # Vault for secrets management
+  - name: registry.connect.redhat.com/hashicorp/vault:1.17.6-ubi
+  
+  # External Secrets Operator
+  - name: ghcr.io/external-secrets/external-secrets:v0.10.2-ubi
+  
+  # Ansible Automation Platform (for imperative jobs)
+  - name: registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest
+  
+  # Validated Patterns Helm Charts (explicit versions)
+  - name: quay.io/hybridcloudpatterns/acm:0.1.4
+  - name: quay.io/hybridcloudpatterns/clustergroup:0.9.6
+  - name: quay.io/hybridcloudpatterns/gitea:0.0.3
+  - name: quay.io/hybridcloudpatterns/golang-external-secrets:0.1.4
+  - name: quay.io/hybridcloudpatterns/hashicorp-vault:0.1.4
+  - name: quay.io/hybridcloudpatterns/utility-container:v0.2.0
+  - name: quay.io/hybridcloudpatterns/imperative-container:v1.0.0
+  - name: quay.io/hybridcloudpatterns/pattern-install:0.0.4
+  
+  # Gitea (internal git server for patterns)
+  - name: docker.io/gitea/gitea:1.21.11-rootless
+  
+  # Trustee (Key Broker Service for CoCo)
+  # Note: These are approximate image references, adjust based on actual trustee release
+  - name: quay.io/confidential-containers/staged-images/kbs:latest
+  - name: quay.io/confidential-containers/staged-images/kbs-client:latest
+  - name: quay.io/confidential-containers/staged-images/attestation-agent:latest
+  
+  # CoCo Images from quay.io
+  - name: quay.io/confidential-containers/peer-pods-webhook:latest
+  - name: quay.io/confidential-containers/cloud-api-adaptor:latest
+  
+  # Sample application images for testing
+  - name: quay.io/openshift/origin-hello-openshift:latest
+  - name: registry.access.redhat.com/ubi8/nginx-120:latest
+
