@@ -46,6 +46,14 @@ done
 
 log_info "All required environment variables are set"
 
+# Export ARM_ variables for Terraform Azure provider
+export ARM_CLIENT_ID="${CLIENT_ID}"
+export ARM_CLIENT_SECRET="${PASSWORD}"
+export ARM_TENANT_ID="${TENANT}"
+export ARM_SUBSCRIPTION_ID="${SUBSCRIPTION}"
+
+log_info "Azure authentication configured for Terraform"
+
 # Check for SSH key
 SSH_KEY_PATH="${HOME}/.ssh/id_rsa"
 SSH_PUB_KEY_PATH="${HOME}/.ssh/id_rsa.pub"

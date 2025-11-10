@@ -169,8 +169,8 @@ export ACR_NAME="${ACR_NAME}"
 export ACR_USERNAME="${ACR_USERNAME}"
 export ACR_PASSWORD="${ACR_PASSWORD}"
 
-# Ensure local bin is in PATH
-export PATH="\${HOME}/.local/bin:\${PATH}"
+# Add OpenShift tools from data disk to PATH
+export PATH="/var/cache/oc-mirror/bin:\${PATH}"
 EOF
 )
 

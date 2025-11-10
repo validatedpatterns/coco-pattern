@@ -23,22 +23,22 @@ mirror:
       # OpenShift Sandboxed Containers (CoCo runtime)
       - name: sandboxed-containers-operator
         channels:
-          - name: stable-1.10
+          - name: stable
       
       # OpenShift GitOps (ArgoCD for patterns)
       - name: openshift-gitops-operator
         channels:
           - name: latest
       
-      # Advanced Cluster Management
+      # Advanced Cluster Management (using latest stable channel)
       - name: advanced-cluster-management
         channels:
-          - name: release-2.12
+          - name: release-2.14
       
-      # Multicluster Engine
+      # Multicluster Engine (compatible with ACM 2.14)
       - name: multicluster-engine
         channels:
-          - name: stable-2.7
+          - name: stable-2.9
       
       # Cert Manager (for certificate management)
       - name: cert-manager
@@ -63,6 +63,7 @@ mirror:
   # Base images
   - name: registry.redhat.io/ubi9/ubi-minimal:latest
   - name: registry.redhat.io/ubi9/ubi:latest
+  - name: registry.access.redhat.com/ubi9/ubi:latest
   - name: registry.redhat.io/ubi8/ubi-minimal:latest
   - name: registry.access.redhat.com/ubi8/httpd-24:1-226
   
@@ -75,24 +76,21 @@ mirror:
   # Ansible Automation Platform (for imperative jobs)
   - name: registry.redhat.io/ansible-automation-platform-24/ee-supported-rhel9:latest
   
-  # Validated Patterns Helm Charts (explicit versions)
+  # Validated Patterns Helm Charts and Container Images
   - name: quay.io/hybridcloudpatterns/acm:0.1.4
   - name: quay.io/hybridcloudpatterns/clustergroup:0.9.6
   - name: quay.io/hybridcloudpatterns/gitea:0.0.3
   - name: quay.io/hybridcloudpatterns/golang-external-secrets:0.1.4
   - name: quay.io/hybridcloudpatterns/hashicorp-vault:0.1.4
-  - name: quay.io/hybridcloudpatterns/utility-container:v0.2.0
-  - name: quay.io/hybridcloudpatterns/imperative-container:v1.0.0
+  - name: quay.io/hybridcloudpatterns/utility-container:latest
+  - name: quay.io/hybridcloudpatterns/imperative-container:latest
   - name: quay.io/hybridcloudpatterns/pattern-install:0.0.4
   
   # Gitea (internal git server for patterns)
   - name: docker.io/gitea/gitea:1.21.11-rootless
   
-  # Trustee (Key Broker Service for CoCo)
-  # Note: These are approximate image references, adjust based on actual trustee release
-  - name: quay.io/confidential-containers/staged-images/kbs:latest
-  - name: quay.io/confidential-containers/staged-images/kbs-client:latest
-  - name: quay.io/confidential-containers/staged-images/attestation-agent:latest
+  # CoCo/KBS Application Images (for pattern testing)
+  - name: ghcr.io/butler54/kbs-access-app:latest
   
   # CoCo Images from quay.io
   - name: quay.io/confidential-containers/peer-pods-webhook:latest

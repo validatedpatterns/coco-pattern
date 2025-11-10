@@ -81,9 +81,24 @@ fi
 
 log_info "oc-mirror found: $(oc-mirror version 2>&1 | head -n1 || echo 'v2')"
 
-# Login to ACR using podman
+# Create merged auth file in XDG_RUNTIME_DIR for oc-mirror v2
+log_step "Setting up authentication for oc-mirror v2"
+
+# oc-mirror v2 expects auth in standard locations: ${XDG_RUNTIME_DIR}/containers/auth.json
+# Create the directory structure
+AUTH_DIR="${HOME}/.docker"
+mkdir -p "${AUTH_DIR}"
+MERGED_AUTH_FILE="${AUTH_DIR}/config.json"
+
+# Start with the Red Hat pull secret
+cp "${PULL_SECRET}" "${MERGED_AUTH_FILE}"
+
+# Login to ACR using podman with the merged auth file
 log_step "Authenticating to ACR: ${ACR_LOGIN_SERVER}"
-echo "${ACR_PASSWORD}" | podman login "${ACR_LOGIN_SERVER}" --username "${ACR_USERNAME}" --password-stdin
+echo "${ACR_PASSWORD}" | podman login "${ACR_LOGIN_SERVER}" \
+    --username "${ACR_USERNAME}" \
+    --password-stdin \
+    --authfile="${MERGED_AUTH_FILE}"
 
 if [ $? -eq 0 ]; then
     log_info "Successfully authenticated to ACR"
@@ -94,7 +109,7 @@ fi
 
 # Test connectivity
 log_info "Testing ACR connectivity..."
-if podman search "${ACR_LOGIN_SERVER}/test" --limit 1 &>/dev/null; then
+if podman search "${ACR_LOGIN_SERVER}/test" --limit 1 --authfile="${MERGED_AUTH_FILE}" &>/dev/null; then
     log_info "ACR is accessible"
 else
     log_warn "ACR search test returned non-zero, but this may be normal for empty registry"
@@ -102,10 +117,12 @@ fi
 
 # Verify Red Hat registry access
 log_step "Verifying Red Hat registry access with pull secret"
-if ! podman login registry.redhat.io --authfile="${PULL_SECRET}" --get-login &>/dev/null; then
+if ! podman login registry.redhat.io --authfile="${MERGED_AUTH_FILE}" --get-login &>/dev/null; then
     log_warn "Could not verify registry.redhat.io access"
     log_warn "Continuing anyway, oc-mirror will use the pull secret"
 fi
+
+log_info "Authentication configured at: ${MERGED_AUTH_FILE}"
 
 # Display disk space
 log_info "Available disk space:"
@@ -128,8 +145,9 @@ log_info "Source: Red Hat registries (quay.io, registry.redhat.io)"
 log_info "Destination: ${ACR_LOGIN_SERVER}"
 log_info "Workspace: ${MIRROR_WORKSPACE}"
 
-# Set registry credentials for oc-mirror
-export REGISTRY_AUTH_FILE="${PULL_SECRET}"
+# Note: oc-mirror v2 uses standard Docker/Podman auth locations automatically
+# We don't set REGISTRY_AUTH_FILE as it causes parsing errors in v2
+log_info "oc-mirror will use auth from: ${MERGED_AUTH_FILE}"
 
 # Run oc-mirror with v2 flag
 START_TIME=$(date +%s)
