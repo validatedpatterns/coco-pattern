@@ -168,11 +168,11 @@ sleep 30
 log_info "Checking catalog source status:"
 oc get catalogsources -n openshift-marketplace
 
-log_step "Setting up pattern secrets"
-bash ./scripts/gen-secrets.sh
-
 log_info "Waiting for cluster to stabilize..."
 sleep 60
+
+log_step "Setting up pattern secrets"
+bash ./scripts/gen-secrets.sh
 
 log_step "Installing CoCo pattern with disconnected configuration"
 
@@ -181,11 +181,37 @@ export PATTERN_DISCONNECTED_HOME="${ACR_LOGIN_SERVER}/hybridcloudpatterns"
 
 log_info "Using mirrored Helm repository: ${PATTERN_DISCONNECTED_HOME}"
 
-# Create or update values-disconnected.yaml if it doesn't exist
+# Validate values-disconnected.yaml exists
 if [ ! -f "values-disconnected.yaml" ]; then
-    log_warn "values-disconnected.yaml not found, using values-simple.yaml as base"
-    log_warn "Note: You may need to update operator sources to match mirrored catalogs"
+    log_error "values-disconnected.yaml not found"
+    log_error "This file is required for disconnected installation"
+    exit 1
 fi
+
+# IMPORTANT: Do NOT patch values-disconnected.yaml on the bastion!
+# ArgoCD will read values files from Git, so any local patches are lost.
+# Instead, we use --set to override values at install time.
+
+# Build EXTRA_HELM_OPTS with both the values file AND runtime overrides
+# The --set flag takes precedence over values files (per Makefile comment)
+export EXTRA_HELM_OPTS="-f values-disconnected.yaml \
+  --set main.multiSourceConfig.helmRepoUrl=${ACR_LOGIN_SERVER}/hybridcloudpatterns"
+
+log_info "Helm options configured:"
+log_info "  Base values: values-global.yaml (always loaded)"
+log_info "  Cluster group: values-simple.yaml (from clusterGroupName)"
+log_info "  Overlay: values-disconnected.yaml (catalog sources, operators)"
+log_info "  Runtime override: --set main.multiSourceConfig.helmRepoUrl"
+log_info ""
+log_info "Disconnected configuration:"
+log_info "  helmRepoUrl: ${ACR_LOGIN_SERVER}/hybridcloudpatterns (via --set)"
+log_info "  Operator sources: cs-*-v4-20 (from values-disconnected.yaml)"
+log_info ""
+log_info "Why this approach:"
+log_info "  1. ArgoCD reads values files from Git (not bastion)"
+log_info "  2. --set overrides are baked into ArgoCD Application at install time"
+log_info "  3. No need to modify files that ArgoCD syncs from Git"
+log_info "  4. Avoids race conditions with helmRepoUrl availability"
 
 # Install pattern
 log_info "Running pattern installation..."
@@ -204,15 +230,23 @@ log_info "Credentials:"
 log_info "  Username: kubeadmin"
 log_info "  Password: $(cat ./openshift-install-disconnected/auth/kubeadmin-password)"
 log_info ""
-log_info "Pattern installed in disconnected mode"
-log_info "Images sourced from: ${ACR_LOGIN_SERVER}"
+log_info "Disconnected Configuration:"
+log_info "  Container Registry: ${ACR_LOGIN_SERVER}"
+log_info "  Helm Repository: ${ACR_LOGIN_SERVER}/hybridcloudpatterns"
+log_info "  Catalog Sources: cs-redhat-operator-index-v4-20, cs-community-operator-index-v4-20"
 log_info ""
 log_info "To access the cluster from this bastion:"
 log_info "  export KUBECONFIG=$(pwd)/openshift-install-disconnected/auth/kubeconfig"
 log_info "  oc get nodes"
+log_info "  oc get clusterversion"
 log_info ""
 log_info "Monitor pattern deployment:"
 log_info "  oc get applications -A"
 log_info "  oc get pods -n openshift-gitops"
+log_info "  oc get subscriptions -A"
+log_info ""
+log_info "Check CoCo/Sandboxed Containers:"
+log_info "  oc get pods -n openshift-sandboxed-containers-operator"
+log_info "  oc get kataconfig"
 log_info ""
 
