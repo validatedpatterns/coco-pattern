@@ -162,12 +162,14 @@ fi
 # 2. Environment variables
 if [ -f ~/.envrc ]; then
     source ~/.envrc
-    if [ -n "$ACR_LOGIN_SERVER" ] && [ -n "$GUID" ]; then
+    if [ -n "$REGISTRY_URL" ] && [ -n "$GUID" ]; then
         echo "  ✅ Environment variables configured"
         echo "     GUID: $GUID"
-        echo "     ACR: $ACR_LOGIN_SERVER"
+        echo "     Registry: $REGISTRY_URL"
     else
         echo "  ❌ Environment variables incomplete"
+        echo "     Expected: REGISTRY_URL and GUID"
+        echo "     Found: REGISTRY_URL=${REGISTRY_URL:-unset}, GUID=${GUID:-unset}"
         exit 1
     fi
 else
