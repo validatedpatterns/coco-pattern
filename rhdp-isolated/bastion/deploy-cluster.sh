@@ -129,6 +129,16 @@ fi
 cp openshift-install-upi/install-config.yaml openshift-install-upi/install-config.yaml.backup
 log_success "Install config generated"
 
+# Copy insecure registry MachineConfig to manifests
+log_info "Adding insecure registry configuration for cluster nodes..."
+mkdir -p openshift-install-upi/openshift
+if [ -f rhdp-isolated/bastion/manifests/99-insecure-registry.yaml ]; then
+    cp rhdp-isolated/bastion/manifests/99-insecure-registry.yaml openshift-install-upi/openshift/
+    log_success "Insecure registry MachineConfig added"
+else
+    log_warn "Insecure registry manifest not found, cluster may have issues pulling from HTTP registry"
+fi
+
 # ============================================================================
 # STEP 3: Generate Ignition Configs
 # ============================================================================
