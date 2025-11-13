@@ -148,7 +148,7 @@ def setup_install(
     
     # Bastion registry uses HTTP (no TLS), so no certificate needed
     rprint("[info]Using bastion-hosted HTTP registry (no TLS certificate needed)[/info]")
-    additional_trust_bundle = "# Bastion registry uses HTTP (no TLS)"
+    additional_trust_bundle = ""  # Empty string for HTTP registry
     
     # Parse IDMS files to imageDigestSources
     cluster_resources_dir = pattern_dir / "cluster-resources"

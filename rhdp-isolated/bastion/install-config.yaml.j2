@@ -42,14 +42,9 @@ platform:
     computeSubnet: {{ worker_subnet_name }}
     networkResourceGroupName: {{ RESOURCEGROUP }}
     bootstrapExternalStaticIP: "10.0.10.4"
-    bootstrapExternalStaticGateway: "10.0.10.1"
 publish: External
 pullSecret: '{{ pull_secret }}'
 sshKey: '{{ ssh_key }}'
 imageDigestSources:
 {{ image_digest_sources | indent(2, True) }}
-imageContentSources:
-- mirrors:
-  - 10.0.1.4:5000
-  source: 10.0.1.4:5000
 
