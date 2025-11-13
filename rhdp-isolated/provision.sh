@@ -143,8 +143,7 @@ terraform apply tfplan
 log_info "Retrieving outputs..."
 BASTION_IP=$(terraform output -raw bastion_public_ip)
 BASTION_USER=$(terraform output -raw bastion_admin_username)
-ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)
-ACR_NAME=$(terraform output -raw acr_name)
+REGISTRY_URL=$(terraform output -raw bastion_registry_url)
 
 # Save outputs to file for later use
 OUTPUTS_FILE="${SCRIPT_DIR}/infrastructure-outputs.env"
@@ -156,8 +155,7 @@ cat > "${OUTPUTS_FILE}" <<EOF
 
 export BASTION_IP="${BASTION_IP}"
 export BASTION_USER="${BASTION_USER}"
-export ACR_LOGIN_SERVER="${ACR_LOGIN_SERVER}"
-export ACR_NAME="${ACR_NAME}"
+export REGISTRY_URL="${REGISTRY_URL}"
 export AZURE_REGION="${AZURE_REGION}"
 export GUID="${GUID}"
 export RESOURCEGROUP="${RESOURCEGROUP}"
@@ -165,10 +163,6 @@ export CLIENT_ID="${CLIENT_ID}"
 export PASSWORD="${PASSWORD}"
 export TENANT="${TENANT}"
 export SUBSCRIPTION="${SUBSCRIPTION}"
-
-# Get ACR credentials (these are sensitive)
-export ACR_USERNAME=$(terraform output -raw acr_admin_username)
-export ACR_PASSWORD=$(terraform output -raw acr_admin_password)
 EOF
 
 chmod 600 "${OUTPUTS_FILE}"
@@ -179,14 +173,27 @@ log_info "Infrastructure provisioning complete!"
 log_info "=========================================="
 log_info ""
 log_info "Bastion Host: ${BASTION_USER}@${BASTION_IP}"
-log_info "ACR: ${ACR_LOGIN_SERVER}"
+log_info "Container Registry: ${REGISTRY_URL} (bastion-hosted)"
+log_info ""
+log_info "Cloud-init configured on bastion:"
+log_info "  ✓ Container registry (port 5000)"
+log_info "  ✓ Git HTTP server (port 8080)"
+log_info "  ✓ Ignition HTTP server (port 8081)"
+log_info "  ✓ Azure credentials, SSH key, pattern repo"
 log_info ""
 log_info "Next steps:"
-log_info "1. Configure the bastion host:"
+log_info "1. Verify bastion configuration (optional):"
 log_info "   ./configure-bastion.sh"
 log_info ""
-log_info "2. SSH to bastion (credentials saved in ${OUTPUTS_FILE}):"
+log_info "2. Copy pull secret to bastion:"
+log_info "   scp ~/pull-secret.json ${BASTION_USER}@${BASTION_IP}:~/"
+log_info ""
+log_info "3. SSH to bastion and deploy:"
 log_info "   ssh ${BASTION_USER}@${BASTION_IP}"
+log_info "   cd ~/coco-pattern"
+log_info "   ./rhdp-isolated/bastion/deploy-cluster.sh ${AZURE_REGION}"
+log_info ""
+log_info "Note: deploy-cluster.sh automatically runs mirroring if needed (2-4 hours first time)"
 log_info ""
 log_info "Connection details saved to: ${OUTPUTS_FILE}"
 log_info "To use these variables: source ${OUTPUTS_FILE}"
