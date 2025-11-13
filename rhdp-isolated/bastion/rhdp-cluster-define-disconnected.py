@@ -131,7 +131,7 @@ def setup_install(
     try:
         GUID = os.environ["GUID"]
         RESOURCEGROUP = os.environ["RESOURCEGROUP"]
-        ACR_LOGIN_SERVER = os.environ["ACR_LOGIN_SERVER"]
+        REGISTRY_URL = os.environ.get("REGISTRY_URL", "10.0.1.4:5000")
     except KeyError as e:
         rprint(f"[red]Unable to get required environment variable: {e}[/red]")
         raise e
@@ -146,13 +146,9 @@ def setup_install(
     ssh_key = ssh_key_path.expanduser().read_text().strip()
     pull_secret = pull_secret_path.expanduser().read_text().strip()
     
-    # Get ACR certificate
-    rprint("[info]Retrieving ACR certificate...[/info]")
-    additional_trust_bundle = get_acr_certificate(ACR_LOGIN_SERVER)
-    
-    if not additional_trust_bundle:
-        rprint("[yellow]Warning: No ACR certificate retrieved. You may need to add it manually.[/yellow]")
-        additional_trust_bundle = "# No certificate retrieved automatically"
+    # Bastion registry uses HTTP (no TLS), so no certificate needed
+    rprint("[info]Using bastion-hosted HTTP registry (no TLS certificate needed)[/info]")
+    additional_trust_bundle = "# Bastion registry uses HTTP (no TLS)"
     
     # Parse IDMS files to imageDigestSources
     cluster_resources_dir = pattern_dir / "cluster-resources"
