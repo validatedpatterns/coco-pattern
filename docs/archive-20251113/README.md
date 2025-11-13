@@ -1,4 +1,4 @@
-# Archived Documentation - 2025-11-13
+de# Archived Documentation - 2025-11-13
 
 ## Why These Were Archived
 
