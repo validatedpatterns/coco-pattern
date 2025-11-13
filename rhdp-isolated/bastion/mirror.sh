@@ -77,7 +77,8 @@ if ! command -v oc-mirror &> /dev/null; then
     exit 1
 fi
 
-log_info "oc-mirror found: $(oc-mirror version 2>&1 | head -n1 || echo 'v2')"
+# Note: We use oc-mirror --v2 (the version command without --v2 shows deprecation warning)
+log_info "oc-mirror found (using v2 mode)"
 
 # Create merged auth file in XDG_RUNTIME_DIR for oc-mirror v2
 log_step "Setting up authentication for oc-mirror v2"
