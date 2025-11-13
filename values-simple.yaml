@@ -10,6 +10,7 @@ clusterGroup:
   - openshift-sandboxed-containers-operator
   - trustee-operator-system
   - hello-openshift
+  - hello-openshift-two
   - cert-manager-operator
   - cert-manager
   - letsencrypt
@@ -102,7 +103,11 @@ clusterGroup:
       namespace: hello-openshift
       project: workloads
       path: charts/coco-supported/hello-openshift
-
+    hello-openshift-two:
+      name: hello-openshift-two
+      namespace: hello-openshift-two
+      project: workloads
+      path: charts/coco-supported/hello-openshift-2
     kbs-access:
       name: kbs-access
       namespace: kbs-access

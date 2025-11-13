@@ -1,0 +1,6 @@
+apiVersion: v2
+description: Deploys a 'hello openshift' pod 3 times, twice with different coco configurations and once as a standard pod
+keywords:
+- pattern
+name: hello-openshift
+version: 0.0.1

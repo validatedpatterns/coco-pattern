@@ -141,13 +141,14 @@ log_info "oc-mirror will use auth from: ${MERGED_AUTH_FILE}"
 START_TIME=$(date +%s)
 
 log_info "Executing oc-mirror..."
-log_info "Command: oc-mirror --config=${MIRROR_WORKSPACE}/imageset-config.yaml --workspace file://${MIRROR_WORKSPACE} docker://${REGISTRY_URL} --v2"
+log_info "Command: oc-mirror --config=${MIRROR_WORKSPACE}/imageset-config.yaml --workspace file://${MIRROR_WORKSPACE} docker://${REGISTRY_URL} --v2 --dest-skip-tls"
 
 if oc-mirror \
     --config="${MIRROR_WORKSPACE}/imageset-config.yaml" \
     --workspace "file://${MIRROR_WORKSPACE}" \
     "docker://${REGISTRY_URL}" \
-    --v2; then
+    --v2 \
+    --dest-skip-tls; then
     
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
