@@ -116,8 +116,13 @@ python3 rhdp-isolated/bastion/rhdp-cluster-define-disconnected.py ${AZUREREGION}
 log_info "Install config generated"
 sleep 5
 
-log_step "Starting OpenShift installation"
+log_step "Creating OpenShift cluster"
 log_warn "This will take 45-60 minutes"
+log_info "Using Red Hat recommended approach for disconnected Azure installations:"
+log_info "  ✓ NAT Gateway provides outbound SNAT for UserDefinedRouting"
+log_info "  ✓ Subnet-level NSG restricts traffic to Azure service endpoints only"
+log_info "  ✓ Service Endpoints optimize routing to Azure Storage/ACR"
+log_info "  ✓ CAPI will create its own NIC-level NSG (subnet NSG handles filtering)"
 
 if ! openshift-install create cluster --dir=./openshift-install-disconnected; then
     log_error "OpenShift installation failed"
@@ -192,26 +197,52 @@ fi
 # ArgoCD will read values files from Git, so any local patches are lost.
 # Instead, we use --set to override values at install time.
 
+# Get bastion private IP for git server
+BASTION_PRIVATE_IP=$(hostname -I | awk '{print $1}')
+GIT_HTTP_URL="http://${BASTION_PRIVATE_IP}:8080/coco-pattern"
+GIT_BRANCH=$(cd ~/coco-pattern && git branch --show-current)
+
+log_info "Disconnected git repository:"
+log_info "  URL: ${GIT_HTTP_URL}"
+log_info "  Branch: ${GIT_BRANCH}"
+log_info "  Status: $(systemctl is-active git-http.service)"
+
+# Verify git HTTP server is accessible
+if ! curl -s -o /dev/null -w "%{http_code}" "${GIT_HTTP_URL}/HEAD" | grep -q "200"; then
+    log_error "Git HTTP server is not accessible at ${GIT_HTTP_URL}"
+    log_error "Check server status: systemctl status git-http.service"
+    exit 1
+fi
+
+log_info "Git HTTP server is accessible ✓"
+
 # Build EXTRA_HELM_OPTS with both the values file AND runtime overrides
 # The --set flag takes precedence over values files (per Makefile comment)
 export EXTRA_HELM_OPTS="-f values-disconnected.yaml \
-  --set main.multiSourceConfig.helmRepoUrl=${ACR_LOGIN_SERVER}/hybridcloudpatterns"
+  --set main.multiSourceConfig.helmRepoUrl=${ACR_LOGIN_SERVER}/hybridcloudpatterns \
+  --set main.git.repoURL=${GIT_HTTP_URL} \
+  --set main.git.revision=${GIT_BRANCH}"
 
 log_info "Helm options configured:"
 log_info "  Base values: values-global.yaml (always loaded)"
 log_info "  Cluster group: values-simple.yaml (from clusterGroupName)"
 log_info "  Overlay: values-disconnected.yaml (catalog sources, operators)"
-log_info "  Runtime override: --set main.multiSourceConfig.helmRepoUrl"
+log_info "  Runtime overrides:"
+log_info "    - main.multiSourceConfig.helmRepoUrl = ${ACR_LOGIN_SERVER}/hybridcloudpatterns"
+log_info "    - main.git.repoURL = ${GIT_HTTP_URL}"
+log_info "    - main.git.revision = ${GIT_BRANCH}"
 log_info ""
 log_info "Disconnected configuration:"
-log_info "  helmRepoUrl: ${ACR_LOGIN_SERVER}/hybridcloudpatterns (via --set)"
+log_info "  Helm charts: ${ACR_LOGIN_SERVER}/hybridcloudpatterns (via --set)"
+log_info "  Git repository: ${GIT_HTTP_URL} (via --set)"
+log_info "  Git branch: ${GIT_BRANCH} (via --set)"
 log_info "  Operator sources: cs-*-v4-20 (from values-disconnected.yaml)"
 log_info ""
 log_info "Why this approach:"
-log_info "  1. ArgoCD reads values files from Git (not bastion)"
-log_info "  2. --set overrides are baked into ArgoCD Application at install time"
-log_info "  3. No need to modify files that ArgoCD syncs from Git"
-log_info "  4. Avoids race conditions with helmRepoUrl availability"
+log_info "  1. Cluster cannot reach GitHub in disconnected mode"
+log_info "  2. Bastion serves git repository over HTTP on private network"
+log_info "  3. --set overrides are baked into ArgoCD Application at install time"
+log_info "  4. ArgoCD syncs from bastion git server (accessible from cluster)"
 
 # Install pattern
 log_info "Running pattern installation..."

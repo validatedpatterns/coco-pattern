@@ -41,6 +41,8 @@ platform:
     controlPlaneSubnet: {{ master_subnet_name }}
     computeSubnet: {{ worker_subnet_name }}
     networkResourceGroupName: {{ RESOURCEGROUP }}
+    bootstrapExternalStaticIP: "10.0.10.4"
+    bootstrapExternalStaticGateway: "10.0.10.1"
 publish: External
 pullSecret: '{{ pull_secret }}'
 sshKey: '{{ ssh_key }}'

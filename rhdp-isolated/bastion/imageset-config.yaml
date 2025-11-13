@@ -86,8 +86,7 @@ mirror:
   - name: quay.io/hybridcloudpatterns/imperative-container:latest
   - name: quay.io/hybridcloudpatterns/pattern-install:0.0.4
   
-  # Gitea (internal git server for patterns)
-  - name: docker.io/gitea/gitea:1.21.11-rootless
+  # Note: Gitea removed - bastion serves git via HTTP instead
   
   # CoCo/KBS Application Images (for pattern testing)
   - name: ghcr.io/butler54/kbs-access-app:latest

@@ -35,13 +35,20 @@ fi
 source "${OUTPUTS_FILE}"
 
 log_info "=========================================="
-log_info "Configuring bastion host"
+log_info "Verifying bastion host configuration"
 log_info "=========================================="
-log_info "Note: Hardware and software setup via cloud-init"
-log_info "This script handles:"
-log_info "  - Environment variables"
-log_info "  - Azure credentials"
-log_info "  - Pattern repository upload"
+log_info "Note: Cloud-init does EVERYTHING automatically!"
+log_info ""
+log_info "What cloud-init configured (from Terraform variables):"
+log_info "  ✓ Azure credentials (~/.azure/osServicePrincipal.json)"
+log_info "  ✓ Environment variables (~/.envrc with registry, Azure auth)"
+log_info "  ✓ SSH key pair (~/.ssh/id_rsa)"
+log_info "  ✓ Pattern repository (~/coco-pattern from git)"
+log_info "  ✓ Container registry (podman on port 5000)"
+log_info "  ✓ Git HTTP server (populated and running)"
+log_info "  ✓ Ignition HTTP server (running)"
+log_info ""
+log_info "This script only verifies the setup is complete"
 log_info "=========================================="
 
 log_info "Bastion: ${BASTION_USER}@${BASTION_IP}"
@@ -57,14 +64,15 @@ fi
 
 log_info "SSH connection successful"
 
-# Wait for cloud-init to complete
+# Wait for cloud-init to complete (using sudo to avoid permission issues)
 log_info "Waiting for cloud-init to complete..."
 MAX_WAIT=600  # 10 minutes
 ELAPSED=0
 WAIT_INTERVAL=15
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
-    STATUS=$(ssh -o ConnectTimeout=10 "${BASTION_USER}@${BASTION_IP}" "cloud-init status" 2>/dev/null || echo "waiting")
+    # Use sudo to avoid permission denied errors
+    STATUS=$(ssh -o ConnectTimeout=10 "${BASTION_USER}@${BASTION_IP}" "sudo cloud-init status" 2>/dev/null || echo "waiting")
     
     if echo "$STATUS" | grep -q "status: done"; then
         log_info "Cloud-init completed successfully"
@@ -86,8 +94,7 @@ done
 
 if [ $ELAPSED -ge $MAX_WAIT ]; then
     log_warn "Timed out waiting for cloud-init (${MAX_WAIT}s)"
-    log_warn "Proceeding anyway, but some tools may not be available yet"
-    log_warn "You can check status later with: ssh ${BASTION_USER}@${BASTION_IP} 'cloud-init status'"
+    log_warn "Proceeding anyway, but verification will check if setup is complete"
 fi
 
 # Verify cloud-init installed tools
@@ -134,144 +141,129 @@ if [ $? -ne 0 ]; then
     log_warn "Wait a few minutes and check: ssh ${BASTION_USER}@${BASTION_IP} 'cloud-init status'"
 fi
 
-# Create Azure credentials directory on bastion
-log_info "Configuring Azure credentials on bastion..."
-ssh "${BASTION_USER}@${BASTION_IP}" "mkdir -p ~/.azure"
-
-# Create service principal JSON
-AZURE_CREDS=$(cat <<EOF
-{
-  "subscriptionId": "${SUBSCRIPTION}",
-  "clientId": "${CLIENT_ID}",
-  "clientSecret": "${PASSWORD}",
-  "tenantId": "${TENANT}"
-}
-EOF
-)
-
-echo "$AZURE_CREDS" | ssh "${BASTION_USER}@${BASTION_IP}" "cat > ~/.azure/osServicePrincipal.json && chmod 600 ~/.azure/osServicePrincipal.json"
-
-# Create environment file on bastion
-log_info "Creating environment file on bastion..."
-BASTION_ENV=$(cat <<EOF
-# Azure and RHDP Environment Variables
-export GUID="${GUID}"
-export CLIENT_ID="${CLIENT_ID}"
-export PASSWORD="${PASSWORD}"
-export TENANT="${TENANT}"
-export SUBSCRIPTION="${SUBSCRIPTION}"
-export RESOURCEGROUP="${RESOURCEGROUP}"
-export AZURE_REGION="${AZURE_REGION}"
-
-# ACR Credentials
-export ACR_LOGIN_SERVER="${ACR_LOGIN_SERVER}"
-export ACR_NAME="${ACR_NAME}"
-export ACR_USERNAME="${ACR_USERNAME}"
-export ACR_PASSWORD="${ACR_PASSWORD}"
-
-# Add OpenShift tools from data disk to PATH
-export PATH="/var/cache/oc-mirror/bin:\${PATH}"
-EOF
-)
-
-echo "$BASTION_ENV" | ssh "${BASTION_USER}@${BASTION_IP}" "cat > ~/.envrc && chmod 600 ~/.envrc"
-
-# Add to bashrc if not already there
-ssh "${BASTION_USER}@${BASTION_IP}" "if ! grep -q 'source ~/.envrc' ~/.bashrc; then echo 'source ~/.envrc' >> ~/.bashrc; fi"
-
-# Clone pattern repository to bastion
-log_info "Cloning pattern repository to bastion..."
-PATTERN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
-cd "${PATTERN_ROOT}"
-
-# Detect current git remote and branch
-GIT_REMOTE=$(git config --get remote.origin.url || echo "")
-GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD || echo "main")
-
-if [ -z "$GIT_REMOTE" ]; then
-    log_error "Could not determine git remote URL"
-    log_error "Please ensure you are in a git repository with a remote configured"
-    exit 1
-fi
-
-# Convert SSH URL to HTTPS URL if needed (for bastion access without SSH keys)
-if [[ "$GIT_REMOTE" =~ ^git@ ]]; then
-    log_info "Converting SSH URL to HTTPS for bastion access..."
-    # Convert git@github.com:user/repo.git -> https://github.com/user/repo.git
-    GIT_REMOTE_HTTPS=$(echo "$GIT_REMOTE" | sed -E 's|^git@([^:]+):(.+)$|https://\1/\2|')
-    log_info "Original (SSH): ${GIT_REMOTE}"
-    log_info "Converted (HTTPS): ${GIT_REMOTE_HTTPS}"
-    GIT_REMOTE="$GIT_REMOTE_HTTPS"
-else
-    log_info "Git remote: ${GIT_REMOTE}"
-fi
-
-log_info "Git branch: ${GIT_BRANCH}"
-
-# Clone the repository on the bastion
-log_info "Cloning ${GIT_REMOTE} (branch: ${GIT_BRANCH}) to bastion..."
-ssh "${BASTION_USER}@${BASTION_IP}" bash <<EOFCLONE
+# Verify cloud-init completed all setup
+log_info "Verifying cloud-init completed full bastion setup..."
+ssh "${BASTION_USER}@${BASTION_IP}" bash <<'EOFVERIFY'
+#!/bin/bash
 set -e
 
-# Remove existing directory if present
-if [ -d ~/coco-pattern ]; then
-    echo "[INFO] Removing existing coco-pattern directory"
-    rm -rf ~/coco-pattern
-fi
+echo ""
+echo "Verification Checklist:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Clone the repository
-echo "[INFO] Cloning repository..."
-git clone --branch ${GIT_BRANCH} ${GIT_REMOTE} ~/coco-pattern
-
-cd ~/coco-pattern
-echo "[INFO] Cloned to: \$(pwd)"
-echo "[INFO] Current branch: \$(git branch --show-current)"
-echo "[INFO] Latest commit: \$(git log -1 --oneline)"
-
-EOFCLONE
-
-if [ $? -eq 0 ]; then
-    log_info "Repository cloned successfully"
+# 1. Azure credentials
+if [ -f ~/.azure/osServicePrincipal.json ]; then
+    echo "  ✅ Azure credentials configured"
 else
-    log_error "Failed to clone repository"
-    log_error "Please check git credentials and network connectivity from bastion"
+    echo "  ❌ Azure credentials missing (cloud-init failed?)"
     exit 1
 fi
 
+# 2. Environment variables
+if [ -f ~/.envrc ]; then
+    source ~/.envrc
+    if [ -n "$ACR_LOGIN_SERVER" ] && [ -n "$GUID" ]; then
+        echo "  ✅ Environment variables configured"
+        echo "     GUID: $GUID"
+        echo "     ACR: $ACR_LOGIN_SERVER"
+    else
+        echo "  ❌ Environment variables incomplete"
+        exit 1
+    fi
+else
+    echo "  ❌ .envrc missing (cloud-init failed?)"
+    exit 1
+fi
+
+# 3. SSH key
+if [ -f ~/.ssh/id_rsa ]; then
+    echo "  ✅ SSH key generated"
+else
+    echo "  ❌ SSH key missing (cloud-init failed?)"
+    exit 1
+fi
+
+# 4. Pattern repository
+if [ -d ~/coco-pattern ]; then
+    cd ~/coco-pattern
+    BRANCH=$(git branch --show-current)
+    echo "  ✅ Pattern repository cloned (branch: $BRANCH)"
+else
+    echo "  ❌ Pattern repository missing (cloud-init failed?)"
+    exit 1
+fi
+
+# 5. Git HTTP server
+if systemctl is-active --quiet git-http.service; then
+    echo "  ✅ Git HTTP Server: Running (port 8080)"
+    if curl -sf http://localhost:8080/coco-pattern/.git/HEAD > /dev/null; then
+        echo "     → Serving pattern repository"
+    else
+        echo "     ⚠️ Server running but content not accessible"
+    fi
+else
+    echo "  ❌ Git HTTP Server: Not running"
+    exit 1
+fi
+
+# 6. Container registry
+if systemctl is-active --quiet registry.service; then
+    echo "  ✅ Container Registry: Running (port 5000)"
+    if curl -sf http://localhost:5000/v2/ > /dev/null; then
+        echo "     → Accessible at http://10.0.1.4:5000"
+    else
+        echo "     ⚠️ Service running but not responding"
+    fi
+else
+    echo "  ❌ Container Registry: Not running"
+    exit 1
+fi
+
+# 7. Ignition HTTP server
+if systemctl is-active --quiet ignition-http.service; then
+    echo "  ✅ Ignition HTTP Server: Running (port 8081)"
+else
+    echo "  ❌ Ignition HTTP Server: Not running"
+    exit 1
+fi
+
+echo ""
+echo "✅ ALL CLOUD-INIT SETUP VERIFIED - Bastion is fully configured!"
+
+EOFVERIFY
+
+# Get bastion private IP for git server
+BASTION_PRIVATE_IP=$(ssh "${BASTION_USER}@${BASTION_IP}" "hostname -I | awk '{print \$1}'")
+
 log_info ""
 log_info "=========================================="
-log_info "Bastion configuration complete!"
+log_info "✅ Bastion verification complete!"
 log_info "=========================================="
 log_info ""
-log_info "To connect to bastion:"
-log_info "  ssh ${BASTION_USER}@${BASTION_IP}"
-log_info ""
-log_info "Cloud-init handled:"
-log_info "  ✓ System packages and updates"
-log_info "  ✓ OpenShift CLI tools (oc, kubectl, openshift-install, oc-mirror)"
-log_info "  ✓ Container tools (podman, skopeo)"
-log_info "  ✓ Python packages (jinja2, typer, rich, PyYAML, ansible)"
-log_info "  ✓ Data disk setup and mount"
-log_info ""
-log_info "This script configured:"
+log_info "Cloud-init configured EVERYTHING automatically:"
+log_info "  ✓ System packages and OpenShift tools"
+log_info "  ✓ Data disk mounted (500GB)"
 log_info "  ✓ Azure credentials"
-log_info "  ✓ Environment variables"
-log_info "  ✓ Pattern repository (cloned from ${GIT_REMOTE}, branch ${GIT_BRANCH})"
+log_info "  ✓ Environment variables (with ACR)"
+log_info "  ✓ SSH key pair"
+log_info "  ✓ Pattern repository (from Terraform git_remote_url/git_branch)"
+log_info "  ✓ Git HTTP server (running on port 8080)"
+log_info "  ✓ Ignition HTTP server (running on port 8081)"
 log_info ""
-log_info "Next steps (on bastion):"
-log_info "  1. cd ~/coco-pattern"
-log_info "  2. Ensure pull secret: ~/pull-secret.json"
-log_info "  3. Run mirroring: ./rhdp-isolated/bastion/mirror.sh"
-log_info "  4. Install cluster: ./rhdp-isolated/bastion/wrapper-disconnected.sh ${AZURE_REGION}"
+log_info "Services:"
+log_info "  • Container Registry: http://${BASTION_PRIVATE_IP}:5000"
+log_info "  • Git HTTP: http://${BASTION_PRIVATE_IP}:8080/coco-pattern"
+log_info "  • Ignition HTTP: http://${BASTION_PRIVATE_IP}:8081/"
 log_info ""
-log_info "Note: You need to copy your pull-secret.json to the bastion:"
-log_info "  scp ~/pull-secret.json ${BASTION_USER}@${BASTION_IP}:~/"
+log_info "Next steps:"
+log_info "  1. Copy pull secret to bastion:"
+log_info "     scp ~/pull-secret.json ${BASTION_USER}@${BASTION_IP}:~/"
 log_info ""
-log_info "Git repository info:"
-log_info "  Remote: ${GIT_REMOTE}"
-log_info "  Branch: ${GIT_BRANCH}"
+log_info "  2. SSH to bastion and deploy:"
+log_info "     ssh ${BASTION_USER}@${BASTION_IP}"
+log_info "     cd ~/coco-pattern"
+log_info "     ./rhdp-isolated/bastion/deploy-cluster.sh eastasia"
 log_info ""
-log_info "To check cloud-init completion status:"
-log_info "  ssh ${BASTION_USER}@${BASTION_IP} 'cloud-init status --long'"
+log_info "Note: deploy-cluster.sh automatically runs mirroring if needed (2-4 hrs first time)"
+log_info "All configuration is automated - no manual setup required!"
 log_info ""

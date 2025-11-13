@@ -42,14 +42,12 @@ else
     exit 1
 fi
 
-# Verify required variables
-required_vars=("ACR_LOGIN_SERVER" "ACR_USERNAME" "ACR_PASSWORD")
-for var in "${required_vars[@]}"; do
-    if [ -z "${!var}" ]; then
-        log_error "Required environment variable '${var}' is not set"
-        exit 1
-    fi
-done
+# Set registry URL (defaults to bastion-hosted registry)
+REGISTRY_URL="${REGISTRY_URL:-localhost:5000}"
+
+log_info "Container registry: ${REGISTRY_URL}"
+
+# No authentication required for bastion-hosted registry (localhost)
 
 # Verify pull secret exists
 PULL_SECRET="${HOME}/pull-secret.json"
@@ -93,26 +91,15 @@ MERGED_AUTH_FILE="${AUTH_DIR}/config.json"
 # Start with the Red Hat pull secret
 cp "${PULL_SECRET}" "${MERGED_AUTH_FILE}"
 
-# Login to ACR using podman with the merged auth file
-log_step "Authenticating to ACR: ${ACR_LOGIN_SERVER}"
-echo "${ACR_PASSWORD}" | podman login "${ACR_LOGIN_SERVER}" \
-    --username "${ACR_USERNAME}" \
-    --password-stdin \
-    --authfile="${MERGED_AUTH_FILE}"
+# Verify bastion container registry is accessible
+log_step "Verifying bastion container registry: ${REGISTRY_URL}"
 
-if [ $? -eq 0 ]; then
-    log_info "Successfully authenticated to ACR"
+if curl -sf "http://${REGISTRY_URL}/v2/" > /dev/null 2>&1; then
+    log_info "Bastion registry is accessible"
 else
-    log_error "Failed to authenticate to ACR"
+    log_error "Cannot access bastion registry at ${REGISTRY_URL}"
+    log_error "Please ensure registry.service is running: systemctl status registry.service"
     exit 1
-fi
-
-# Test connectivity
-log_info "Testing ACR connectivity..."
-if podman search "${ACR_LOGIN_SERVER}/test" --limit 1 --authfile="${MERGED_AUTH_FILE}" &>/dev/null; then
-    log_info "ACR is accessible"
-else
-    log_warn "ACR search test returned non-zero, but this may be normal for empty registry"
 fi
 
 # Verify Red Hat registry access
@@ -153,12 +140,12 @@ log_info "oc-mirror will use auth from: ${MERGED_AUTH_FILE}"
 START_TIME=$(date +%s)
 
 log_info "Executing oc-mirror..."
-log_info "Command: oc-mirror --config=${MIRROR_WORKSPACE}/imageset-config.yaml --workspace file://${MIRROR_WORKSPACE} docker://${ACR_LOGIN_SERVER} --v2"
+log_info "Command: oc-mirror --config=${MIRROR_WORKSPACE}/imageset-config.yaml --workspace file://${MIRROR_WORKSPACE} docker://${REGISTRY_URL} --v2"
 
 if oc-mirror \
     --config="${MIRROR_WORKSPACE}/imageset-config.yaml" \
     --workspace "file://${MIRROR_WORKSPACE}" \
-    "docker://${ACR_LOGIN_SERVER}" \
+    "docker://${REGISTRY_URL}" \
     --v2; then
     
     END_TIME=$(date +%s)
@@ -240,7 +227,7 @@ Mirror Operation Summary
 ========================
 Date: $(date)
 Duration: ${HOURS}h ${MINUTES}m
-ACR: ${ACR_LOGIN_SERVER}
+Registry: ${REGISTRY_URL} (bastion-hosted)
 
 Generated Resources:
 $(ls -1 "${INSTALL_MANIFESTS_DIR}")

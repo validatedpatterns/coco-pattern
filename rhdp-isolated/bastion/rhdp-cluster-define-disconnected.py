@@ -18,9 +18,11 @@ from rich import print as rprint
 from typing_extensions import Annotated
 
 
-def cleanup(pattern_dir: pathlib.Path) -> None:
+def cleanup(pattern_dir: pathlib.Path, use_upi: bool = False) -> None:
     """Cleanup directory"""
-    install_dir = pattern_dir / "openshift-install-disconnected"
+    # Use UPI directory if requested, otherwise IPI
+    dir_name = "openshift-install-upi" if use_upi else "openshift-install-disconnected"
+    install_dir = pattern_dir / dir_name
     azure_dir = pathlib.Path.home() / ".azure"
 
     if install_dir.exists() and install_dir.is_dir():
@@ -98,15 +100,15 @@ def parse_idms_to_digest_sources(cluster_resources_dir: pathlib.Path) -> str:
     for idms_file in idms_files:
         try:
             with open(idms_file, 'r') as f:
-                idms_content = yaml.safe_load(f)
-            
-            if idms_content and 'spec' in idms_content and 'imageDigestMirrors' in idms_content['spec']:
-                for mirror in idms_content['spec']['imageDigestMirrors']:
-                    source_entry = {
-                        'source': mirror.get('source', ''),
-                        'mirrors': mirror.get('mirrors', [])
-                    }
-                    digest_sources.append(source_entry)
+                # Use safe_load_all to handle multi-document YAML files
+                for idms_content in yaml.safe_load_all(f):
+                    if idms_content and 'spec' in idms_content and 'imageDigestMirrors' in idms_content['spec']:
+                        for mirror in idms_content['spec']['imageDigestMirrors']:
+                            source_entry = {
+                                'source': mirror.get('source', ''),
+                                'mirrors': mirror.get('mirrors', [])
+                            }
+                            digest_sources.append(source_entry)
         except Exception as e:
             rprint(f"[yellow]Warning: Failed to parse {idms_file.name}: {e}[/yellow]")
     
@@ -123,6 +125,7 @@ def setup_install(
     region: str,
     pull_secret_path: pathlib.Path,
     ssh_key_path: pathlib.Path,
+    use_upi: bool = False,
 ):
     """Create the disconnected install config file"""
     try:
@@ -185,7 +188,9 @@ def setup_install(
         image_digest_sources=image_digest_sources
     )
     
-    install_config = pattern_dir / "openshift-install-disconnected" / "install-config.yaml"
+    # Use UPI directory if requested, otherwise IPI
+    dir_name = "openshift-install-upi" if use_upi else "openshift-install-disconnected"
+    install_config = pattern_dir / dir_name / "install-config.yaml"
     install_config.write_text(output_text)
     
     rprint(f"[green]Install config created at: {install_config}[/green]")
@@ -215,21 +220,26 @@ def write_azure_creds():
     rprint("[green]Azure credentials configured[/green]")
 
 
-def run(region: Annotated[str, typer.Argument(help="Azure region code")]):
+def run(
+    region: Annotated[str, typer.Argument(help="Azure region code")],
+    upi: Annotated[bool, typer.Option("--upi", help="Generate config for UPI deployment")] = False,
+):
     """
     Generate disconnected install-config.yaml for CoCo pattern.
     Region flag requires an azure region key which can be (authoritatively)
     requested with: "az account list-locations -o table".
     """
-    rprint("[bold blue]CoCo Pattern - Disconnected Install Config Generator[/bold blue]")
+    mode = "UPI" if upi else "IPI"
+    rprint(f"[bold blue]CoCo Pattern - Disconnected Install Config Generator ({mode})[/bold blue]")
     
     validate_dir()
-    cleanup(pathlib.Path.cwd())
+    cleanup(pathlib.Path.cwd(), use_upi=upi)
     setup_install(
         pathlib.Path.cwd(),
         region,
         pathlib.Path("~/pull-secret.json"),
         pathlib.Path("~/.ssh/id_rsa.pub"),
+        use_upi=upi,
     )
     write_azure_creds()
     

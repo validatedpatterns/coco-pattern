@@ -73,14 +73,41 @@ fi
 
 log_info "Terraform found: $(terraform version | head -n1)"
 
-# Create terraform.tfvars
+# Detect current git repository details
+PATTERN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${PATTERN_ROOT}"
+
+GIT_REMOTE=$(git config --get remote.origin.url || echo "")
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD || echo "main")
+
+# Convert SSH URL to HTTPS if needed (bastion can't use SSH without keys)
+if [[ "$GIT_REMOTE" =~ ^git@ ]]; then
+    GIT_REMOTE=$(echo "$GIT_REMOTE" | sed -E 's|^git@([^:]+):(.+)$|https://\1/\2|')
+    log_info "Converted git remote to HTTPS: ${GIT_REMOTE}"
+fi
+
+log_info "Git remote: ${GIT_REMOTE}"
+log_info "Git branch: ${GIT_BRANCH}"
+
+# Create terraform.tfvars with ALL variables for self-contained cloud-init
 log_info "Creating terraform.tfvars from environment variables"
 cat > "${TERRAFORM_DIR}/terraform.tfvars" <<EOF
+# Infrastructure
 region              = "${AZURE_REGION}"
 resource_group_name = "${RESOURCEGROUP}"
 guid                = "${GUID}"
 
-# Generated from environment
+# Azure Service Principal (for cloud-init bastion configuration)
+subscription_id  = "${SUBSCRIPTION}"
+client_id        = "${CLIENT_ID}"
+client_secret    = "${PASSWORD}"
+tenant_id        = "${TENANT}"
+
+# Git Repository (for cloud-init pattern cloning)
+git_remote_url = "${GIT_REMOTE}"
+git_branch     = "${GIT_BRANCH}"
+
+# Tags
 tags = {
   pattern    = "coco-disconnected"
   managed_by = "terraform"
@@ -88,7 +115,7 @@ tags = {
 }
 EOF
 
-log_info "terraform.tfvars created"
+log_info "terraform.tfvars created with self-contained cloud-init variables"
 
 # Navigate to terraform directory
 cd "${TERRAFORM_DIR}"

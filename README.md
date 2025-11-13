@@ -12,7 +12,9 @@ The current version of this application the confidential containers assumes depl
 ## Deployment Options
 
 - **Standard (Connected) Deployment**: Requires internet access from the cluster ([Installation Guide](#setup-instructions))
-- **Disconnected Deployment**: For air-gapped or restricted network environments ([Disconnected Guide](docs/DISCONNECTED.md))
+- **Disconnected Deployment**: For air-gapped environments with bastion-hosted registry ([Architecture & Deployment Guide](ARCHITECTURE.md))
+
+**New**: Fully automated disconnected deployment using Terraform and cloud-init. See [ARCHITECTURE.md](ARCHITECTURE.md) for complete guide.
 
 On the platform a sample workload is deployed:
 
