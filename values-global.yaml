@@ -18,7 +18,7 @@ main:
   # WARNING
   # This default configuration uses a single cluster on azure.
   # It fundamentally violates the separation of duties.
-  clusterGroupName: trusted-hub
+  clusterGroupName: simple
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.*
