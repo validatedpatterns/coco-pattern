@@ -1,0 +1,34 @@
+---
+name: Validate defaults apply
+
+on: [push, pull_request]
+
+jobs:
+  validate_defaults:
+    name: Json Schema tests
+    strategy:
+      matrix:
+        python-version: [3.11]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+
+      - name: Install yq
+        uses: chrisdickinson/setup-yq@latest
+        with:
+          yq-version: v4.30.7
+
+      - name: Validate clusterGroupName is simple
+        run: |
+          if [ "$(yq '.main.clusterGroupName' values-global.yaml)" != "simple" ]; then
+            echo "main.clusterGroupName must be 'simple'"
+            exit 1
+          fi
