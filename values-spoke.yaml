@@ -68,7 +68,7 @@ clusterGroup:
     # Total timeout of all jobs is 1h: imperative.activeDeadlineSeconds
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     # For additional overrides that apply to the jobs, please refer to
-    # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
+    # https://validatedpatterns.io/imperative-actions/#additional-job-customizations
     jobs:
     - name: install-deps
       playbook: ansible/install-deps.yaml

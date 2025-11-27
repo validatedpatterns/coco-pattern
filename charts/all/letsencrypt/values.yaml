@@ -34,9 +34,9 @@ letsencrypt:
   #server: https://acme-staging-v02.api.letsencrypt.org/directory
   server: https://acme-v02.api.letsencrypt.org/directory
 
-  # -- List of organization names to be put in a certificate (Defaults to [hybrid-cloud-patterns.io])
+  # -- List of organization names to be put in a certificate (Defaults to [validatedpatterns.io])
   organizations:
-  - hybrid-cloud-patterns.io
+  - validatedpatterns.io
   # -- List of certificate uses. See API cert-manager.io/v1.KeyUsage (Defaults to [server auth])
   usages:
   - server auth
