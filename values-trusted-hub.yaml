@@ -16,7 +16,6 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.13
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
@@ -67,12 +66,17 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system #upstream config
       project: trustee
-      path: charts/hub/trustee
+      chart: trustee
+      chartVersion: 0.1.*
+      # Use the override file to specify the list of secrets accessible to trustee from the ESO backend (today by default, Vault).
+      extraValueFiles:
+        - '$patternref/overrides/values-trustee.yaml'
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
-      project: sandbox
-      path: charts/hub/sandbox-policies
+      chart: sandboxed-policies
+      chartVersion: 0.0.*
+
 
 
   imperative:
@@ -85,10 +89,6 @@ clusterGroup:
     jobs:
     - name: install-deps
       playbook: ansible/install-deps.yaml
-      verbosity: -vvv
-      timeout: 3600
-    - name: gen-certificate
-      playbook: ansible/gen-certificate.yaml
       verbosity: -vvv
       timeout: 3600
     - name: init-data-gzipper

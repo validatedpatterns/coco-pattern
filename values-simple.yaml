@@ -78,17 +78,22 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system #upstream config
       project: trustee
-      path: charts/hub/trustee
+      chart: trustee
+      chartVersion: 0.1.*
+      # Use the override file to specify the list of secrets accessible to trustee from the ESO backend (today by default, Vault).
+      extraValueFiles:
+        - '$patternref/overrides/values-trustee.yaml'
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
-      path: charts/coco-supported/sandbox
+      chart: sandboxed-containers
+      chartVersion: 0.0.*
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
-      project: sandbox
-      path: charts/hub/sandbox-policies
+      chart: sandboxed-policies
+      chartVersion: 0.0.*
 
     # Letsencrypt is not required anymore for trustee.
     # It's only here if you need it for your needs.
@@ -113,6 +118,7 @@ clusterGroup:
       project: workloads
       path: charts/coco-supported/kbs-access
 
+
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
@@ -133,10 +139,6 @@ clusterGroup:
       timeout: 3600
     - name: configure-azure-nat-gateway
       playbook: ansible/azure-nat-gateway.yaml
-      verbosity: -vvv
-      timeout: 3600
-    - name: gen-certificate
-      playbook: ansible/gen-certificate.yaml
       verbosity: -vvv
       timeout: 3600
     - name: init-data-gzipper
