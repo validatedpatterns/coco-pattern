@@ -2,28 +2,30 @@
 
 This is a validated pattern for deploying confidential containers on OpenShift.
 
-The target operating model has two clusters:
+There are two topologies for deploying this pattern:
 
-- One in a "trusted" zone where the remote attestation, KMS and Key Broker infrastructure are deployed.
-- A second where a subset of workloads are deployed in confidential containers.
+1. *Default* using a single cluster. This breaks the RACI expected in a remote attestation architecture, however, makes it easier to test. This uses the `simple` `clusterGroup`.
+2. A more secure operating model that has two clusters:
+   - One in a "trusted" zone where the remote attestation, KMS and Key Broker infrastructure are deployed. This is also the Advanced Cluster Manager Hub cluster. It uses the `trusted-hub` `clusterGroup`.
+   - A second where a subset of workloads are deployed in confidential containers. It uses the `spoke` `clusterGroup`
 
 The current version of this application the confidential containers assumes deployment to Azure.
 
-On the platform a sample workload is deployed:
+On the cluster where confidential workloads are deployed two sample applications are deployed:
 
 1. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
 2. A sample application `kbs-access` which presents secrets obtained from trustee to a web service. This is designed to allow users to test locked down environments.
 
 Future work includes:
 
-1. Supporting a multiple cluster deployment
-2. Supporting multiple infrastructure providers
-3. Supporting a more sophisticated workload such as confidential AI inference with protected GPUs.
+1. ~~Supporting a multiple cluster deployment~~ Done
+2. Supporting multiple infrastructure providers - Work in Progress.
+3. Supporting air-gapped deployments - Work in Progress.
+4. Supporting a more sophisticated workload such as confidential AI inference with protected GPUs.
 
 ## Current constraints and assumptions
 
 - Only currently is known to work with `azure` as the provider of confidential vms via peer-pods.
-- Only known to work today with everything on one cluster. The work to expand this is in flight.
 - Below version 3.1, if not using ARO you must either provide your own CA signed certs, or use let's encrypt.
 - Must be on 4.16.14 or later.
 
@@ -61,8 +63,6 @@ The pattern has been tested on Azure for two installation methods:
 1. Installing onto an ARO cluster
 2. Self managed OpenShift install using the `openshift-install` CLI.
 
-> [!IMPORTANT]
-> You need an external CA signed certificate for to be added (e.g. with let's encrypt) to a self-managed install
 
 ### `1.0.0`
 
@@ -75,7 +75,7 @@ The pattern has been tested on Azure for one installation method:
 
 ## Validated pattern flavours
 
-**Today the demo has one flavour**.
+**Today the demo has two flavour**.
 A number are planned based on various different hub cluster-groups.
 You can change between behaviour by configuring [`global.main.clusterGroupName`](https://validatedpatterns.io/learn/values-files/) key in the `values-global.yaml` file.
 

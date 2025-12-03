@@ -1,6 +1,0 @@
-apiVersion: v2
-description: Deploy and configure trustee on the hub cluster. If upstream operatorhub's catalog source is configured to pull trustee down.
-keywords:
-- pattern
-name: trustee
-version: 0.0.1

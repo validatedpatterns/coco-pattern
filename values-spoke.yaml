@@ -48,8 +48,9 @@ clusterGroup:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
-      path: charts/coco-supported/sandbox
-
+      chart: sandboxed-containers
+      chartVersion: 0.0.*
+  
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift

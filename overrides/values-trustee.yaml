@@ -1,0 +1,9 @@
+# Override the default values for the trustee chart
+# This lists the secret resources that are uploaded to your chosen ESO backend (today by default, Vault).
+# it does not contain the secrets themselves
+kbs:
+  secretResources:
+    - name: "kbsres1" # name is the name of the k8s secret that will be presented to trustee and accessible via the CDH
+      key: "secret/data/hub/kbsres1" # this is the path to the secret in vault. 
+    - name: "passphrase"
+      key: "secret/data/hub/passphrase"
