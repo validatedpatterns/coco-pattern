@@ -82,7 +82,6 @@ You can change between behaviour by configuring [`global.main.clusterGroupName`]
 - `values-simple.yaml`: or the `simple` cluster group is the default for the pattern. It deploys everything in one cluster.
 -`values-trusted-hub`: or the `trusted-hub` cluster group can be configured as the main cluster group. A second cluster should be deployed with the `spoke` cluster group. Follow [instructions here](https://validatedpatterns.io/learn/importing-a-cluster/) to add the second cluster.
 
-
 ## Setup instructions
 
 ### Default single cluster setup with `values-simple.yaml`
@@ -108,7 +107,6 @@ This only has to be done once.
 > Once generated this script will not override secrets. Be careful when doing multiple tests.
 
 #### Configuring let's encrypt (deprecated)
-
 
 > [!IMPORTANT]
 > Ensure you have password login available to the cluster. Let's encrypt will replace the API certificate in addition to the certificates to user with routes.
