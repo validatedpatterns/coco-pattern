@@ -63,7 +63,6 @@ The pattern has been tested on Azure for two installation methods:
 1. Installing onto an ARO cluster
 2. Self managed OpenShift install using the `openshift-install` CLI.
 
-
 ### `1.0.0`
 
 1.0.0 supports OpenShift Sandboxed containers version `1.8.1` along with Trustee version `0.2.0`.
@@ -73,18 +72,16 @@ The pattern has been tested on Azure for one installation method:
 1. Self managed OpenShift install using the `openshift-install` CLI
 2. Installing on top of an existing Azure Red Hat OpenShift (ARO) cluster
 
-## Validated pattern flavours
+## Changing deployment topoloiges
 
-**Today the demo has two flavour**.
-A number are planned based on various different hub cluster-groups.
+**Today the demo has two deployment topologies**
+The most important change is what `clusterGroup` is deployed to your main or 'hub' cluster.
+
 You can change between behaviour by configuring [`global.main.clusterGroupName`](https://validatedpatterns.io/learn/values-files/) key in the `values-global.yaml` file.
 
-`values-simple.yaml`: or the `simple` cluster group is the default for the pattern.
-It deploys a hello-openshift application 3 times:
+- `values-simple.yaml`: or the `simple` cluster group is the default for the pattern. It deploys everything in one cluster.
+-`values-trusted-hub`: or the `trusted-hub` cluster group can be configured as the main cluster group. A second cluster should be deployed with the `spoke` cluster group. Follow [instructions here](https://validatedpatterns.io/learn/importing-a-cluster/) to add the second cluster.
 
-- A standard pod
-- A kata container with peer-pods
-- A confidential kata-container
 
 ## Setup instructions
 
@@ -110,12 +107,13 @@ This only has to be done once.
 > [!NOTE]
 > Once generated this script will not override secrets. Be careful when doing multiple tests.
 
-#### Configuring let's encrypt
+#### Configuring let's encrypt (deprecated)
+
 
 > [!IMPORTANT]
 > Ensure you have password login available to the cluster. Let's encrypt will replace the API certificate in addition to the certificates to user with routes.
 
-Trustee requires a trusted CA issued certificate. Let's Encrypt is included for environments without a trusted cert on OpenShift's routes.
+Trustee (guest agents) requires that Trustee uses a Mozilla trusted CA issued certificate, or a specific certificate which is known in advance. Today the pattern uses specific self signed certs. Let's encrypt was an option for getting a trusted certificate onto OpenShift's routes, and therefore Trustee. Ths functionality will be removed at a later date.
 
 If you need a Let's Encrypt certificate to be issued the `letsencrypt` application configuration needs to be changed as below.
 
