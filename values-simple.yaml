@@ -20,7 +20,6 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.13
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
