@@ -7,6 +7,6 @@ spec:
     targetPort: 8888
   to:
     kind: Service
-    name: standard
+    name: insecure-policy
     weight: 100
   wildcardPolicy: None
