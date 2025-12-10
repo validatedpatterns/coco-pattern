@@ -26,14 +26,14 @@ clusterGroup:
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual 
-      csv: sandboxed-containers-operator.v1.10.1
+      csv: sandboxed-containers-operator.v1.11.0
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v0.4.1
+      csv: trustee-operator.v1.0.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
