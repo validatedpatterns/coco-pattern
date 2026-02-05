@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,50 +15,42 @@ spec:
         app: pccs
         trustedservices.intel.com/cache: pccs
     spec:
-      serviceAccountName: pccs-service-account
       tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: node-role.kubernetes.io/master
-                operator: Exists
-        # Prefer to schedule on the same node as existing PCCS pods
-        podAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  app: pccs
-              topologyKey: kubernetes.io/hostname
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+      nodeSelector:
+        kubernetes.io/hostname: master-03 # THIS IS REALLLY REALLY BAD
       initContainers:
-       - name: init-seclabel
-         image: registry.access.redhat.com/ubi9/ubi:latest
-         command: ["sh", "-c", "chcon -Rt container_file_t /var/cache/pccs"]
-         volumeMounts:
-         - name: host-database
-           mountPath: /var/cache/pccs
-         securityContext:
-           runAsUser: 0
-           runAsGroup: 0
-           privileged: true  # Required for chcon to work on host files
+        - name: init-seclabel
+          image: registry.access.redhat.com/ubi9/ubi:9.7-1764578509
+          command: [ "sh", "-c", "chcon -Rt container_file_t /var/cache/pccs" ]
+          volumeMounts:
+            - name: host-database
+              mountPath: /var/cache/pccs
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            privileged: true  # Required for chcon to work on host files
       containers:
         - name: pccs
-          image: quay.io/openshift_sandboxed_containers/dcap/pccs:0.2.0
+          image: registry.redhat.io/openshift-sandboxed-containers/osc-pccs@sha256:352fac8fb229177e52a3bc132b1e2a1a2af9f924a35f5efb1ab4aaef25fca720
+          envFrom:
+            - secretRef:
+                name: pccs-secrets
+          env:
+            - name: "PCCS_LOG_LEVEL"
+              value: "info"
+            - name: "CLUSTER_HTTPS_PROXY"
+              value: ""
+            - name: "PCCS_FILL_MODE"
+              value: "LAZY"
           ports:
             - containerPort: 8042
               name: pccs-port
           volumeMounts:
             - name: pccs-tls
               mountPath: /opt/intel/pccs/ssl_key
-              readOnly: true
-            - name: pccs-config
-              mountPath: /opt/intel/pccs/config
               readOnly: true
             - name: host-database
               mountPath: /var/cache/pccs/
@@ -67,9 +60,6 @@ spec:
         - name: pccs-tls
           secret:
             secretName: pccs-tls
-        - name: pccs-config
-          secret:
-            secretName: pccs-config
         - name: host-database
           hostPath:
             path: /var/cache/pccs/
