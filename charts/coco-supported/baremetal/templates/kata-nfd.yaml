@@ -1,0 +1,29 @@
+apiVersion: nfd.openshift.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: osc-rules
+  namespace: openshift-nfd
+spec:
+  rules:
+    - name: "runtime.kata"
+      labels:
+        "feature.node.kubernetes.io/runtime.kata": "true"
+      matchAny:
+        - matchFeatures:
+            - feature: cpu.cpuid
+              matchExpressions:
+                SSE42: {op: Exists}
+                VMX: {op: Exists}
+            - feature: kernel.loadedmodule
+              matchExpressions:
+                kvm: {op: Exists}
+                kvm_intel: {op: Exists}
+        - matchFeatures:
+            - feature: cpu.cpuid
+              matchExpressions:
+                SSE42: {op: Exists}
+                SVM: {op: Exists}
+            - feature: kernel.loadedmodule
+              matchExpressions:
+                kvm: {op: Exists}
+                kvm_amd: {op: Exists}

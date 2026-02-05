@@ -1,13 +1,13 @@
 apiVersion: nfd.openshift.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
-  name: intel-dp-devices
+  name: intel-tdx
   namespace: openshift-nfd
 spec:
   rules:
     - name: "intel.sgx"
       labels:
-        "intel.feature.node.kubernetes.io/sgx": "true"
+        "feature.node.kubernetes.io/sgx": "true"
       extendedResources:
         sgx.intel.com/epc: "@cpu.security.sgx.epc"
       matchFeatures:
