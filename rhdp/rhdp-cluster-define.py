@@ -13,8 +13,22 @@ from rich import print as rprint
 from typing_extensions import Annotated
 
 
-def get_default_cluster_configs() -> List[Dict]:
-    """Get default cluster configurations"""
+def get_default_cluster_configs(prefix: str = "") -> List[Dict]:
+    """Get default cluster configurations
+
+    Args:
+        prefix: Optional prefix to add to cluster name and directory
+    """
+    if prefix:
+        return [
+            {
+                "name": f"coco-{prefix}",
+                "directory": f"openshift-install-{prefix}",
+                "cluster_network_cidr": "10.128.0.0/14",
+                "machine_network_cidr": "10.0.0.0/16",
+                "service_network_cidr": "172.30.0.0/16",
+            }
+        ]
     return [
         {
             "name": "coco",
@@ -135,6 +149,9 @@ def run(
     multicluster: Annotated[
         bool, typer.Option("--multicluster", help="Deploy hub and spoke clusters")
     ] = False,
+    prefix: Annotated[
+        str, typer.Option("--prefix", help="Prefix for cluster name and directory")
+    ] = "",
 ):
     """
     Region flag requires an azure region key which can be (authoritatively)
@@ -142,16 +159,25 @@ def run(
 
     Use --multicluster flag to deploy both hub (coco-hub) and spoke (coco-spoke)
     clusters.
+
+    Use --prefix to add a prefix to cluster name and install directory, enabling
+    multiple cluster deployments (e.g., --prefix cluster1 creates coco-cluster1
+    in openshift-install-cluster1).
     """
     validate_dir()
 
     # Choose cluster configurations based on multicluster flag
     if multicluster:
+        if prefix:
+            rprint("WARNING: --prefix is ignored when using --multicluster")
         cluster_configs = get_multicluster_configs()
         rprint("Setting up multicluster deployment (hub and spoke)")
     else:
-        cluster_configs = get_default_cluster_configs()
-        rprint("Setting up single cluster deployment")
+        cluster_configs = get_default_cluster_configs(prefix)
+        if prefix:
+            rprint(f"Setting up single cluster deployment with prefix: {prefix}")
+        else:
+            rprint("Setting up single cluster deployment")
 
     cleanup(pathlib.Path.cwd(), cluster_configs)
     setup_install(

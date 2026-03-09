@@ -1,6 +1,10 @@
 apiVersion: v2
 name: letsencrypt
-description: A Helm chart to add letsencrypt support to Validated Patterns.
+description: >-
+  DEPRECATED: This chart is unsupported and will be removed in a future release.
+  Trustee 1.0 uses cert-manager for certificate management, making Let's Encrypt
+  integration unnecessary. A Helm chart to add letsencrypt support to Validated Patterns.
+deprecated: true
 
 type: application
 

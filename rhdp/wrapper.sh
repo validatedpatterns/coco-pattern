@@ -14,13 +14,56 @@ get_python_cmd() {
     fi
 } 
 
-if [ "$#" -ne 1 ]; then
-    echo "Error: Exactly one argument is required."
-    echo "Usage: $0 {azure-region-code}"
+# Parse arguments
+AZUREREGION=""
+PREFIX=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --prefix)
+            PREFIX="$2"
+            shift 2
+            ;;
+        --prefix=*)
+            PREFIX="${1#*=}"
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option $1"
+            echo "Usage: $0 [--prefix <prefix>] {azure-region-code}"
+            echo "Example: $0 eastasia"
+            echo "Example: $0 --prefix cluster1 eastasia"
+            exit 1
+            ;;
+        *)
+            if [ -z "$AZUREREGION" ]; then
+                AZUREREGION="$1"
+            else
+                echo "Error: Too many positional arguments."
+                echo "Usage: $0 [--prefix <prefix>] {azure-region-code}"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$AZUREREGION" ]; then
+    echo "Error: Azure region is required."
+    echo "Usage: $0 [--prefix <prefix>] {azure-region-code}"
     echo "Example: $0 eastasia"
+    echo "Example: $0 --prefix cluster1 eastasia"
     exit 1
 fi
-AZUREREGION=$1
+
+# Set install directory based on prefix
+if [ -n "$PREFIX" ]; then
+    INSTALL_DIR="openshift-install-${PREFIX}"
+    echo "Using prefix: $PREFIX"
+    echo "Install directory: $INSTALL_DIR"
+else
+    INSTALL_DIR="openshift-install"
+fi
 
 echo "---------------------"
 echo "Validating configuration"
@@ -37,6 +80,17 @@ fi
 if ! command -v yq &> /dev/null; then
     echo "ERROR: yq is required but not installed"
     echo "Please install yq: https://github.com/mikefarah/yq#install"
+    exit 1
+fi
+
+# Check if podman is available and running
+if ! command -v podman &> /dev/null; then
+    echo "ERROR: podman is required but not installed"
+    exit 1
+fi
+
+if ! podman info &> /dev/null; then
+    echo "ERROR: podman is installed but not responding"
     exit 1
 fi
 
@@ -113,7 +167,11 @@ echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
 PYTHON_CMD=$(get_python_cmd)
-$PYTHON_CMD rhdp/rhdp-cluster-define.py ${AZUREREGION}
+if [ -n "$PREFIX" ]; then
+    $PYTHON_CMD rhdp/rhdp-cluster-define.py --prefix "${PREFIX}" ${AZUREREGION}
+else
+    $PYTHON_CMD rhdp/rhdp-cluster-define.py ${AZUREREGION}
+fi
 echo "---------------------"
 echo "cluster defined"
 echo "---------------------"
@@ -121,19 +179,23 @@ sleep 10
 echo "---------------------"
 echo "openshift-install"
 echo "---------------------"
-openshift-install create cluster --dir=./openshift-install
+openshift-install create cluster --dir=./${INSTALL_DIR}
 echo "openshift-install done"
 echo "---------------------"
 echo "setting up secrets"
 
 bash ./scripts/gen-secrets.sh
 
+echo "---------------------"
+echo "retrieving PCR measurements"
+echo "---------------------"
+bash ./scripts/get-pcr.sh
 
 sleep 60
 echo "---------------------"
 echo "pattern install"
 echo "---------------------"
-export KUBECONFIG="$(pwd)/openshift-install/auth/kubeconfig"
+export KUBECONFIG="$(pwd)/${INSTALL_DIR}/auth/kubeconfig"
 
 
 ./pattern.sh make install
