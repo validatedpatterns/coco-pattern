@@ -31,9 +31,24 @@ Future work includes:
 
 ## Major versions
 
-### `3.*`
+### `4.0.0`
 
-Version `3.*` of the pattern is currently constrained to support the general availability releases of coco.
+Version `4.0.0` uses GA releases of confidential containers: OpenShift Sandboxed Containers (OSC) `1.11.x`+ and Trustee `1.0.0`+.
+
+- **Breaking change:** attestation on Azure is required and configured by default.
+- Requires OpenShift 4.17+.
+
+The pattern has been tested on Azure for two installation methods:
+
+1. Installing onto an ARO cluster
+2. Self managed OpenShift install using the `openshift-install` CLI.
+
+### `3.*` (Tech Preview)
+
+> [!NOTE]
+> Versions below `4.0.0` used tech preview releases of confidential containers (OSC peer pods and Trustee).
+
+Version `3.*` of the pattern uses:
 
 - (OpenShift Sandboxed Containers Operator) `1.10.*` and above
 - Trustee `0.4.*`
@@ -49,9 +64,9 @@ The pattern has been tested on Azure for two installation methods:
 
 [Additional configuration](https://issues.redhat.com/browse/KATA-4107) is required to pull secrets from authenticated registries.
 
-### `2.*`
+### `2.*` (Tech Preview)
 
-Version `2.*` of the pattern is currently constrained to support:
+Version `2.*` of the pattern uses:
 
 - (OpenShift Sandboxed Containers Operator) `1.9.*`
 - Trustee `0.3.*`
@@ -63,7 +78,7 @@ The pattern has been tested on Azure for two installation methods:
 1. Installing onto an ARO cluster
 2. Self managed OpenShift install using the `openshift-install` CLI.
 
-### `1.0.0`
+### `1.0.0` (Tech Preview)
 
 1.0.0 supports OpenShift Sandboxed containers version `1.8.1` along with Trustee version `0.2.0`.
 
