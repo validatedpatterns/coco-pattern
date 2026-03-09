@@ -1,4 +1,4 @@
-- name: Gzip initdata
+- name: Gzip initdata and register init data
   become: false
   connection: local
   hosts: localhost
@@ -7,6 +7,7 @@
     kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
     cluster_platform: "{{ global.clusterPlatform | default('none') | lower }}"
     hub_domain: "{{ global.hubClusterDomain | default('none')  | lower}}"
+    security_policy_flavour: "{{ global.coco.securityPolicyFlavour | default('insecure') }}"
     template_src: "initdata-default.toml.tpl"
   tasks:
     - name: Create temporary working directory
@@ -36,7 +37,6 @@
     - name: Define temp file paths
       ansible.builtin.set_fact:
         rendered_path: "{{ tmpdir.path }}/rendered.toml"
-        gz_path: "{{ tmpdir.path }}/rendered.toml.gz"
 
     - name: Render template to temp file
       ansible.builtin.template:
@@ -45,15 +45,33 @@
         mode: "0600"
 
 
-    - name: Gzip the rendered content
+    - name: Gzip and base64 encode the rendered content
       ansible.builtin.shell: |
-        gzip -c "{{ rendered_path }}" > "{{ gz_path }}"
-      changed_when: true
+        set -o pipefail
+        cat "{{ rendered_path }}" | gzip | base64 -w0
+      register: initdata_encoded
+      changed_when: false
 
-    - name: Read gzip as base64
-      ansible.builtin.slurp:
-        path: "{{ gz_path }}"
-      register: gz_slurped
+    # This block runs a shell script that calculates a hash value (PCR8_HASH) derived from the contents of 'initdata.toml'.
+    # The script performs the following steps:
+    # 1. hash=$(sha256sum initdata.toml | cut -d' ' -f1): Computes the sha256 hash of 'initdata.toml' and assigns it to $hash.
+    # 2. initial_pcr=0000000000000000000000000000000000000000000000000000000000000000: Initializes a string of zeros as the initial PCR value.
+    # 3. PCR8_HASH=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1):
+    #    Concatenates initial_pcr and $hash, converts from hex to binary,
+    #    computes its sha256 hash, and stores the result as PCR8_HASH.
+    # 4. echo $PCR8_HASH: Outputs the PCR hash value.
+    # The important part: The 'register: pcr8_hash' registers the **stdout of the command**,
+    #    which is the value output by 'echo $PCR8_HASH', as 'pcr8_hash.stdout' in Ansible.
+    # It does NOT register an environment variable, but rather the value actually printed by 'echo'.
+    - name: Register init data pcr into a var
+      ansible.builtin.shell: |
+        set -o pipefail
+        hash=$(sha256sum "{{ rendered_path }}" | cut -d' ' -f1)
+        initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
+        PCR8_HASH=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1) && echo $PCR8_HASH
+      register: pcr8_hash
+      changed_when: false
+
 
     - name: Create/update ConfigMap with gzipped+base64 content
       kubernetes.core.k8s:
@@ -66,4 +84,5 @@
             name: "initdata"
             namespace: "imperative"
           data:
-            INITDATA: "{{ gz_slurped.content }}"
+            INITDATA: "{{ initdata_encoded.stdout }}"
+            PCR8_HASH: "{{ pcr8_hash.stdout }}"
