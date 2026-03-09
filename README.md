@@ -1,199 +1,131 @@
 # coco-pattern
 
-This is a validated pattern for deploying confidential containers on OpenShift.
+Validated pattern for deploying confidential containers on OpenShift using the [Validated Patterns](https://validatedpatterns.io/) framework.
 
-There are two topologies for deploying this pattern:
+Confidential containers use hardware-backed Trusted Execution Environments (TEEs) to isolate workloads from cluster and hypervisor administrators. This pattern deploys and configures the Red Hat CoCo stack — including the sandboxed containers operator, Trustee (Key Broker Service), and peer-pod infrastructure — on Azure.
 
-1. *Default* using a single cluster. This breaks the RACI expected in a remote attestation architecture, however, makes it easier to test. This uses the `simple` `clusterGroup`.
-2. A more secure operating model that has two clusters:
-   - One in a "trusted" zone where the remote attestation, KMS and Key Broker infrastructure are deployed. This is also the Advanced Cluster Manager Hub cluster. It uses the `trusted-hub` `clusterGroup`.
-   - A second where a subset of workloads are deployed in confidential containers. It uses the `spoke` `clusterGroup`
+## Topologies
 
-The current version of this application the confidential containers assumes deployment to Azure.
+The pattern provides two deployment topologies:
 
-On the cluster where confidential workloads are deployed two sample applications are deployed:
+1. **Single cluster** (`simple` clusterGroup) — deploys all components (Trustee, Vault, ACM, sandboxed containers, workloads) in one cluster. This breaks the RACI separation expected in a remote attestation architecture but simplifies testing and demonstrations.
 
-1. Sample hello world applications to allow users to experiment with the policies for CoCo and the KBS (trustee).
-2. A sample application `kbs-access` which presents secrets obtained from trustee to a web service. This is designed to allow users to test locked down environments.
+2. **Multi-cluster** (`trusted-hub` + `spoke` clusterGroups) — separates the trusted zone from the untrusted workload zone:
+   - **Hub** (`trusted-hub`): Runs Trustee (KBS + attestation service), HashiCorp Vault, ACM, and cert-manager. This cluster is the trust anchor.
+   - **Spoke** (`spoke`): Runs the sandboxed containers operator and confidential workloads. The spoke is imported into ACM and managed from the hub.
 
-Future work includes:
+The topology is controlled by the `main.clusterGroupName` field in `values-global.yaml`.
 
-1. ~~Supporting a multiple cluster deployment~~ Done
-2. Supporting multiple infrastructure providers - Work in Progress.
-3. Supporting air-gapped deployments - Work in Progress.
-4. Supporting a more sophisticated workload such as confidential AI inference with protected GPUs.
+Currently supports Azure via peer-pods. Peer-pods provision confidential VMs (`Standard_DCas_v5` family) directly on the Azure hypervisor rather than nesting VMs inside worker nodes.
 
-## Current constraints and assumptions
+## Current version (4.*)
 
-- Only currently is known to work with `azure` as the provider of confidential vms via peer-pods.
-- Below version 3.1, if not using ARO you must either provide your own CA signed certs, or use let's encrypt.
-- Must be on 4.16.14 or later.
+Breaking change from v3. This is the first version using GA (Generally Available) releases of the CoCo stack:
 
-## Major versions
+- **OpenShift Sandboxed Containers 1.11+** (requires OCP 4.17+)
+- **Red Hat Build of Trustee 1.0** (first GA release; all prior versions were Technology Preview)
+- External chart repositories for [Trustee](https://github.com/validatedpatterns/trustee-chart), [sandboxed-containers](https://github.com/validatedpatterns/sandboxed-containers-chart), and [sandboxed-policies](https://github.com/validatedpatterns/sandboxed-policies-chart)
+- Self-signed certificates via cert-manager (Let's Encrypt no longer required)
+- Multi-cluster support via ACM
 
-### `3.*`
+### Previous versions
 
-Version `3.*` of the pattern is currently constrained to support the general availability releases of coco.
+All previous versions used pre-GA (Technology Preview) releases of Trustee:
 
-- (OpenShift Sandboxed Containers Operator) `1.10.*` and above
-- Trustee `0.4.*`
+| Version | Trustee | OSC | Min OCP |
+|---------|---------|-----|---------|
+| **3.*** | 0.4.* (Tech Preview) | 1.10.* | 4.16+ |
+| **2.*** | 0.3.* (Tech Preview) | 1.9.* | 4.16+ |
+| **1.0.0** | 0.2.0 (Tech Preview) | 1.8.1 | 4.16+ |
 
-This limits support to OpenShift 4.16 and higher.
+## Setup
 
-The pattern has been tested on Azure for two installation methods:
+### Prerequisites
 
-1. Installing onto an ARO cluster
-2. Self managed OpenShift install using the `openshift-install` CLI.
+- OpenShift 4.17+ cluster on Azure (self-managed via `openshift-install` or ARO)
+- Azure `Standard_DCas_v5` VM quota in your target region (these are confidential computing VMs and are not available in all regions). See the note below for more details.
+- Azure DNS hosting the cluster's DNS zone
+- Tools on your workstation: `podman`, `yq`, `jq`, `skopeo`
+- OpenShift pull secret saved at `~/pull-secret.json` (download from [console.redhat.com](https://console.redhat.com/openshift/downloads))
+- Fork the repository — ArgoCD reconciles cluster state against your fork, so changes must be pushed to your remote
 
-#### Known limitations
+### Secrets and PCR setup
 
-[Additional configuration](https://issues.redhat.com/browse/KATA-4107) is required to pull secrets from authenticated registries.
+These scripts generate the cryptographic material and attestation measurements needed by Trustee and the peer-pod VMs. Run them once before your first deployment.
 
-### `2.*`
+1. `bash scripts/gen-secrets.sh` — generates KBS key pairs, attestation policy seeds, and copies `values-secret.yaml.template` to `~/values-secret-coco-pattern.yaml`
+2. `bash scripts/get-pcr.sh` — retrieves PCR measurements from the peer-pod VM image and stores them at `~/.coco-pattern/measurements.json` (requires `podman`, `skopeo`, and `~/pull-secret.json`)
+3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern
 
-Version `2.*` of the pattern is currently constrained to support:
+> **Note:** `gen-secrets.sh` will not overwrite existing secrets. Delete `~/.coco-pattern/` if you need to regenerate.
 
-- (OpenShift Sandboxed Containers Operator) `1.9.*`
-- Trustee `0.3.*`
+### Single cluster deployment
 
-This limits support to OpenShift 4.16 and higher.
+1. Set `main.clusterGroupName: simple` in `values-global.yaml`
+2. Ensure your Azure configuration is populated in `values-global.yaml` (see `global.azure.*` fields)
+3. `./pattern.sh make install`
+4. Wait for the cluster to reboot all nodes (the sandboxed containers operator triggers a MachineConfig update). Monitor progress in the ArgoCD UI.
 
-The pattern has been tested on Azure for two installation methods:
+### Multi-cluster deployment
 
-1. Installing onto an ARO cluster
-2. Self managed OpenShift install using the `openshift-install` CLI.
+1. Set `main.clusterGroupName: trusted-hub` in `values-global.yaml`
+2. Deploy the hub cluster: `./pattern.sh make install`
+3. Wait for ACM (`MultiClusterHub`) to reach `Running` state on the hub
+4. Provision a second OpenShift 4.17+ cluster on Azure for the spoke
+5. Import the spoke into ACM with label `clusterGroup=spoke`
+   (see [importing a cluster](https://validatedpatterns.io/learn/importing-a-cluster/))
+6. ACM will automatically deploy the `spoke` clusterGroup applications (sandboxed containers, workloads) to the imported cluster
 
-### `1.0.0`
+## Sample applications
 
-1.0.0 supports OpenShift Sandboxed containers version `1.8.1` along with Trustee version `0.2.0`.
+Two sample applications are deployed on the cluster running confidential workloads (the single cluster in `simple` mode, or the spoke in multi-cluster mode):
 
-The pattern has been tested on Azure for one installation method:
+- **hello-openshift**: Three pods demonstrating CoCo security boundaries:
+  - `standard` — a regular Kubernetes pod (no confidential computing)
+  - `secure` — a confidential container with a strict policy; `oc exec` is denied even for `kubeadmin`
+  - `insecure-policy` — a confidential container with a relaxed policy allowing `oc exec` (useful for testing the Confidential Data Hub)
 
-1. Self managed OpenShift install using the `openshift-install` CLI
-2. Installing on top of an existing Azure Red Hat OpenShift (ARO) cluster
+  Each confidential pod runs on its own `Standard_DC2as_v5` Azure VM (visible in the Azure portal). Pods use `runtimeClassName: kata-remote`.
 
-## Changing deployment topoloiges
+- **kbs-access**: A web service that retrieves and presents secrets obtained from the Trustee Key Broker Service (KBS) via the Confidential Data Hub (CDH). Useful for verifying end-to-end attestation and secret delivery in locked-down environments.
 
-**Today the demo has two deployment topologies**
-The most important change is what `clusterGroup` is deployed to your main or 'hub' cluster.
+## Confidential computing virtual machine availability on Microsoft Azure
 
-You can change between behaviour by configuring [`global.main.clusterGroupName`](https://validatedpatterns.io/learn/values-files/) key in the `values-global.yaml` file.
+Confidential computing VM availability on Azure varies by region. Not all regions offer the required VM families, and available sizes differ between regions. Before deploying, verify the following:
 
-- `values-simple.yaml`: or the `simple` cluster group is the default for the pattern. It deploys everything in one cluster.
--`values-trusted-hub`: or the `trusted-hub` cluster group can be configured as the main cluster group. A second cluster should be deployed with the `spoke` cluster group. Follow [instructions here](https://validatedpatterns.io/learn/importing-a-cluster/) to add the second cluster.
+1. **Check regional availability.** Confirm that your target Azure region supports confidential computing VMs. Microsoft's [products available by region](https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/) page lists which services and VM families are offered in each region.
 
-## Setup instructions
+2. **Check your subscription quota.** Even in supported regions, your subscription may have zero default quota for confidential VM sizes. Go to **Azure Portal > Subscriptions > Usage + quotas** and filter for the DCas/DCads/ECas/ECads families. Request a quota increase if needed.
 
-### Default single cluster setup with `values-simple.yaml`
+3. **Select a VM size.** The pattern defaults to `Standard_DC2as_v5` but supports a configurable list of sizes. The following VM families are relevant for confidential containers on Azure:
 
-The instructions here presume you have a cluster. See further down for provisioning instructions for a cluster.
+| VM Family | CPU | Architecture | Notes |
+|-----------|-----|--------------|-------|
+| `Standard_DC2as_v5` | AMD SEV-SNP | AMD EPYC (Genoa) | Default for this pattern. Smallest CoCo-capable size. |
+| `Standard_DC4as_v5` | AMD SEV-SNP | AMD EPYC (Genoa) | More vCPUs/memory for larger workloads. |
+| `Standard_DC2ads_v5` | AMD SEV-SNP | AMD EPYC (Genoa) | Same as DC2as_v5 with a local temp disk. |
+| `Standard_DC2es_v5` | Intel TDX | Intel Xeon (Sapphire Rapids) | Intel-based confidential VMs. Regional availability is more limited than AMD. |
 
-#### Fork and Clone the GitHub repository
+The available sizes can be configured via the `global.coco.azure.VMFlavours` field in `values-global.yaml` and the sandbox-policies chart overrides. The default VM flavour is set in `global.coco.azure.defaultVMFlavour`.
 
-1. Following [standard validated patterns workflow](https://validatedpatterns.io/learn/workflow/) fork the repository and clone to your development environment which has `podman` and `git`
-2. If using a particular version (e.g. `1.0.0`) checkout the correct tag.
+### RHDP deployment (Red Hat Demo Platform)
 
-> [!TIP]
-> Forking is essential as the validated pattern uses ArgoCD to reconcile it's state against your remote (forked) repository.
+For Red Hat associates and partners, the pattern includes wrapper scripts that automate cluster provisioning and deployment using RHDP Azure Open Environments.
 
-#### Configuring required secrets / parameters
-
-The secrets here secure Trustee and the peer-pod vms. Mostly they are for demonstration purposes.
-This only has to be done once.
-
-1. Run `sh scripts/gen-secrets.sh`
-
-> [!NOTE]
-> Once generated this script will not override secrets. Be careful when doing multiple tests.
-
-#### Configuring let's encrypt (deprecated)
-
-> [!IMPORTANT]
-> Ensure you have password login available to the cluster. Let's encrypt will replace the API certificate in addition to the certificates to user with routes.
-
-Trustee (guest agents) requires that Trustee uses a Mozilla trusted CA issued certificate, or a specific certificate which is known in advance. Today the pattern uses specific self signed certs. Let's encrypt was an option for getting a trusted certificate onto OpenShift's routes, and therefore Trustee. Ths functionality will be removed at a later date.
-
-If you need a Let's Encrypt certificate to be issued the `letsencrypt` application configuration needs to be changed as below.
-
-```yaml
-    ---
-    # Default configuration, safe for ARO
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      # Default to 'safe' for ARO
-      overrides:
-      - name: letsencrypt.enabled
-        value: false
-    ---
-    # Explicitly correct configuration for enabling let's encrypt
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      overrides:
-      - name: letsencrypt.enabled
-        value: true  
-```
-
-> [!WARNING]
-> Configuration changes are only effective once committed and pushed to your remote repository.
-
-#### Installing onto a cluster
-
-Once you configuration is pushed (if required) `./pattern.sh make install` to provision a cluster.
-
-> [!TIP]
-> The branch and default origin you have checked-out in your local repository is used to determine what ArgoCD and the patterns operator should reconcile against. Typical choices are to use the main for your fork.
-
-## Cluster setup (if not already setup)
-
-### Single cluster install on an OCP cluster on azure using Red Hat Demo Platform
-
-Red Hat a demo platform. This allows easy access for Red Hat associates and partners to ephemeral cloud resources. The pattern is known to work with this setup.
-
-1. Get the [openshift installer](https://console.redhat.com/openshift/downloads)
-   1. **NOTE: openshift installer must be updated regularly if you want to automatically provision the latest versions of OCP**
-2. Get access to an [Azure Subscription Based Blank Open Environment](https://catalog.demo.redhat.com/catalog?category=Open_Environments&search=azure&item=babylon-catalog-prod%2Fazure-gpte.open-environment-azure-subscription.prod).
-3. Import the required azure environmental variables (see code block below)
-4. Ensure certificates are configured (via let's encrypt or do so manually)
-5. Run the wrapper install script
-   1. `bash ./rhdp/wrapper.sh azure-region-code`
-   2. Where azure region code is `eastasia`, `useast2` etc.
-6. You *should* be done
-   1. You *may* need to recreate the hello world peer-pods depending on timeouts.
+Required environment variables (provided by your RHDP environment):
 
 ```shell
-    export GUID=
-    export CLIENT_ID=
-    export PASSWORD=
-    export TENANT=
-    export SUBSCRIPTION=
-    export RESOURCEGROUP=
+export GUID=
+export CLIENT_ID=
+export PASSWORD=
+export TENANT=
+export SUBSCRIPTION=
+export RESOURCEGROUP=
 ```
 
-### Single cluster install on plain old azure *not* using Red Hat Demo Platform
+Deployment commands:
 
-> [!TIP]
-> Don't use the default node sizes.. increase the node sizes such as below
+- Single cluster: `bash rhdp/wrapper.sh <azure-region>` (e.g. `bash rhdp/wrapper.sh eastasia`)
+- Multi-cluster: `bash rhdp/wrapper-multicluster.sh <azure-region>`
 
-1. Login to console.redhat.com
-2. Get the openshift installer
-3. Login to azure locally.
-4. `openshift-install create install-config`
-   1. Select azure
-   2. For Red Hatter's and partners using RHDP make sure you select the same region for your account that you selected in RHDP
-5. Change worker machine type e.g. change `type: Standard_D4s_v5` to `type: Standard_D8s_v5` or similar based on your needs.
-6. `mkdir ./ocp-install && mv openshift-install.yaml ./ocp-install`
-7. `openshift-install create cluster --dir=./ocp-install`
-8. Once installed:
-   1. Login to `oc`
-   2. Configure Let's Encrypt (if required)
-   3. `./pattern.sh make install`
-
-### Multi cluster setup
-
-TBD
+The wrapper scripts handle cluster provisioning via `openshift-install`, secret generation, PCR retrieval, and pattern installation.

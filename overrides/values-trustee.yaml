@@ -7,3 +7,8 @@ kbs:
       key: "secret/data/hub/kbsres1" # this is the path to the secret in vault. 
     - name: "passphrase"
       key: "secret/data/hub/passphrase"
+# Override the default values for the coco pattern this is because when testing against a branch strange stuff happens
+# FIXME: Don't commit this to main
+global:
+  coco:
+    secured: true # true or false. If true, the cluster will be secured. If false, the cluster will be insecure.

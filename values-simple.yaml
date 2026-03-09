@@ -3,6 +3,8 @@
 clusterGroup:
   name: simple
   isHubCluster: true
+  # Override health check for Subscriptions to treat UpgradePending as healthy
+  # Only applies to pinned CSV subscriptions (sandbox and trustee)
   namespaces:
   - open-cluster-management
   - vault
@@ -12,7 +14,6 @@ clusterGroup:
   - hello-openshift
   - cert-manager-operator
   - cert-manager
-  - letsencrypt
   - kbs-access
   - encrypted-storage
   subscriptions:
@@ -26,14 +27,14 @@ clusterGroup:
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual 
-      csv: sandboxed-containers-operator.v1.10.1
+      csv: sandboxed-containers-operator.v1.11.0
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v0.4.1
+      csv: trustee-operator.v1.0.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -72,39 +73,28 @@ clusterGroup:
       project: golang-external-secrets
       chart: golang-external-secrets
       chartVersion: 0.1.*
-
     trustee:
       name: trustee
       namespace: trustee-operator-system #upstream config
       project: trustee
       chart: trustee
-      chartVersion: 0.1.*
-      # Use the override file to specify the list of secrets accessible to trustee from the ESO backend (today by default, Vault).
-      extraValueFiles:
-        - '$patternref/overrides/values-trustee.yaml'
+      chartVersion: 0.2.*     
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
       project: sandbox
       chart: sandboxed-containers
-      chartVersion: 0.0.*
+      chartVersion: 0.2.*
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
       chart: sandboxed-policies
-      chartVersion: 0.0.*
-
-    # Letsencrypt is not required anymore for trustee.
-    # It's only here if you need it for your needs.
-    letsencrypt:
-      name: letsencrypt
-      namespace: letsencrypt
-      project: hub
-      path: charts/all/letsencrypt
-      # Default to 'safe' for ARO
+      chartVersion: 0.1.*
       overrides:
-      - name: letsencrypt.enabled
-        value: false
+        - name: global.coco.azure.tags
+          value: "key1=value1,key2=value2"
+        - name: global.coco.azure.rootVolumeSize
+          value: "20"
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
@@ -117,7 +107,6 @@ clusterGroup:
       project: workloads
       path: charts/coco-supported/kbs-access
 
-
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
@@ -125,6 +114,7 @@ clusterGroup:
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     # For additional overrides that apply to the jobs, please refer to
     # https://validatedpatterns.io/imperative-actions/#additional-job-customizations
+    image: ghcr.io/butler54/imperative-container:latest
     jobs:
     - name: install-deps
       playbook: ansible/install-deps.yaml

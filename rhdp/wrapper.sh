@@ -83,6 +83,17 @@ if ! command -v yq &> /dev/null; then
     exit 1
 fi
 
+# Check if podman is available and running
+if ! command -v podman &> /dev/null; then
+    echo "ERROR: podman is required but not installed"
+    exit 1
+fi
+
+if ! podman info &> /dev/null; then
+    echo "ERROR: podman is installed but not responding"
+    exit 1
+fi
+
 # Extract clusterGroupName from values-global.yaml using yq
 CLUSTER_GROUP_NAME=$(yq eval '.main.clusterGroupName' values-global.yaml)
 
@@ -175,6 +186,10 @@ echo "setting up secrets"
 
 bash ./scripts/gen-secrets.sh
 
+echo "---------------------"
+echo "retrieving PCR measurements"
+echo "---------------------"
+bash ./scripts/get-pcr.sh
 
 sleep 60
 echo "---------------------"
