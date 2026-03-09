@@ -11,6 +11,12 @@ global:
   # This defines whether or not to use upstream resources for CoCo.
   # Defines whether or not the hub cluster can be used for confidential containers
   coco:
+    securityPolicyFlavour: "insecure" # insecure, signed or reject is expected.
+    secured: true # true or false. If true, the cluster will be secured. If false, the cluster will be insecure.
+    # Enable SSH key injection into podvm for debugging. Do not enable in production.
+    # Also requires: COCO_ENABLE_SSH_DEBUG=true ./scripts/gen-secrets.sh
+    # and uncommenting the sshKey block in values-secret.yaml.template.
+    enableSSHDebug: false
     azure:
       defaultVMFlavour: "Standard_DC2as_v5"
       VMFlavours: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
@@ -24,6 +30,7 @@ main:
     clusterGroupChartVersion: 0.9.*
 
 # Common secret store configuration used across multiple charts
+# Warning do not rely on this. it does not consistently apply.
 secretStore:
   name: vault-backend
   kind: ClusterSecretStore
