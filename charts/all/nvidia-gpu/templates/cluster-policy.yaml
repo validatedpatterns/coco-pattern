@@ -1,0 +1,35 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  ccManager:
+    defaultMode: {{ .Values.ccManager.defaultMode | quote }}
+    enabled: {{ .Values.ccManager.enabled }}
+  cdi:
+    enabled: true
+    default: false
+  driver:
+    enabled: false
+  devicePlugin:
+    enabled: false
+  gfd:
+    enabled: true
+  kataManager:
+    enabled: false
+  sandboxDevicePlugin:
+    enabled: true
+    env:
+      - name: P_GPU_ALIAS
+        value: {{ .Values.sandboxDevicePlugin.pgpuAlias }}
+      - name: NVSWITCH_ALIAS
+        value: {{ .Values.sandboxDevicePlugin.nvswitchAlias }}
+  sandboxWorkloads:
+    defaultWorkload: vm-passthrough
+    enabled: true
+    mode: kata
+  vfioManager:
+    enabled: true
+    env:
+      - name: BIND_NVSWITCHES
+        value: {{ .Values.vfioManager.bindNvSwitches | quote }}

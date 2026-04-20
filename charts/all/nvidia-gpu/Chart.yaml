@@ -1,0 +1,9 @@
+apiVersion: v2
+description: NVIDIA GPU operator configuration for confidential containers (ClusterPolicy, IOMMU, VFIO).
+keywords:
+- pattern
+- nvidia
+- gpu
+- confidential-computing
+name: nvidia-gpu
+version: 0.0.1

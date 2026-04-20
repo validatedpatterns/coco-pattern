@@ -1,0 +1,10 @@
+ccManager:
+  enabled: true
+  defaultMode: "on"
+
+sandboxDevicePlugin:
+  pgpuAlias: pgpu
+  nvswitchAlias: nvswitch
+
+vfioManager:
+  bindNvSwitches: "true"

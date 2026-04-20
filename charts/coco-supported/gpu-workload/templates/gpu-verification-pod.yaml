@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-cc-verify
+  labels:
+    app: gpu-cc-verify
+  annotations:
+    io.katacontainers.config.hypervisor.default_memory: {{ .Values.gpuMemory | quote }}
+spec:
+  runtimeClassName: {{ .Values.runtimeClassName }}
+  restartPolicy: OnFailure
+  containers:
+    - name: cuda-vectoradd
+      image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0
+      resources:
+        limits:
+          nvidia.com/pgpu: 1
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault

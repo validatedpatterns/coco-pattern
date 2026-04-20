@@ -1,0 +1,16 @@
+{{- range list "master" "worker" }}
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: {{ . }}
+  name: 100-iommu-kernel-args-{{ . }}
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+  kernelArguments:
+  - intel_iommu=on
+  - amd_iommu=on
+{{- end }}

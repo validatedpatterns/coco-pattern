@@ -1,0 +1,9 @@
+apiVersion: v2
+description: Sample GPU workload for confidential containers (NVIDIA GPU verification in a CoCo pod).
+keywords:
+- pattern
+- nvidia
+- gpu
+- confidential-computing
+name: gpu-workload
+version: 0.0.1

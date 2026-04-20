@@ -1,0 +1,3 @@
+runtimeClassName: "kata-cc-nvidia-gpu"
+
+gpuMemory: "32768"
