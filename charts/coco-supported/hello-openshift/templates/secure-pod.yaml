@@ -6,6 +6,7 @@ metadata:
     app: secure
   annotations:
     peerpods: "true"
+    coco.io/initdata-configmap: initdata
 spec:
   runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
   containers:

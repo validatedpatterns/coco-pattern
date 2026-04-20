@@ -1,0 +1,6 @@
+apiVersion: v2
+name: coco-kyverno-policies
+description: Kyverno policies for CoCo cc_init_data injection and validation
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

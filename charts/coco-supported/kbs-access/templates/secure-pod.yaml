@@ -6,6 +6,10 @@ metadata:
     app: secure
   annotations:
     peerpods: "true"
+    coco.io/initdata-configmap: initdata
+    {{- if .Values.defaultMemory }}
+    io.katacontainers.config.hypervisor.default_memory: {{ .Values.defaultMemory | quote }}
+    {{- end }}
 spec:
   runtimeClassName: kata-remote
   containers:

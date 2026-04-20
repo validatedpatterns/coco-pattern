@@ -16,6 +16,7 @@ clusterGroup:
   - cert-manager
   - kbs-access
   - encrypted-storage
+  - kyverno
   subscriptions:
     # ACM is kept anticipating 
     acm:
@@ -27,14 +28,14 @@ clusterGroup:
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual 
-      csv: sandboxed-containers-operator.v1.11.0
+      csv: sandboxed-containers-operator.v1.12.0
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.0.0
+      csv: trustee-operator.v1.1.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -78,7 +79,10 @@ clusterGroup:
       namespace: trustee-operator-system #upstream config
       project: trustee
       chart: trustee
-      chartVersion: 0.2.*     
+      chartVersion: 0.2.*
+      overrides:
+        - name: kbs.admin.format
+          value: "v1.1"
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
@@ -106,6 +110,37 @@ clusterGroup:
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access
+
+    kyverno:
+      name: kyverno
+      namespace: kyverno
+      project: hub
+      repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      chartVersion: 3.7.*
+      overrides:
+        - name: admissionController.container.securityContext
+          value: "null"
+        - name: admissionController.initContainer.securityContext
+          value: "null"
+        - name: backgroundController.securityContext
+          value: "null"
+        - name: cleanupController.securityContext
+          value: "null"
+        - name: reportsController.securityContext
+          value: "null"
+        - name: crds.migration.securityContext
+          value: "null"
+        - name: webhooksCleanup.securityContext
+          value: "null"
+        - name: test.securityContext
+          value: "null"
+
+    coco-kyverno-policies:
+      name: coco-kyverno-policies
+      namespace: openshift-sandboxed-containers-operator
+      project: sandbox
+      path: charts/all/coco-kyverno-policies
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm

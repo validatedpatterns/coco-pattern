@@ -5,7 +5,7 @@ metadata:
   labels:
     app: insecure-policy
   annotations:
-    io.katacontainers.config.agent.policy: '{{ tpl ( .Files.Get "insecure-policy.rego") . | b64enc }}'
+    coco.io/initdata-configmap: initdata
 spec:
   runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
   containers:

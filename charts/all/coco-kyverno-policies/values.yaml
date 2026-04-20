@@ -1,0 +1,5 @@
+workloadNamespaces:
+  - hello-openshift
+  - kbs-access
+
+initdataSourceNamespace: imperative

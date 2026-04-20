@@ -1,0 +1,46 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: validate-initdata-configmap
+  annotations:
+    policies.kyverno.io/title: Validate InitData ConfigMap Required Fields
+    policies.kyverno.io/category: Confidential Computing
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: ConfigMap
+    policies.kyverno.io/description: >-
+      Validates that ConfigMaps with label coco.io/type=initdata contain
+      all required fields with proper values.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["configmaps"]
+  matchConditions:
+    - name: has-initdata-label
+      expression: >-
+        has(object.metadata.labels) &&
+        'coco.io/type' in object.metadata.labels &&
+        object.metadata.labels['coco.io/type'] == 'initdata'
+  variables:
+    - name: configData
+      expression: "object.data.orValue({})"
+    - name: allowedAlgorithms
+      expression: "['sha256', 'sha384', 'sha512']"
+  validationActions: ["Audit"]
+  validations:
+    - expression: "'version' in variables.configData && variables.configData['version'] != ''"
+      messageExpression: "'ConfigMap must contain a non-empty version field'"
+    - expression: "'algorithm' in variables.configData && variables.configData['algorithm'] in variables.allowedAlgorithms"
+      messageExpression: "'ConfigMap must contain an algorithm field with value sha256, sha384, or sha512, found: ' + ('algorithm' in variables.configData ? variables.configData['algorithm'] : 'missing')"
+    - expression: "'policy.rego' in variables.configData && variables.configData['policy.rego'] != ''"
+      messageExpression: "'ConfigMap must contain a non-empty policy.rego field'"
+    - expression: "'aa.toml' in variables.configData && variables.configData['aa.toml'] != ''"
+      messageExpression: "'ConfigMap must contain a non-empty aa.toml field'"
+    - expression: "'cdh.toml' in variables.configData && variables.configData['cdh.toml'] != ''"
+      messageExpression: "'ConfigMap must contain a non-empty cdh.toml field'"

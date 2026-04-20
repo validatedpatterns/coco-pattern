@@ -9,6 +9,7 @@
     hub_domain: "{{ global.hubClusterDomain | default('none')  | lower}}"
     security_policy_flavour: "{{ global.coco.securityPolicyFlavour | default('insecure') }}"
     template_src: "initdata-default.toml.tpl"
+    debug_template_src: "initdata-debug.toml.tpl"
   tasks:
     - name: Create temporary working directory
       ansible.builtin.tempfile:
@@ -37,32 +38,82 @@
     - name: Define temp file paths
       ansible.builtin.set_fact:
         rendered_path: "{{ tmpdir.path }}/rendered.toml"
+        debug_rendered_path: "{{ tmpdir.path }}/debug-rendered.toml"
 
-    - name: Render template to temp file
+    - name: Render default template to temp file
       ansible.builtin.template:
         src: "{{ template_src }}"
         dest: "{{ rendered_path }}"
         mode: "0600"
 
+    - name: Render debug template to temp file
+      ansible.builtin.template:
+        src: "{{ debug_template_src }}"
+        dest: "{{ debug_rendered_path }}"
+        mode: "0600"
 
-    - name: Gzip and base64 encode the rendered content
+    - name: Read raw aa.toml from rendered template
+      ansible.builtin.shell: |
+        set -o pipefail
+        python3 -c "
+        import tomllib
+        with open('{{ rendered_path }}', 'rb') as f:
+            data = tomllib.load(f)
+        print(data['data']['aa.toml'], end='')
+        "
+      register: raw_aa_toml
+      changed_when: false
+
+    - name: Read raw cdh.toml from rendered template
+      ansible.builtin.shell: |
+        set -o pipefail
+        python3 -c "
+        import tomllib
+        with open('{{ rendered_path }}', 'rb') as f:
+            data = tomllib.load(f)
+        print(data['data']['cdh.toml'], end='')
+        "
+      register: raw_cdh_toml
+      changed_when: false
+
+    - name: Read raw policy.rego from default template
+      ansible.builtin.shell: |
+        set -o pipefail
+        python3 -c "
+        import tomllib
+        with open('{{ rendered_path }}', 'rb') as f:
+            data = tomllib.load(f)
+        print(data['data']['policy.rego'], end='')
+        "
+      register: raw_policy_rego
+      changed_when: false
+
+    - name: Read raw policy.rego from debug template
+      ansible.builtin.shell: |
+        set -o pipefail
+        python3 -c "
+        import tomllib
+        with open('{{ debug_rendered_path }}', 'rb') as f:
+            data = tomllib.load(f)
+        print(data['data']['policy.rego'], end='')
+        "
+      register: debug_raw_policy_rego
+      changed_when: false
+
+    - name: Gzip and base64 encode the default rendered content
       ansible.builtin.shell: |
         set -o pipefail
         cat "{{ rendered_path }}" | gzip | base64 -w0
       register: initdata_encoded
       changed_when: false
 
-    # This block runs a shell script that calculates a hash value (PCR8_HASH) derived from the contents of 'initdata.toml'.
-    # The script performs the following steps:
-    # 1. hash=$(sha256sum initdata.toml | cut -d' ' -f1): Computes the sha256 hash of 'initdata.toml' and assigns it to $hash.
-    # 2. initial_pcr=0000000000000000000000000000000000000000000000000000000000000000: Initializes a string of zeros as the initial PCR value.
-    # 3. PCR8_HASH=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1):
-    #    Concatenates initial_pcr and $hash, converts from hex to binary,
-    #    computes its sha256 hash, and stores the result as PCR8_HASH.
-    # 4. echo $PCR8_HASH: Outputs the PCR hash value.
-    # The important part: The 'register: pcr8_hash' registers the **stdout of the command**,
-    #    which is the value output by 'echo $PCR8_HASH', as 'pcr8_hash.stdout' in Ansible.
-    # It does NOT register an environment variable, but rather the value actually printed by 'echo'.
+    - name: Gzip and base64 encode the debug rendered content
+      ansible.builtin.shell: |
+        set -o pipefail
+        cat "{{ debug_rendered_path }}" | gzip | base64 -w0
+      register: debug_initdata_encoded
+      changed_when: false
+
     - name: Register init data pcr into a var
       ansible.builtin.shell: |
         set -o pipefail
@@ -72,8 +123,16 @@
       register: pcr8_hash
       changed_when: false
 
+    - name: Register debug init data pcr into a var
+      ansible.builtin.shell: |
+        set -o pipefail
+        hash=$(sha256sum "{{ debug_rendered_path }}" | cut -d' ' -f1)
+        initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
+        PCR8_HASH=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1) && echo $PCR8_HASH
+      register: debug_pcr8_hash
+      changed_when: false
 
-    - name: Create/update ConfigMap with gzipped+base64 content
+    - name: Create/update default initdata ConfigMap
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig | default(omit) }}"
         state: present
@@ -83,6 +142,34 @@
           metadata:
             name: "initdata"
             namespace: "imperative"
+            labels:
+              coco.io/type: initdata
           data:
             INITDATA: "{{ initdata_encoded.stdout }}"
             PCR8_HASH: "{{ pcr8_hash.stdout }}"
+            version: "0.1.0"
+            algorithm: "sha256"
+            aa.toml: "{{ raw_aa_toml.stdout }}"
+            cdh.toml: "{{ raw_cdh_toml.stdout }}"
+            policy.rego: "{{ raw_policy_rego.stdout }}"
+
+    - name: Create/update debug initdata ConfigMap
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig | default(omit) }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "debug-initdata"
+            namespace: "imperative"
+            labels:
+              coco.io/type: initdata
+          data:
+            INITDATA: "{{ debug_initdata_encoded.stdout }}"
+            PCR8_HASH: "{{ debug_pcr8_hash.stdout }}"
+            version: "0.1.0"
+            algorithm: "sha256"
+            aa.toml: "{{ raw_aa_toml.stdout }}"
+            cdh.toml: "{{ raw_cdh_toml.stdout }}"
+            policy.rego: "{{ debug_raw_policy_rego.stdout }}"

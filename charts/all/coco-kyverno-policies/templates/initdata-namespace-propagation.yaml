@@ -1,0 +1,31 @@
+{{- range .Values.workloadNamespaces }}
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: propagate-initdata-to-{{ . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  rules:
+    - name: copy-initdata
+      match:
+        any:
+          - resources:
+              kinds:
+                - ConfigMap
+              namespaces:
+                - {{ $.Values.initdataSourceNamespace }}
+              selector:
+                matchLabels:
+                  coco.io/type: initdata
+      generate:
+        synchronize: true
+        apiVersion: v1
+        kind: ConfigMap
+        name: "{{ "{{" }}request.object.metadata.name{{ "}}" }}"
+        namespace: {{ . }}
+        clone:
+          namespace: {{ $.Values.initdataSourceNamespace }}
+          name: "{{ "{{" }}request.object.metadata.name{{ "}}" }}"
+{{- end }}
