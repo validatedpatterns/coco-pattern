@@ -14,7 +14,7 @@ spec:
       labels:
         app: insecure-policy
       annotations:
-        coco.io/initdata-configmap: initdata
+        coco.io/initdata-configmap: debug-initdata
     spec:
       runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
       containers:
