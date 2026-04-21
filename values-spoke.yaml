@@ -17,7 +17,7 @@ clusterGroup:
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual 
-      csv: sandboxed-containers-operator.v1.11.0
+      csv: sandboxed-containers-operator.v1.12.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator

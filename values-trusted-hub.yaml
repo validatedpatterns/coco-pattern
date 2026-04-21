@@ -22,7 +22,7 @@ clusterGroup:
       source: redhat-operators
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.0.0
+      csv: trustee-operator.v1.1.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -66,11 +66,14 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system #upstream config
       project: trustee
-      chart: trustee
-      chartVersion: 0.2.*
+      repoURL: https://github.com/butler54/trustee-chart.git
+      path: .
+      chartVersion: feature/trustee-1.1-compat
       overrides:
         - name: global.coco.secured
           value: "true"
+        - name: kbs.admin.format
+          value: "v1.1"
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config

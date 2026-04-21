@@ -76,14 +76,14 @@ if [ -z "$SANDBOX_CSV" ] || [ "$SANDBOX_CSV" == "null" ]; then
     exit 0
 fi
 
-# Extract version from CSV (e.g., "sandboxed-containers-operator.v1.11.0" -> "1.11.0")
+# Extract version from CSV (e.g., "sandboxed-containers-operator.v1.12.0" -> "1.12.0")
 # Remove everything up to and including ".v"
 SANDBOX_VERSION="${SANDBOX_CSV##*.v}"
 
 echo "Sandboxed container operator CSV: $SANDBOX_CSV"
 echo "Version: $SANDBOX_VERSION"
 # alternatively, use the operator-version tag.
-# OSC_VERSION=1.11.1
+# OSC_VERSION=1.12.0
 VERITY_IMAGE=registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
 
 TAG=$(skopeo inspect --authfile $PULL_SECRET_PATH docker://${VERITY_IMAGE}:${SANDBOX_VERSION} | jq -r .Digest)
