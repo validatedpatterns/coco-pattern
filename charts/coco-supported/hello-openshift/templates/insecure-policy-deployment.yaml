@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insecure-policy
+  labels:
+    app: insecure-policy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insecure-policy
+  template:
+    metadata:
+      labels:
+        app: insecure-policy
+      annotations:
+        coco.io/initdata-configmap: initdata
+    spec:
+      runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
+      containers:
+        - name: hello-openshift
+          image: quay.io/openshift/origin-hello-openshift
+          ports:
+            - containerPort: 8888
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault

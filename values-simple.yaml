@@ -105,12 +105,18 @@ clusterGroup:
       namespace: hello-openshift
       project: workloads
       path: charts/coco-supported/hello-openshift
+      syncPolicy:
+        automated:
+          prune: true
 
     kbs-access:
       name: kbs-access
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access
+      syncPolicy:
+        automated:
+          prune: true
 
     kyverno:
       name: kyverno

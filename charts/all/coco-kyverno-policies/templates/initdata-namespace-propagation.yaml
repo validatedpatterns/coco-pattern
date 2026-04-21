@@ -20,6 +20,7 @@ spec:
                 matchLabels:
                   coco.io/type: initdata
       generate:
+        generateExisting: true
         synchronize: true
         apiVersion: v1
         kind: ConfigMap

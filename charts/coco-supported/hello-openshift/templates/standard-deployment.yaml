@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: standard
+  labels:
+    app: standard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: standard
+  template:
+    metadata:
+      labels:
+        app: standard
+    spec:
+      containers:
+        - name: hello-openshift
+          image: quay.io/openshift/origin-hello-openshift
+          ports:
+            - containerPort: 8888
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault

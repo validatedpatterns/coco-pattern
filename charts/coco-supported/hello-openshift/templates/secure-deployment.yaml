@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure
+  labels:
+    app: secure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: secure
+  template:
+    metadata:
+      labels:
+        app: secure
+      annotations:
+        peerpods: "true"
+        coco.io/initdata-configmap: initdata
+    spec:
+      runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
+      containers:
+        - name: hello-openshift
+          image: quay.io/openshift/origin-hello-openshift
+          ports:
+            - containerPort: 8888
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
