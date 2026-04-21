@@ -1,53 +1,47 @@
-apiVersion: policies.kyverno.io/v1
-kind: MutatingPolicy
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
 metadata:
   name: inject-coco-initdata
   annotations:
     policies.kyverno.io/title: Inject CoCo InitData
     policies.kyverno.io/category: Confidential Computing
     policies.kyverno.io/severity: medium
-    policies.kyverno.io/subject: Deployment
+    policies.kyverno.io/subject: Pod,Deployment
     policies.kyverno.io/description: >-
-      Injects cc_init_data annotation into Deployment pod templates with a kata
-      runtime class by reading from a ConfigMap specified via the
-      coco.io/initdata-configmap annotation on the pod template.
-      Adapted from upstream kyverno inject-coco-initdata policy.
+      Injects cc_init_data annotation into pods with a kata runtime class
+      by reading from a ConfigMap specified via the coco.io/initdata-configmap
+      annotation. Kyverno autogen extends this to Deployments, StatefulSets,
+      DaemonSets, and Jobs automatically.
     argocd.argoproj.io/sync-wave: "1"
+    pod-policies.kyverno.io/autogen-controllers: Deployment,StatefulSet,DaemonSet,Job
 spec:
-  matchConstraints:
-    resourceRules:
-      - apiGroups: ["apps"]
-        apiVersions: ["v1"]
-        operations: ["CREATE", "UPDATE"]
-        resources: ["deployments"]
-  matchConditions:
-    - name: has-kata-runtime
-      expression: >-
-        has(object.spec.template.spec.runtimeClassName) &&
-        (object.spec.template.spec.runtimeClassName == "kata" || object.spec.template.spec.runtimeClassName == "kata-cc")
-    - name: has-initdata-configmap-annotation
-      expression: >-
-        has(object.spec.template.metadata.annotations) &&
-        'coco.io/initdata-configmap' in object.spec.template.metadata.annotations &&
-        object.spec.template.metadata.annotations['coco.io/initdata-configmap'] != ''
-    - name: no-existing-cc-init-data
-      expression: >-
-        !has(object.spec.template.metadata.annotations) ||
-        !('io.katacontainers.config.hypervisor.cc_init_data' in object.spec.template.metadata.annotations)
-  variables:
-    - name: configMapName
-      expression: "object.spec.template.metadata.annotations['coco.io/initdata-configmap']"
-    - name: configMap
-      expression: >-
-        namespaceObject.get('configmaps', variables.configMapName)
-  mutations:
-    - patchType: JSONPatch
-      jsonPatch:
-        expression: >-
-          [
-            JSONPatch{
-              op: "add",
-              path: "/spec/template/metadata/annotations/io.katacontainers.config.hypervisor.cc_init_data",
-              value: variables.configMap.data['INITDATA']
-            }
-          ]
+  rules:
+    - name: inject-initdata
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              operations:
+                - CREATE
+      preconditions:
+        all:
+          - key: "{{ "{{" }}request.object.spec.runtimeClassName || '' {{ "}}" }}"
+            operator: AnyIn
+            value: ["kata", "kata-cc"]
+          - key: "{{ "{{" }}request.object.metadata.annotations.\"coco.io/initdata-configmap\" || '' {{ "}}" }}"
+            operator: NotEquals
+            value: ""
+          - key: "{{ "{{" }}request.object.metadata.annotations.\"io.katacontainers.config.hypervisor.cc_init_data\" || '' {{ "}}" }}"
+            operator: Equals
+            value: ""
+      context:
+        - name: initdata
+          configMap:
+            name: "{{ "{{" }}request.object.metadata.annotations.\"coco.io/initdata-configmap\"{{ "}}" }}"
+            namespace: "{{ "{{" }}request.namespace{{ "}}" }}"
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              io.katacontainers.config.hypervisor.cc_init_data: "{{ "{{" }}initdata.data.INITDATA{{ "}}" }}"
