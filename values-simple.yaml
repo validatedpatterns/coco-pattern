@@ -142,6 +142,10 @@ clusterGroup:
           value: "null"
         - name: test.securityContext
           value: "null"
+        - name: crds.groups.wgpolicyk8s.policyreports
+          value: "false"
+        - name: crds.groups.wgpolicyk8s.clusterpolicyreports
+          value: "false"
 
     coco-kyverno-policies:
       name: coco-kyverno-policies
