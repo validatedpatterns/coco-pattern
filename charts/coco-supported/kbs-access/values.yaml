@@ -1,9 +1,7 @@
 # Chart-specific values
 # Common values are inherited from values-global.yaml
 
-# Global values used by this chart (overridden by values-global.yaml)
 defaultMemory: ""
 
 global:
-  coco:
-    runtimeClassName: ""  # Runtime class for confidential containers
+  clusterPlatform: ""  # Cluster platform: "Azure", "AWS", etc. - determines runtime class

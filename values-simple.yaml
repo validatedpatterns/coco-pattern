@@ -119,6 +119,12 @@ clusterGroup:
       repoURL: https://kyverno.github.io/kyverno/
       chart: kyverno
       chartVersion: 3.7.*
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 20
+        syncOptions:
+          - ServerSideApply=true
       overrides:
         - name: admissionController.container.securityContext
           value: "null"
