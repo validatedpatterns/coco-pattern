@@ -28,7 +28,7 @@ spec:
         all:
           - key: "{{ "{{" }}request.object.spec.runtimeClassName || '' {{ "}}" }}"
             operator: AnyIn
-            value: ["kata", "kata-cc"]
+            value: ["kata", "kata-cc", "kata-remote"]
           - key: "{{ "{{" }}request.object.metadata.annotations.\"coco.io/initdata-configmap\" || '' {{ "}}" }}"
             operator: NotEquals
             value: ""
