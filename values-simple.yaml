@@ -146,6 +146,8 @@ clusterGroup:
           value: "false"
         - name: crds.groups.wgpolicyk8s.clusterpolicyreports
           value: "false"
+        - name: reportsController.enabled
+          value: "false"
 
     coco-kyverno-policies:
       name: coco-kyverno-policies
