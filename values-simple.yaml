@@ -78,9 +78,8 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system #upstream config
       project: trustee
-      repoURL: https://github.com/butler54/trustee-chart.git
-      path: .
-      chartVersion: feature/trustee-1.1-compat
+      chart: trustee
+      chartVersion: 0.3.*
       overrides:
         - name: kbs.admin.format
           value: "v1.1"
