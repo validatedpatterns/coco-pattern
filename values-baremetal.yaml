@@ -106,9 +106,8 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system
       project: trustee
-      repoURL: https://github.com/butler54/trustee-chart.git
-      targetRevision: feature/baremetal-attestation
-      path: .
+      chart: trustee
+      chartVersion: 0.3.*
       overrides:
         - name: global.coco.secured
           value: "true"
