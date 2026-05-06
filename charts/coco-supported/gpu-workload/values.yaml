@@ -1,0 +1,6 @@
+runtimeClassName: "kata-cc-nvidia-gpu"
+
+defaultMemory: "32768"
+
+global:
+  clusterPlatform: ""

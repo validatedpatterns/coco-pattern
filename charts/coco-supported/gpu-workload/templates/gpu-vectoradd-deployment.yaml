@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-vectoradd
+  labels:
+    app: gpu-vectoradd
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gpu-vectoradd
+  template:
+    metadata:
+      labels:
+        app: gpu-vectoradd
+      annotations:
+        coco.io/initdata-configmap: debug-initdata
+        {{- if .Values.defaultMemory }}
+        io.katacontainers.config.hypervisor.default_memory: {{ .Values.defaultMemory | quote }}
+        {{- end }}
+    spec:
+      runtimeClassName: {{ .Values.runtimeClassName }}
+      containers:
+        - name: gpu-cc-verifier
+          image: quay.io/openshift_sandboxed_containers/gpu-verifier:ubi9
+          imagePullPolicy: Always
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              /opt/cuda-samples/Samples/0_Introduction/vectorAdd/build/vectorAdd
+              sleep 36000
+          resources:
+            limits:
+              nvidia.com/pgpu: 1

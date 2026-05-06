@@ -1,0 +1,42 @@
+---
+- name: Reconcile KataConfig for GPU RuntimeClass
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Check for nodes with NVIDIA GPU labels
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        label_selectors:
+          - "nvidia.com/gpu.present=true"
+      register: gpu_nodes
+
+    - name: Check if kata-cc-nvidia-gpu RuntimeClass exists
+      kubernetes.core.k8s_info:
+        api_version: node.k8s.io/v1
+        kind: RuntimeClass
+        name: kata-cc-nvidia-gpu
+      register: gpu_runtimeclass
+
+    - name: Trigger KataConfig re-reconciliation
+      kubernetes.core.k8s:
+        state: patched
+        api_version: kataconfiguration.openshift.io/v1
+        kind: KataConfig
+        name: default-kata-config
+        definition:
+          metadata:
+            annotations:
+              kata-reconcile: "{{ ansible_date_time.epoch }}"
+      when:
+        - gpu_nodes.resources | length > 0
+        - gpu_runtimeclass.resources | length == 0
+
+    - name: Report status
+      ansible.builtin.debug:
+        msg: >-
+          GPU nodes: {{ gpu_nodes.resources | length }},
+          RuntimeClass exists: {{ gpu_runtimeclass.resources | length > 0 }},
+          Action: {{ 'triggered re-reconciliation' if (gpu_nodes.resources | length > 0 and gpu_runtimeclass.resources | length == 0) else 'no action needed' }}

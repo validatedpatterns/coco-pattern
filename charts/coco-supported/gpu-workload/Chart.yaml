@@ -1,0 +1,10 @@
+apiVersion: v2
+description: Sample CUDA workload for NVIDIA confidential GPU verification.
+keywords:
+- pattern
+- nvidia
+- gpu
+- workload
+- confidential
+name: gpu-workload
+version: 0.0.1

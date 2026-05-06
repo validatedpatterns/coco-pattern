@@ -1,0 +1,11 @@
+enabled: true
+
+ccManager:
+  enabled: true
+  defaultMode: "on"
+
+kataSandboxDevicePlugin:
+  enabled: true
+
+iommu:
+  enabled: true
