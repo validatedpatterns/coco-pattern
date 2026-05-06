@@ -1,5 +1,6 @@
 workloadNamespaces:
   - hello-openshift
   - kbs-access
+  - gpu-workload
 
 initdataSourceNamespace: imperative
