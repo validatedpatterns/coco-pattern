@@ -46,13 +46,13 @@ if [ ! -f "${PCCS_USER_TOKEN_FILE}" ]; then
 	echo "Creating PCCS user token"
 	echo "usertoken" > "${PCCS_USER_TOKEN_FILE}"
 fi
-echo -n "usertoken" | sha512sum | tr -d '[:space:]-' > "${COCO_SECRETS_DIR}/pccs_user_token_hash"
+tr -d '\n' < "${PCCS_USER_TOKEN_FILE}" | sha512sum | tr -d '[:space:]-' > "${COCO_SECRETS_DIR}/pccs_user_token_hash"
 
 if [ ! -f "${PCCS_ADMIN_TOKEN_FILE}" ]; then
 	echo "Creating PCCS admin token"
 	echo "admintoken" > "${PCCS_ADMIN_TOKEN_FILE}"
 fi
-echo -n "admintoken" | sha512sum | tr -d '[:space:]-' > "${COCO_SECRETS_DIR}/pccs_admin_token_hash"
+tr -d '\n' < "${PCCS_ADMIN_TOKEN_FILE}" | sha512sum | tr -d '[:space:]-' > "${COCO_SECRETS_DIR}/pccs_admin_token_hash"
 
 ## Copy a sample values file if this stuff doesn't exist
 
