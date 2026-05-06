@@ -231,6 +231,10 @@ clusterGroup:
           value: "false"
         - name: reportsController.enabled
           value: "false"
+        - name: backgroundController.resources.limits.memory
+          value: "512Mi"
+        - name: backgroundController.resources.requests.memory
+          value: "256Mi"
 
     coco-kyverno-policies:
       name: coco-kyverno-policies
