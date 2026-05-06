@@ -16,6 +16,8 @@ The pattern provides three deployment topologies:
 
 3. **Bare metal** (`baremetal` clusterGroup) — deploys all components on bare metal hardware with Intel TDX or AMD SEV-SNP support. NFD (Node Feature Discovery) auto-detects the CPU architecture and configures the appropriate runtime. Supports SNO (Single Node OpenShift) and multi-node clusters.
 
+4. **Bare metal with GPU** (`baremetal-gpu` clusterGroup) — extends the bare metal topology with NVIDIA H100 confidential GPU support. Adds the NVIDIA GPU Operator, IOMMU kernel configuration, and a sample CUDA workload for CC GPU verification. Requires NVIDIA H100 GPUs with confidential computing firmware.
+
 The topology is controlled by the `main.clusterGroupName` field in `values-global.yaml`.
 
 Azure deployments use peer-pods, which provision confidential VMs (`Standard_DCas_v5` family) directly on the Azure hypervisor. Bare metal deployments use layered images and hardware TEE features directly.
@@ -108,6 +110,17 @@ The system auto-detects your hardware:
 - PCCS and QGS services deploy unconditionally; DaemonSets only schedule on Intel nodes via NFD labels
 
 Optional: pin PCCS to a specific node with `bash scripts/get-pccs-node.sh` and set `baremetal.pccs.nodeSelector` in the baremetal chart values.
+
+### Bare metal GPU deployment
+
+1. Set `main.clusterGroupName: baremetal-gpu` in `values-global.yaml`
+2. Run `bash scripts/gen-secrets.sh` to generate KBS keys and PCCS secrets
+3. For Intel TDX: uncomment the PCCS secrets in `~/values-secret-coco-pattern.yaml` and provide your Intel PCS API key
+4. `./pattern.sh make install`
+5. Wait for the cluster to reboot nodes (MachineConfig updates for TDX/SEV-SNP kernel parameters, vsock, and IOMMU)
+6. Approve the GPU Operator install plan when it appears (uses `installPlanApproval: Manual`)
+
+> **Note:** The `baremetal-gpu` topology deploys IOMMU MachineConfig on all nodes and will trigger reboots. For clusters without GPUs, use the `baremetal` topology instead. The GPU workload deployment will remain Pending on non-GPU systems but is otherwise harmless.
 
 ## Sample applications
 
