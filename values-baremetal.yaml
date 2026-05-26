@@ -108,25 +108,13 @@ clusterGroup:
       project: trustee
       chart: trustee
       chartVersion: 0.3.*
+      extraValueFiles:
+        - '/overrides/values-trustee.yaml'
       overrides:
-        - name: global.coco.secured
-          value: "true"
-        - name: kbs.admin.format
-          value: "v1.1"
-        - name: kbs.https.enabled
-          value: "false"
-        - name: kbs.secretResources[0].name
-          value: kbsres1
-        - name: kbs.secretResources[0].key
-          value: secret/data/hub/kbsres1
         - name: kbs.tdx.enabled
           value: "true"
         - name: kbs.tdx.collateralService
           value: "https://pccs-service.intel-dcap.svc.cluster.local:8042/sgx/certification/v4/"
-        - name: kbs.secretResources[1].name
-          value: passphrase
-        - name: kbs.secretResources[1].key
-          value: secret/data/hub/passphrase
 
     storage:
       name: storage
@@ -208,29 +196,9 @@ clusterGroup:
           limit: 20
         syncOptions:
           - ServerSideApply=true
+      extraValueFiles:
+        - '/overrides/values-kyverno.yaml'
       overrides:
-        - name: admissionController.container.securityContext
-          value: "null"
-        - name: admissionController.initContainer.securityContext
-          value: "null"
-        - name: backgroundController.securityContext
-          value: "null"
-        - name: cleanupController.securityContext
-          value: "null"
-        - name: reportsController.securityContext
-          value: "null"
-        - name: crds.migration.securityContext
-          value: "null"
-        - name: webhooksCleanup.securityContext
-          value: "null"
-        - name: test.securityContext
-          value: "null"
-        - name: crds.groups.wgpolicyk8s.policyreports
-          value: "false"
-        - name: crds.groups.wgpolicyk8s.clusterpolicyreports
-          value: "false"
-        - name: reportsController.enabled
-          value: "false"
         - name: backgroundController.resources.limits.memory
           value: "512Mi"
         - name: backgroundController.resources.requests.memory
