@@ -11,3 +11,5 @@ kbs:
       key: "secret/data/hub/kbsres1"
     - name: "passphrase"
       key: "secret/data/hub/passphrase"
+  extraSecrets:
+    - mySecret
