@@ -1,14 +1,15 @@
-# Override the default values for the trustee chart
-# This lists the secret resources that are uploaded to your chosen ESO backend (today by default, Vault).
-# it does not contain the secrets themselves
+# Shared trustee chart overrides loaded via extraValueFiles.
+# Common to all profiles: admin format, HTTPS config, secret resources.
+# Profile-specific overrides (tdx, collateralService, gpu, baremetal) stay inline in values-<profile>.yaml.
 kbs:
+  admin:
+    format: "v1.1"
+  https:
+    enabled: false
   secretResources:
-    - name: "kbsres1" # name is the name of the k8s secret that will be presented to trustee and accessible via the CDH
-      key: "secret/data/hub/kbsres1" # this is the path to the secret in vault. 
+    - name: "kbsres1"
+      key: "secret/data/hub/kbsres1"
     - name: "passphrase"
       key: "secret/data/hub/passphrase"
-# Override the default values for the coco pattern this is because when testing against a branch strange stuff happens
-# FIXME: Don't commit this to main
-global:
-  coco:
-    secured: true # true or false. If true, the cluster will be secured. If false, the cluster will be insecure.
+  extraSecrets:
+    - mySecret

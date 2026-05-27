@@ -79,10 +79,9 @@ clusterGroup:
       namespace: trustee-operator-system #upstream config
       project: trustee
       chart: trustee
-      chartVersion: 0.3.*
-      overrides:
-        - name: kbs.admin.format
-          value: "v1.1"
+      chartVersion: 0.4.*
+      extraValueFiles:
+        - '/overrides/values-trustee.yaml'
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config
@@ -130,29 +129,16 @@ clusterGroup:
           limit: 20
         syncOptions:
           - ServerSideApply=true
-      overrides:
-        - name: admissionController.container.securityContext
-          value: "null"
-        - name: admissionController.initContainer.securityContext
-          value: "null"
-        - name: backgroundController.securityContext
-          value: "null"
-        - name: cleanupController.securityContext
-          value: "null"
-        - name: reportsController.securityContext
-          value: "null"
-        - name: crds.migration.securityContext
-          value: "null"
-        - name: webhooksCleanup.securityContext
-          value: "null"
-        - name: test.securityContext
-          value: "null"
-        - name: crds.groups.wgpolicyk8s.policyreports
-          value: "false"
-        - name: crds.groups.wgpolicyk8s.clusterpolicyreports
-          value: "false"
-        - name: reportsController.enabled
-          value: "false"
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+      extraValueFiles:
+        - '/overrides/values-kyverno.yaml'
 
     coco-kyverno-policies:
       name: coco-kyverno-policies

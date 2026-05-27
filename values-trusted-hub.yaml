@@ -69,11 +69,8 @@ clusterGroup:
       repoURL: https://github.com/butler54/trustee-chart.git
       path: .
       chartVersion: feature/trustee-1.1-compat
-      overrides:
-        - name: global.coco.secured
-          value: "true"
-        - name: kbs.admin.format
-          value: "v1.1"
+      extraValueFiles:
+        - '/overrides/values-trustee.yaml'
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
