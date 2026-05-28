@@ -262,6 +262,7 @@ Veritas does not measure the application container image digest. Image policy en
 **Expected behavior:** The attestation policy has backwards-compatible fallback rules. If no firmware reference values are in RVPS, the policy only checks `init_data`.
 
 To **enforce** firmware, remove the fallback rules from `attestation-policy.yaml`:
+
 ```rego
 # Remove these "hardware := 2 if count(query_reference_value(...)) == 0" rules
 ```
@@ -297,6 +298,7 @@ Choose the level appropriate for your threat model.
 ### Debug Mode
 
 The attestation policy enforces `debug == false` for both TDX and SNP. Debug mode allows:
+
 - Memory inspection via hypervisor
 - Single-stepping the guest
 - Extracting secrets from guest memory
