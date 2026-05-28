@@ -5,11 +5,10 @@
 include Makefile-common
 
 ##@ Firmware Reference Values
-.PHONY: push-firmware-refvals
-push-firmware-refvals: ## Push firmware reference values to Vault (REFVALS_FILE=<path>)
-	@if [ -z "$(REFVALS_FILE)" ]; then \
-		echo "Error: REFVALS_FILE not specified" >&2; \
-		echo "Usage: make push-firmware-refvals REFVALS_FILE=./refvals.json" >&2; \
-		exit 1; \
-	fi
-	@scripts/collect-firmware-refvals.sh $(REFVALS_FILE)
+.PHONY: collect-firmware-refvals
+collect-firmware-refvals: ## Collect firmware reference values from bare metal cluster
+	@scripts/collect-firmware-refvals.sh
+
+.PHONY: collect-firmware-refvals-merge
+collect-firmware-refvals-merge: ## Collect and merge with existing firmware refvals
+	@scripts/collect-firmware-refvals.sh --merge

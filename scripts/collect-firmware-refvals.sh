@@ -1,148 +1,243 @@
 #!/usr/bin/env bash
-# Collect firmware reference values from veritas output and push to Vault
+# Collect firmware reference values from a bare metal confidential VM
+#
+# This script automates the full lifecycle:
+#   1. Launch a kata pod with the specified RuntimeClass
+#   2. Install veritas inside the pod
+#   3. Collect firmware measurements (TDX/SNP)
+#   4. Copy output locally and transform to RVPS format
+#   5. Save to ~/.coco-pattern/firmware-reference-values.json
+#   6. Clean up the pod
 #
 # Usage:
-#   ./scripts/collect-firmware-refvals.sh <refvals-file.json>
+#   ./scripts/collect-firmware-refvals.sh [OPTIONS]
 #
-# Prerequisites:
-#   - jq installed
-#   - vault CLI installed and authenticated
-#   - VAULT_ADDR environment variable set (or infer from oc)
-#   - veritas output JSON file from bare metal kata pod
+# Options:
+#   -m, --merge              Merge with existing file instead of overwriting
+#   -n, --namespace <ns>     Namespace for collection pod (default: default)
+#   -o, --output <path>      Override output path (default: ~/.coco-pattern/firmware-reference-values.json)
+#   -r, --runtime-class <class>  Override RuntimeClass (default: kata-cc)
+#   -i, --pod-image <image>  Override pod base image (default: registry.access.redhat.com/ubi9/ubi:latest)
+#   -h, --help               Show this help message
 
 set -euo pipefail
 
-# Check prerequisites
-command -v jq >/dev/null 2>&1 || { echo "Error: jq is required but not installed." >&2; exit 1; }
-command -v vault >/dev/null 2>&1 || { echo "Error: vault CLI is required but not installed." >&2; exit 1; }
+# Defaults
+NAMESPACE="default"
+OUTPUT_FILE="${HOME}/.coco-pattern/firmware-reference-values.json"
+RUNTIME_CLASS="kata-cc"
+POD_IMAGE="registry.access.redhat.com/ubi9/ubi:latest"
+MERGE_MODE=false
+POD_NAME="firmware-collector-$(date +%s)"
 
-# Validate arguments
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <refvals-file.json>" >&2
-    echo "" >&2
-    echo "Example:" >&2
-    echo "  $0 ./refvals-ocp-4.18.json" >&2
-    exit 1
-fi
-
-REFVALS_FILE="$1"
-
-if [ ! -f "$REFVALS_FILE" ]; then
-    echo "Error: File not found: $REFVALS_FILE" >&2
-    exit 1
-fi
-
-# Infer VAULT_ADDR from cluster if not set
-if [ -z "${VAULT_ADDR:-}" ]; then
-    if command -v oc >/dev/null 2>&1; then
-        VAULT_ROUTE=$(oc get route -n vault vault -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
-        if [ -n "$VAULT_ROUTE" ]; then
-            export VAULT_ADDR="https://${VAULT_ROUTE}"
-            echo "Inferred VAULT_ADDR from cluster: $VAULT_ADDR"
-        else
-            echo "Error: VAULT_ADDR not set and could not infer from cluster" >&2
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -m|--merge)
+            MERGE_MODE=true
+            shift
+            ;;
+        -n|--namespace)
+            NAMESPACE="$2"
+            shift 2
+            ;;
+        -o|--output)
+            OUTPUT_FILE="$2"
+            shift 2
+            ;;
+        -r|--runtime-class)
+            RUNTIME_CLASS="$2"
+            shift 2
+            ;;
+        -i|--pod-image)
+            POD_IMAGE="$2"
+            shift 2
+            ;;
+        -h|--help)
+            sed -n '2,17p' "$0" | sed 's/^# //'
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option $1" >&2
+            echo "Run with --help for usage information" >&2
             exit 1
-        fi
-    else
-        echo "Error: VAULT_ADDR not set and oc CLI not available" >&2
-        exit 1
-    fi
-fi
+            ;;
+    esac
+done
 
-# Check Vault authentication
-if ! vault token lookup >/dev/null 2>&1; then
-    echo "Error: Not authenticated to Vault. Set VAULT_TOKEN or run 'vault login'" >&2
+# Prerequisites check
+command -v oc >/dev/null 2>&1 || { echo "Error: oc CLI is required but not installed." >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is required but not installed." >&2; exit 1; }
+
+# Check oc login
+if ! oc whoami >/dev/null 2>&1; then
+    echo "Error: Not logged in to OpenShift. Run 'oc login' first." >&2
     exit 1
 fi
 
-echo "Processing firmware reference values from: $REFVALS_FILE"
+echo "=========================================="
+echo "Firmware Reference Value Collection"
+echo "=========================================="
+echo "Namespace:      $NAMESPACE"
+echo "RuntimeClass:   $RUNTIME_CLASS"
+echo "Pod image:      $POD_IMAGE"
+echo "Output file:    $OUTPUT_FILE"
+echo "Merge mode:     $MERGE_MODE"
+echo ""
 
-# Extract measurements from veritas JSON
-# Veritas format varies by TEE type - handle both TDX and SNP
-# We extract into separate variables then merge
+# Cleanup function (called via trap)
+cleanup() {
+    local exit_code=$?
+    echo ""
+    if [[ $exit_code -ne 0 ]]; then
+        echo "⚠ Collection failed or was interrupted"
+    fi
 
-# TDX measurements (if present)
-MR_TD=$(jq -r '.tdx.mr_td // empty' "$REFVALS_FILE" 2>/dev/null || echo "")
-RTMR_1=$(jq -r '.tdx.rtmr[1] // empty' "$REFVALS_FILE" 2>/dev/null || echo "")
-RTMR_2=$(jq -r '.tdx.rtmr[2] // empty' "$REFVALS_FILE" 2>/dev/null || echo "")
-XFAM=$(jq -r '.tdx.xfam // empty' "$REFVALS_FILE" 2>/dev/null || echo "")
+    if oc get pod "$POD_NAME" -n "$NAMESPACE" &>/dev/null; then
+        echo "Cleaning up pod $POD_NAME..."
+        oc delete pod "$POD_NAME" -n "$NAMESPACE" --ignore-not-found=true
+    fi
 
-# SNP measurements (if present)
-SNP_LAUNCH=$(jq -r '.snp.launch_measurement // empty' "$REFVALS_FILE" 2>/dev/null || echo "")
+    exit $exit_code
+}
 
-# Build JSON payload for Vault
-# Each field is an array to support multiple valid values (multi-version support)
-VAULT_PAYLOAD=$(jq -n \
-    --arg mr_td "$MR_TD" \
-    --arg rtmr_1 "$RTMR_1" \
-    --arg rtmr_2 "$RTMR_2" \
-    --arg xfam "$XFAM" \
-    --arg snp_launch "$SNP_LAUNCH" \
+# Register cleanup on exit, error, or interrupt
+trap cleanup EXIT ERR SIGINT SIGTERM
+
+# Check for existing pod with same name and clean it up
+if oc get pod "$POD_NAME" -n "$NAMESPACE" &>/dev/null; then
+    echo "Found existing pod $POD_NAME, cleaning up..."
+    oc delete pod "$POD_NAME" -n "$NAMESPACE" --wait=false
+    sleep 2
+fi
+
+# Create kata pod
+echo "Creating kata pod with RuntimeClass $RUNTIME_CLASS..."
+cat <<EOF | oc apply -n "$NAMESPACE" -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $POD_NAME
+spec:
+  runtimeClassName: $RUNTIME_CLASS
+  restartPolicy: Never
+  containers:
+  - name: collector
+    image: $POD_IMAGE
+    command: ["sleep", "3600"]
+    securityContext:
+      privileged: false
+EOF
+
+# Wait for pod to be Ready
+echo "Waiting for pod to be Ready..."
+if ! oc wait --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --timeout=120s; then
+    echo "Error: Pod failed to become Ready within 120 seconds" >&2
+    oc describe pod/$POD_NAME -n $NAMESPACE >&2
+    exit 1
+fi
+
+echo "Pod is Ready"
+
+# Install pip and veritas
+echo "Installing pip and veritas inside pod..."
+oc exec $POD_NAME -n $NAMESPACE -- bash -c "dnf install -y python3-pip > /dev/null 2>&1" || {
+    echo "Error: Failed to install pip" >&2
+    exit 1
+}
+
+oc exec $POD_NAME -n $NAMESPACE -- bash -c "pip install --quiet veritas-collectd" || {
+    echo "Error: Failed to install veritas" >&2
+    exit 1
+}
+
+# Run veritas collection
+echo "Running veritas collection (this may take 30-60 seconds)..."
+if ! oc exec $POD_NAME -n $NAMESPACE -- veritas collect --output /tmp/refvals.json; then
+    echo "Error: Veritas collection failed" >&2
+    echo "Check that the pod is running on hardware with TDX or SNP support" >&2
+    exit 1
+fi
+
+# Copy output locally
+echo "Copying veritas output locally..."
+TEMP_RAW="/tmp/refvals-raw-$$.json"
+oc cp $NAMESPACE/$POD_NAME:/tmp/refvals.json $TEMP_RAW || {
+    echo "Error: Failed to copy veritas output from pod" >&2
+    exit 1
+}
+
+# Transform to RVPS format
+echo "Transforming to RVPS format..."
+TEMP_RVPS="/tmp/refvals-rvps-$$.json"
+
+jq -n \
+    --arg mr_td "$(jq -r '.tdx.mr_td // empty' "$TEMP_RAW" 2>/dev/null || echo "")" \
+    --arg rtmr_1 "$(jq -r '.tdx.rtmr[1] // empty' "$TEMP_RAW" 2>/dev/null || echo "")" \
+    --arg rtmr_2 "$(jq -r '.tdx.rtmr[2] // empty' "$TEMP_RAW" 2>/dev/null || echo "")" \
+    --arg xfam "$(jq -r '.tdx.xfam // empty' "$TEMP_RAW" 2>/dev/null || echo "")" \
+    --arg snp_launch "$(jq -r '.snp.launch_measurement // empty' "$TEMP_RAW" 2>/dev/null || echo "")" \
     '{
         mr_td: (if $mr_td != "" then [$mr_td] else [] end),
         rtmr_1: (if $rtmr_1 != "" then [$rtmr_1] else [] end),
         rtmr_2: (if $rtmr_2 != "" then [$rtmr_2] else [] end),
         xfam: (if $xfam != "" then [$xfam] else [] end),
         snp_launch_measurement: (if $snp_launch != "" then [$snp_launch] else [] end)
-    }'
-)
-
-echo "Extracted firmware reference values:"
-echo "$VAULT_PAYLOAD" | jq .
+    }' > "$TEMP_RVPS"
 
 # Check if any values were extracted
-VALUE_COUNT=$(echo "$VAULT_PAYLOAD" | jq '[.[] | select(length > 0)] | length')
+VALUE_COUNT=$(jq '[.[] | select(length > 0)] | length' "$TEMP_RVPS")
 if [ "$VALUE_COUNT" -eq 0 ]; then
-    echo "Warning: No firmware measurements found in $REFVALS_FILE" >&2
-    echo "Veritas output may be incomplete or in unexpected format" >&2
+    echo "Error: No firmware measurements found in veritas output" >&2
+    echo "Veritas may not support this hardware or the output format changed" >&2
+    rm -f "$TEMP_RAW" "$TEMP_RVPS"
     exit 1
 fi
 
-# Merge with existing values if present
-VAULT_PATH="secret/data/hub/firmwareReferenceValues"
-echo "Checking for existing values at $VAULT_PATH..."
+echo "Extracted firmware values:"
+jq . "$TEMP_RVPS"
 
-EXISTING_DATA=$(vault kv get -format=json "$VAULT_PATH" 2>/dev/null | jq -r '.data.data // {}' || echo "{}")
+# Merge with existing file if requested
+if [ "$MERGE_MODE" = true ] && [ -f "$OUTPUT_FILE" ]; then
+    echo "Merging with existing file..."
+    EXISTING_DATA=$(cat "$OUTPUT_FILE")
 
-if [ "$EXISTING_DATA" != "{}" ]; then
-    echo "Found existing firmware reference values"
-    echo "Merging new values with existing..."
-
-    # Merge arrays: union of existing and new values
-    MERGED_PAYLOAD=$(jq -n \
+    MERGED_DATA=$(jq -n \
         --argjson existing "$EXISTING_DATA" \
-        --argjson new "$VAULT_PAYLOAD" \
+        --argjson new "$(cat "$TEMP_RVPS")" \
         '$existing * $new |
          to_entries |
          map({
              key: .key,
-             value: (.value | if type == "array" then unique else . end)
+             value: (.value | if type == "array" then (. + ($new[.key] // [])) | unique else . end)
          }) |
          from_entries'
     )
 
-    echo "Merged payload:"
-    echo "$MERGED_PAYLOAD" | jq .
-    FINAL_PAYLOAD="$MERGED_PAYLOAD"
-else
-    echo "No existing values found, will create new secret"
-    FINAL_PAYLOAD="$VAULT_PAYLOAD"
+    echo "Merged firmware values:"
+    echo "$MERGED_DATA" | jq .
+    echo "$MERGED_DATA" > "$TEMP_RVPS"
 fi
 
-# Push to Vault
-echo "Writing firmware reference values to Vault at $VAULT_PATH..."
-echo "$FINAL_PAYLOAD" | vault kv put "$VAULT_PATH" -
+# Save to output file
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+cp "$TEMP_RVPS" "$OUTPUT_FILE"
 
-if [ $? -eq 0 ]; then
-    echo "✓ Successfully wrote firmware reference values to Vault"
-    echo ""
-    echo "Next steps:"
-    echo "1. Verify the secret: vault kv get $VAULT_PATH"
-    echo "2. On the cluster with KBS deployed, force ExternalSecret sync:"
-    echo "   oc delete externalsecret firmware-refvals-eso -n trustee-operator-system"
-    echo "3. Verify the secret was synced:"
-    echo "   oc get secret firmware-reference-values -n trustee-operator-system"
-else
-    echo "✗ Failed to write to Vault" >&2
-    exit 1
-fi
+# Cleanup temp files
+rm -f "$TEMP_RAW" "$TEMP_RVPS"
+
+echo ""
+echo "✓ Successfully collected firmware reference values"
+echo ""
+echo "Saved to: $OUTPUT_FILE"
+echo ""
+echo "Next steps:"
+echo "1. Review the collected values: cat $OUTPUT_FILE"
+echo "2. For bare metal deployments:"
+echo "   - Uncomment 'firmwareReferenceValues' in ~/values-secret-coco-pattern.yaml"
+echo "   - Run: make load-secrets"
+echo "3. Verify the secret was synced to Vault:"
+echo "   vault kv get secret/hub/firmwareReferenceValues"
+echo "4. Force ExternalSecret sync on the KBS cluster (if needed):"
+echo "   oc delete externalsecret firmware-refvals-eso -n trustee-operator-system"
+echo ""
