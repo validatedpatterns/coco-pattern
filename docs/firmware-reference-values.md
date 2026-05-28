@@ -52,6 +52,7 @@ pip install veritas-collectd
 ### 2. Bare Metal Cluster Access
 
 You need:
+
 - A running bare metal cluster with Intel TDX or AMD SEV-SNP hardware
 - KataConfig deployed and in Ready state
 - At least one kata pod successfully running (proves TEE is functional)
@@ -61,6 +62,7 @@ You need:
 You need write access to the Vault instance at `secret/data/hub/firmwareReferenceValues`.
 
 If using the pattern's default Vault setup:
+
 ```bash
 # Get Vault root token from cluster
 oc get secret -n vault vault-init -o jsonpath='{.data.root_token}' | base64 -d
@@ -113,6 +115,7 @@ make push-firmware-refvals REFVALS_FILE=./refvals-*.json
 ```
 
 This script:
+
 1. Extracts firmware measurements from veritas JSON
 2. Converts to the KBS/RVPS expected format (arrays of hex strings)
 3. Pushes to Vault at `secret/data/hub/firmwareReferenceValues`
