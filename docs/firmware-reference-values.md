@@ -135,6 +135,7 @@ The script creates a secret with this structure:
 ```
 
 **Key points:**
+
 - Each field is an **array** of strings (supports multiple valid values)
 - Hash values are lowercase hex strings (SHA-384 = 96 hex chars)
 - Empty arrays `[]` mean "not available" - attestation will skip that check
@@ -175,6 +176,7 @@ The RVPS will automatically reload reference values from the `rvps-reference-val
 Different OpenShift versions may have different firmware measurements due to kernel/initrd changes. To support multiple versions:
 
 1. **Collect from each version:**
+
    ```bash
    # OCP 4.18 cluster
    veritas collect --output refvals-ocp-4.18.json
@@ -184,6 +186,7 @@ Different OpenShift versions may have different firmware measurements due to ker
    ```
 
 2. **Merge the arrays:**
+
    ```json
    {
      "mr_td": ["<4.18-value>", "<4.19-value>"],
@@ -192,6 +195,7 @@ Different OpenShift versions may have different firmware measurements due to ker
    ```
 
 3. **Push merged values to Vault:**
+
    ```bash
    vault kv put secret/hub/firmwareReferenceValues \
      mr_td='["val1","val2"]' \
@@ -218,6 +222,7 @@ Veritas does not extract minimum required TCB levels (e.g., SNP microcode versio
 ```
 
 Then update the attestation policy to check:
+
 ```rego
 input.snp.report.reported_tcb.bootloader >= tcb_bootloader_min
 ```
@@ -227,6 +232,7 @@ input.snp.report.reported_tcb.bootloader >= tcb_bootloader_min
 The SNP guest policy contains multiple flags (smt_allowed, migrate_ma, debug, etc.). Veritas reports the full policy word but does not break it into individual enforcement rules.
 
 To enforce specific policy bits, add to attestation policy:
+
 ```rego
 input.snp.report.policy.smt_allowed == false
 input.snp.report.policy.debug == false
@@ -235,6 +241,7 @@ input.snp.report.policy.debug == false
 ### 3. Container Image Measurements
 
 Veritas does not measure the application container image digest. Image policy enforcement is handled separately via:
+
 - Confidential Data Hub (CDH) pulling image from KBS
 - Kyverno policies validating image signatures (cosign, Notary)
 
@@ -245,6 +252,7 @@ Veritas does not measure the application container image digest. Image policy en
 **Symptom:** `veritas collect` returns empty or errors
 
 **Check:**
+
 1. Pod is using `kata-remote` RuntimeClass
 2. Pod is actually running on bare metal (not Azure peer-pods)
 3. TEE device exists: `ls /dev/tdx_guest` (TDX) or `ls /dev/sev` (SNP)
