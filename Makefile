@@ -3,3 +3,13 @@
 # You can add custom targets above or below the include line
 
 include Makefile-common
+
+##@ Firmware Reference Values
+.PHONY: push-firmware-refvals
+push-firmware-refvals: ## Push firmware reference values to Vault (REFVALS_FILE=<path>)
+	@if [ -z "$(REFVALS_FILE)" ]; then \
+		echo "Error: REFVALS_FILE not specified" >&2; \
+		echo "Usage: make push-firmware-refvals REFVALS_FILE=./refvals.json" >&2; \
+		exit 1; \
+	fi
+	@scripts/collect-firmware-refvals.sh $(REFVALS_FILE)
