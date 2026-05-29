@@ -3,3 +3,12 @@
 # You can add custom targets above or below the include line
 
 include Makefile-common
+
+##@ Firmware Reference Values
+.PHONY: collect-firmware-refvals
+collect-firmware-refvals: ## Collect firmware reference values from bare metal cluster
+	@scripts/collect-firmware-refvals.sh
+
+.PHONY: collect-firmware-refvals-merge
+collect-firmware-refvals-merge: ## Collect and merge with existing firmware refvals
+	@scripts/collect-firmware-refvals.sh --merge

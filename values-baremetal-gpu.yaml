@@ -117,7 +117,7 @@ clusterGroup:
       namespace: trustee-operator-system
       project: trustee
       chart: trustee
-      chartVersion: 0.4.*
+      chartVersion: 0.6.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -126,6 +126,8 @@ clusterGroup:
         - name: kbs.tdx.collateralService
           value: "https://pccs-service.intel-dcap.svc.cluster.local:8042/sgx/certification/v4/"
         - name: kbs.gpu.enabled
+          value: "true"
+        - name: kbs.baremetal.enabled
           value: "true"
 
     storage:
