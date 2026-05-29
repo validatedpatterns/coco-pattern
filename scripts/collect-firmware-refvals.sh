@@ -60,6 +60,7 @@ done
 # Prerequisites check
 command -v podman >/dev/null 2>&1 || { echo "Error: podman is required but not installed." >&2; exit 1; }
 command -v yq >/dev/null 2>&1 || { echo "Error: yq is required but not installed." >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "Error: jq is required but not installed." >&2; exit 1; }
 
 # Check pull secret exists
 if [ ! -f "$PULL_SECRET" ]; then
@@ -111,10 +112,11 @@ podman run --rm \
     --hw-xfam-allow x87 --hw-xfam-allow sse --hw-xfam-allow avx \
     -o /output
 
-# Extract reference-values.json from ConfigMap
+# Extract reference-values.json from ConfigMap and transform array → object
 echo ""
 echo "Extracting reference values..."
-yq '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" > "$OUTPUT_FILE"
+yq '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" | \
+  jq '[.[] | {(.name): .value}] | add' > "$OUTPUT_FILE"
 
 echo ""
 echo "✓ Successfully collected firmware reference values"
