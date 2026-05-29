@@ -118,6 +118,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: $POD_NAME
+  labels:
+    coco.io/skip-initdata: "true"
 spec:
   runtimeClassName: $RUNTIME_CLASS
   restartPolicy: Never
