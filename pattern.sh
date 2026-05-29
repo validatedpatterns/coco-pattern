@@ -114,12 +114,12 @@ podman run -it --rm --pull=newer \
     -e TOKEN_SECRET \
     -e UUID_FILE \
     -e VALUES_SECRET \
-    "${PKI_HOST_MOUNT_ARGS[@]}" \
+    "${PKI_HOST_MOUNT_ARGS[@]+"${PKI_HOST_MOUNT_ARGS[@]}"}" \
     -v "$(pwd -P)":"$(pwd -P)" \
     -v "${HOME}":"${HOME}" \
     -v "${HOME}":/pattern-home \
     "${PODMAN_ARGS[@]}" \
-    "${EXTRA_ARGS_ARRAY[@]}" \
+    "${EXTRA_ARGS_ARRAY[@]+"${EXTRA_ARGS_ARRAY[@]}"}" \
     -w "$(pwd -P)" \
     "$PATTERN_UTILITY_CONTAINER" \
     "$@"
