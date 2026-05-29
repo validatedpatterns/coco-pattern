@@ -24,6 +24,12 @@ spec:
                 - Pod
               operations:
                 - CREATE
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchLabels:
+                  coco.io/skip-initdata: "true"
       preconditions:
         all:
           - key: "{{ "{{" }}request.object.spec.runtimeClassName || '' {{ "}}" }}"
