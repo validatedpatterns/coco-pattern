@@ -107,7 +107,7 @@ clusterGroup:
       namespace: trustee-operator-system
       project: trustee
       chart: trustee
-      chartVersion: 0.6.*
+      chartVersion: 0.7.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
