@@ -79,7 +79,7 @@ clusterGroup:
       namespace: trustee-operator-system #upstream config
       project: trustee
       chart: trustee
-      chartVersion: 0.4.*
+      chartVersion: 0.7.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
     sandbox:
