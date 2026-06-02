@@ -115,7 +115,10 @@ podman run --rm \
 # Extract reference-values.json from ConfigMap and transform array → object
 echo ""
 echo "Extracting reference values..."
-yq '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" | \
+# -r ensures the embedded JSON string is output raw (not quoted),
+# which is required for yq v3 (kislyuk/yq) compatibility.
+# yq v4 (mikefarah/yq) outputs raw scalars by default but -r is harmless.
+yq -r '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" | \
   jq '[.[] | {(.name): .value}] | add' > "$OUTPUT_FILE"
 
 echo ""
