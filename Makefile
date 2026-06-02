@@ -3,3 +3,12 @@
 # You can add custom targets above or below the include line
 
 include Makefile-common
+
+##@ Reference Value Collection
+.PHONY: collect-firmware-refvals
+collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
+	@scripts/collect-firmware-refvals.sh
+
+.PHONY: collect-azure-refvals
+collect-azure-refvals: ## Collect PCR reference values (Azure)
+	@scripts/collect-firmware-refvals.sh --platform azure

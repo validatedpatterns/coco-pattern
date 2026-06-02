@@ -72,6 +72,8 @@ if [ ! -f "${VALUES_FILE}" ]; then
 	echo "  For Bare Metal deployments:"
 	echo "    - Uncomment the PCCS secrets section"
 	echo "    - Add your Intel PCS API key (get from https://api.portal.trustedservices.intel.com/)"
+	echo "    - Run 'make collect-firmware-refvals' to collect firmware measurements"
+	echo "    - Uncomment firmwareReferenceValues in values-secret file"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
 	echo "    - See docs/pcr-reference-values-bare-metal.md for PCR collection"
 	echo
