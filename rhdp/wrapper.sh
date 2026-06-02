@@ -189,7 +189,7 @@ bash ./scripts/gen-secrets.sh
 echo "---------------------"
 echo "retrieving PCR measurements"
 echo "---------------------"
-bash ./scripts/get-pcr.sh
+bash ./scripts/collect-firmware-refvals.sh --platform azure
 
 sleep 60
 echo "---------------------"

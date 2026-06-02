@@ -145,6 +145,11 @@ echo "setting up secrets"
 bash ./scripts/gen-secrets.sh
 
 echo "---------------------"
+echo "retrieving PCR measurements"
+echo "---------------------"
+bash ./scripts/collect-firmware-refvals.sh --platform azure
+
+echo "---------------------"
 echo "starting pattern install on hub cluster"
 echo "---------------------"
 export KUBECONFIG="$(pwd)/openshift-install-hub/auth/kubeconfig"
