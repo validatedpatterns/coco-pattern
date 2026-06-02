@@ -4,11 +4,11 @@
 
 include Makefile-common
 
-##@ Firmware Reference Values
+##@ Reference Value Collection
 .PHONY: collect-firmware-refvals
-collect-firmware-refvals: ## Collect firmware reference values from bare metal cluster
+collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
 	@scripts/collect-firmware-refvals.sh
 
-.PHONY: collect-firmware-refvals-merge
-collect-firmware-refvals-merge: ## Collect and merge with existing firmware refvals
-	@scripts/collect-firmware-refvals.sh --merge
+.PHONY: collect-azure-refvals
+collect-azure-refvals: ## Collect PCR reference values (Azure)
+	@scripts/collect-firmware-refvals.sh --platform azure
