@@ -6,7 +6,7 @@ Confidential containers use hardware-backed Trusted Execution Environments (TEEs
 
 ## Topologies
 
-The pattern provides three deployment topologies:
+The pattern provides four deployment topologies:
 
 1. **Single cluster** (`simple` clusterGroup) — deploys all components (Trustee, Vault, ACM, sandboxed containers, workloads) in one cluster on Azure. This breaks the RACI separation expected in a remote attestation architecture but simplifies testing and demonstrations.
 
@@ -29,6 +29,10 @@ Breaking change from v4. Uses GA releases of the CoCo stack with Kyverno-based i
 - **5.0** — Kyverno-based `cc_init_data` injection (replaces MutatingAdmissionPolicy), OSC 1.12 / Trustee 1.1 GA, external chart repositories, self-signed certificates via cert-manager, multi-cluster support via ACM. Requires OCP 4.19.28+.
 - **5.1** — Bare metal support for Intel TDX and AMD SEV-SNP via NFD auto-detection. Currently tested on SNO (Single Node OpenShift) configurations only.
 - **5.2** — NVIDIA H100 confidential GPU support for bare metal (`baremetal-gpu` clusterGroup). Adds GPU Operator, IOMMU configuration, CC Manager, and sample CUDA workload.
+- **5.3** — DRY refactor of trustee and kyverno overrides, Kyverno CRD label fix, pattern infrastructure update.
+- **5.4** — Firmware reference values workflow for bare metal attestation via veritas. Adds `collect-firmware-refvals.sh`, RVPS integration, and hardened attestation policy (trustee-chart v0.5.0).
+- **5.5** — Trustee-chart v0.7.0 (td_attributes.debug path fix). Unified reference value collection for Azure and bare metal via veritas container.
+- **5.6** — Documentation update, sandboxed-policies v0.2.0 (Azure-conditional peer-pods).
 
 ### Previous versions
 
@@ -176,4 +180,4 @@ Deployment commands:
 - Single cluster: `bash rhdp/wrapper.sh <azure-region>` (e.g. `bash rhdp/wrapper.sh eastasia`)
 - Multi-cluster: `bash rhdp/wrapper-multicluster.sh <azure-region>`
 
-The wrapper scripts handle cluster provisioning via `openshift-install`, secret generation, PCR retrieval, and pattern installation.
+The wrapper scripts handle cluster provisioning via `openshift-install`, secret generation, reference value collection, and pattern installation.

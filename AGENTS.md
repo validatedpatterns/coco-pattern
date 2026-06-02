@@ -62,7 +62,7 @@ These charts are published independently and consumed from the `charts.validated
 | `sandboxed-policies` | `validatedpatterns/sandboxed-policies-chart` | ACM policies hub → spoke |
 | `sandboxed-containers` | `validatedpatterns/sandboxed-containers-chart` | Sandboxed runtime on spoke |
 
-Changes to companion charts require a release (git tag) before the pattern can consume them. Update the `chartVersion:` field in the values files to pick up new releases.
+Changes to companion charts require a release (Git tag) before the pattern can consume them. Update the `chartVersion:` field in the values files to pick up new releases.
 
 ## Cluster Groups
 
