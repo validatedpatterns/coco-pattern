@@ -162,7 +162,7 @@ clusterGroup:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
       chart: sandboxed-policies
-      chartVersion: 0.1.*
+      chartVersion: 0.2.*
 
     kbs-access:
       name: kbs-access

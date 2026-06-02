@@ -74,7 +74,7 @@ clusterGroup:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator #upstream config
       chart: sandboxed-policies
-      chartVersion: 0.1.*
+      chartVersion: 0.2.*
       overrides:
         - name: global.coco.azure.tags
           value: "key1=value1,key2=value2"

@@ -62,12 +62,15 @@ Breaking change from v4. Uses GA releases of the CoCo stack with Kyverno-based i
 - OpenShift pull secret saved at `~/pull-secret.json` (download from [console.redhat.com](https://console.redhat.com/openshift/downloads))
 - Fork the repository — ArgoCD reconciles cluster state against your fork, so changes must be pushed to your remote
 
-### Secrets and PCR setup
+### Secrets and reference value setup
 
-These scripts generate the cryptographic material and attestation measurements needed by Trustee and the peer-pod VMs. Run them once before your first deployment.
+These scripts generate the cryptographic material and attestation reference values needed by Trustee. Run them once before your first deployment.
 
 1. `bash scripts/gen-secrets.sh` — generates KBS key pairs, PCCS certificates/tokens (for bare metal), and copies `values-secret.yaml.template` to `~/values-secret-coco-pattern.yaml`
-2. `bash scripts/get-pcr.sh` — retrieves PCR measurements from the peer-pod VM image and stores them at `~/.coco-pattern/measurements.json` (requires `podman`, `skopeo`, and `~/pull-secret.json`). **Azure only.** Bare metal uses manual PCR collection — see [docs/pcr-reference-values-bare-metal.md](docs/pcr-reference-values-bare-metal.md) for the procedure. Store the measurements at `~/.coco-pattern/measurements.json`.
+2. Collect attestation reference values (requires `podman`, `yq`, `jq`, and `~/pull-secret.json`):
+   - **Azure:** `make collect-azure-refvals` — pulls PCR measurements from the dm-verity image via veritas. Saves to `~/.coco-pattern/measurements.json`.
+   - **Bare metal:** `make collect-firmware-refvals` — computes firmware measurements from OCP release artifacts via veritas. Saves to `~/.coco-pattern/firmware-reference-values.json`. For bare metal, also uncomment the `firmwareReferenceValues` section in `~/values-secret-coco-pattern.yaml`.
+   - See [docs/firmware-reference-values.md](docs/firmware-reference-values.md) for detailed workflow and options.
 3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern. For bare metal, uncomment the PCCS secrets section and provide your Intel PCS API key.
 
 > **Note:** `gen-secrets.sh` will not overwrite existing secrets. Delete `~/.coco-pattern/` if you need to regenerate.
