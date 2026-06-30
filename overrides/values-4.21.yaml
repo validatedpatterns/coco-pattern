@@ -1,0 +1,7 @@
+# OCP 4.21 version-specific operator pins
+# Applied via sharedValueFiles when global.clusterVersion is "4.21"
+
+clusterGroup:
+  subscriptions:
+    lvm-operator:
+      channel: stable-4.21

@@ -1,6 +1,7 @@
 global:
   pattern: coco-pattern
   storageProvider: hpp  # Options: hpp, lvm, external
+  clusterVersion: "4.21"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
   secretStore:
     # Warning: This must be present even if it is set to none.
     backend: vault # none, vault, kubernetes

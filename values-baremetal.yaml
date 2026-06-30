@@ -79,6 +79,7 @@ clusterGroup:
   sharedValueFiles:
   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
+  - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
 
   applications:
     acm:
