@@ -27,7 +27,7 @@ main:
   # WARNING
   # This default configuration uses a single cluster on azure.
   # It fundamentally violates the separation of duties.
-  clusterGroupName: simple
+  clusterGroupName: baremetal
   singleArgoCD: true
   multiSourceConfig:
     enabled: true
