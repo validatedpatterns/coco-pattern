@@ -106,8 +106,10 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system
       project: trustee
-      chart: trustee
-      chartVersion: 0.7.*
+      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
+      repoURL: https://github.com/butler54/trustee-chart.git
+      targetRevision: dev/phase1-testing
+      path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -161,8 +163,10 @@ clusterGroup:
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
-      chart: sandboxed-policies
-      chartVersion: 0.2.*
+      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
+      repoURL: https://github.com/butler54/sandboxed-policies-chart.git
+      targetRevision: dev/phase1-testing
+      path: .
 
     kbs-access:
       name: kbs-access
