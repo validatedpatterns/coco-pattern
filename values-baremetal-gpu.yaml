@@ -51,7 +51,6 @@ clusterGroup:
       name: lvms-operator
       namespace: openshift-storage
       source: redhat-operators
-      channel: stable-4.20
       installPlanApproval: Automatic
     cnv:
       name: kubevirt-hyperconverged
