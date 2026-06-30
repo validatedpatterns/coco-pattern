@@ -4,7 +4,7 @@ clusterGroup:
   name: spoke
   isHubCluster: false
   namespaces:
-  - golang-external-secrets
+  - external-secrets
   - openshift-sandboxed-containers-operator
   - hello-openshift
   - kbs-access
@@ -27,7 +27,7 @@ clusterGroup:
   - hub
   - vault
   - trustee
-  - golang-external-secrets
+  - external-secrets
   - sandbox
   - workloads
   - default
@@ -38,10 +38,10 @@ clusterGroup:
   applications:
 
     secrets-operator:
-      name: golang-external-secrets
-      namespace: golang-external-secrets
-      project: golang-external-secrets
-      chart: golang-external-secrets
+      name: openshift-external-secrets
+      namespace: external-secrets
+      project: external-secrets
+      chart: openshift-external-secrets
       chartVersion: 0.1.*
 
     sandbox:

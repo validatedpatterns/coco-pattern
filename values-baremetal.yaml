@@ -8,7 +8,7 @@ clusterGroup:
   namespaces:
   - open-cluster-management
   - vault
-  - golang-external-secrets
+  - external-secrets
   - openshift-sandboxed-containers-operator
   - trustee-operator-system
   - cert-manager-operator
@@ -69,7 +69,7 @@ clusterGroup:
   - hub
   - vault
   - trustee
-  - golang-external-secrets
+  - external-secrets
   - sandbox
   - workloads
   - default
@@ -96,10 +96,10 @@ clusterGroup:
       chartVersion: 0.1.*
 
     secrets-operator:
-      name: golang-external-secrets
-      namespace: golang-external-secrets
-      project: golang-external-secrets
-      chart: golang-external-secrets
+      name: openshift-external-secrets
+      namespace: external-secrets
+      project: external-secrets
+      chart: openshift-external-secrets
       chartVersion: 0.1.*
 
     trustee:
