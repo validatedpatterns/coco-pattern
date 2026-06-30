@@ -6,16 +6,23 @@ clusterGroup:
   namespaces:
   - open-cluster-management
   - vault
+  - external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
   - external-secrets
   - trustee-operator-system
   - cert-manager-operator
   - openshift-sandboxed-containers-operator
   - cert-manager
   subscriptions:
-    # ACM is kept anticipating 
+    # ACM is kept anticipating
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
@@ -61,7 +68,7 @@ clusterGroup:
       namespace: external-secrets
       project: external-secrets
       chart: openshift-external-secrets
-      chartVersion: 0.1.*
+      chartVersion: 0.0.*
 
     trustee:
       name: trustee

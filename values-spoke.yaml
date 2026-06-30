@@ -4,13 +4,20 @@ clusterGroup:
   name: spoke
   isHubCluster: false
   namespaces:
+  - external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
   - external-secrets
   - openshift-sandboxed-containers-operator
   - hello-openshift
   - kbs-access
   - cert-manager-operator
   subscriptions:
-    # ACM is kept anticipating 
+    # ACM is kept anticipating
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
@@ -43,7 +50,7 @@ clusterGroup:
       namespace: external-secrets
       project: external-secrets
       chart: openshift-external-secrets
-      chartVersion: 0.1.*
+      chartVersion: 0.0.*
 
     sandbox:
       name: sandbox

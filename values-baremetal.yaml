@@ -8,6 +8,9 @@ clusterGroup:
   namespaces:
   - open-cluster-management
   - vault
+  - external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
   - external-secrets
   - openshift-sandboxed-containers-operator
   - trustee-operator-system
@@ -26,6 +29,10 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
@@ -100,7 +107,7 @@ clusterGroup:
       namespace: external-secrets
       project: external-secrets
       chart: openshift-external-secrets
-      chartVersion: 0.1.*
+      chartVersion: 0.0.*
 
     trustee:
       name: trustee
