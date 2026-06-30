@@ -143,8 +143,10 @@ clusterGroup:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator
       project: sandbox
-      chart: sandboxed-containers
-      chartVersion: 0.2.*
+      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
+      repoURL: https://github.com/butler54/sandboxed-containers-chart.git
+      targetRevision: dev/phase1-testing
+      path: .
       overrides:
         - name: global.secretStore.backend
           value: vault
