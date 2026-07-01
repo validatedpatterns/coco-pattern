@@ -345,10 +345,6 @@ clusterGroup:
     adminServiceAccountCreate: true
     serviceAccountName: imperative-admin-sa
     jobs:
-    - name: push-pull-secret-to-kbs
-      playbook: ansible/push-pull-secret-to-kbs.yaml
-      verbosity: -vvv
-      timeout: 120
     - name: init-data-gzipper
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv

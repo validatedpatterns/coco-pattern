@@ -249,10 +249,6 @@ clusterGroup:
       playbook: ansible/azure-nat-gateway.yaml
       verbosity: -vvv
       timeout: 3600
-    - name: push-pull-secret-to-kbs
-      playbook: ansible/push-pull-secret-to-kbs.yaml
-      verbosity: -vvv
-      timeout: 120
     - name: init-data-gzipper
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
