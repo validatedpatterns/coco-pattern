@@ -18,6 +18,7 @@ spec:
       annotations:
         peerpods: "true"
         coco.io/initdata-configmap: initdata
+        io.katacontainers.config.runtime.create_container_timeout: "900"
     spec:
       runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
       containers:

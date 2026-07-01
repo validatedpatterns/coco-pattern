@@ -21,6 +21,7 @@ spec:
         {{- if .Values.defaultMemory }}
         io.katacontainers.config.hypervisor.default_memory: {{ .Values.defaultMemory | quote }}
         {{- end }}
+        io.katacontainers.config.runtime.create_container_timeout: "900"
     spec:
       runtimeClassName: {{ if .Values.runtimeClassName }}{{ .Values.runtimeClassName }}{{ else if or (eq .Values.global.clusterPlatform "Azure") (eq .Values.global.clusterPlatform "AWS") }}kata-remote{{ else }}kata-cc{{ end }}
       containers:
