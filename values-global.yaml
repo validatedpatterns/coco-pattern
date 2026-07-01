@@ -37,8 +37,11 @@ main:
     enabled: true
     clusterGroupChartVersion: 0.9.*
 
-# Common secret store configuration used across multiple charts
-# Warning do not rely on this. it does not consistently apply.
+# Common secret store configuration used across multiple charts.
+# NOTE: Charts reference secretStore.* (top-level, not global.secretStore.*).
+# Top-level values do not propagate from values-global.yaml — each application
+# that needs secretStore must declare it via inline overrides in the topology file.
+# This is intentional — it allows different charts to use different secret stores.
 secretStore:
   name: vault-backend
   kind: ClusterSecretStore
