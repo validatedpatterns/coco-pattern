@@ -1,5 +1,6 @@
 # Bare metal deployment for confidential containers.
-# Supports Intel TDX and AMD SEV-SNP via auto-detection (NFD).
+# Supports Intel TDX and AMD SEV-SNP with optional NVIDIA GPU.
+# Hardware profile (global.hardware.profile) controls which operators are active.
 # Set main.clusterGroupName: baremetal in values-global.yaml to use.
 
 clusterGroup:
@@ -23,6 +24,8 @@ clusterGroup:
   - openshift-nfd
   - baremetal
   - intel-dcap
+  - nvidia-gpu-operator
+  - gpu-workload
   - kyverno
 
   subscriptions:
@@ -71,6 +74,13 @@ clusterGroup:
       namespace: openshift-operators
       source: certified-operators
       channel: stable
+    gpu-operator:
+      name: gpu-operator-certified
+      namespace: nvidia-gpu-operator
+      source: certified-operators
+      channel: v26.3
+      installPlanApproval: Manual
+      csv: gpu-operator-certified.v26.3.0
   projects:
   - hub
   - vault
@@ -86,6 +96,7 @@ clusterGroup:
   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
+  - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
 
   applications:
     acm:
@@ -126,6 +137,8 @@ clusterGroup:
           value: "true"
         - name: kbs.tdx.collateralService
           value: "https://pccs-service.intel-dcap.svc.cluster.local:8042/sgx/certification/v4/"
+        - name: kbs.gpu.enabled
+          value: "true"
         - name: kbs.baremetal.enabled
           value: "true"
 
@@ -176,6 +189,21 @@ clusterGroup:
           value: vault-backend
         - name: secretStore.kind
           value: ClusterSecretStore
+
+    nvidia-gpu:
+      name: nvidia-gpu
+      namespace: nvidia-gpu-operator
+      project: hub
+      path: charts/all/nvidia-gpu
+
+    gpu-workload:
+      name: gpu-workload
+      namespace: gpu-workload
+      project: workloads
+      path: charts/coco-supported/gpu-workload
+      syncPolicy:
+        automated:
+          prune: true
 
     sandbox-policies:
       name: sandbox-policies
@@ -322,3 +350,7 @@ clusterGroup:
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
       timeout: 3600
+    - name: reconcile-kataconfig-gpu
+      playbook: ansible/reconcile-kataconfig-gpu.yaml
+      verbosity: -vvv
+      timeout: 600
