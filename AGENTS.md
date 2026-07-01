@@ -71,8 +71,7 @@ Set via `main.clusterGroupName` in `values-global.yaml`.
 | Cluster Group | Values File | Role | Description |
 |---|---|---|---|
 | `azure` | `values-azure.yaml` | Hub (single cluster) | All components on one Azure cluster |
-| `baremetal` | `values-baremetal.yaml` | Hub (single cluster) | TDX/SNP + LVM storage on bare metal |
-| `baremetal-gpu` | `values-baremetal-gpu.yaml` | Hub (single cluster) | Bare metal + NVIDIA H100 GPU support |
+| `baremetal` | `values-baremetal.yaml` | Hub (single cluster) | Bare metal (hardware profile gated: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu) |
 | `trusted-hub` | `values-trusted-hub.yaml` | Multi-cluster hub | Trustee + ACM policies |
 | `azure-spoke` | `values-azure-spoke.yaml` | Multi-cluster spoke | Sandbox runtime + workloads (Azure) |
 
