@@ -23,6 +23,8 @@ global:
     azure:
       defaultVMFlavour: "Standard_DC2as_v5"
       VMFlavours: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
+  hardware:
+    profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu
 main:
   # Set clusterGroupName to match your deployment topology:
   #   azure         — Azure single-cluster (all components in one cluster)
