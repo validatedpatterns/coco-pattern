@@ -1,0 +1,19 @@
+# Hardware profile: AMD SEV-SNP (no GPU)
+# Disables Intel device plugins, Intel DCAP (PCCS/QGS), and GPU components.
+# AMD SEV-SNP does not require Intel-specific attestation infrastructure.
+# NFD remains enabled — it detects AMD SEV capabilities via cpu-security labels.
+
+clusterGroup:
+  subscriptions:
+    intel-device-plugins:
+      disabled: true
+    gpu-operator:
+      disabled: true
+
+  applications:
+    intel-dcap:
+      disabled: true
+    nvidia-gpu:
+      disabled: true
+    gpu-workload:
+      disabled: true

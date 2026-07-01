@@ -1,0 +1,14 @@
+# Hardware profile: Intel TDX (no GPU)
+# Disables GPU operator and NVIDIA GPU applications.
+# Intel device plugins, PCCS/QGS (intel-dcap) remain enabled (default).
+
+clusterGroup:
+  subscriptions:
+    gpu-operator:
+      disabled: true
+
+  applications:
+    nvidia-gpu:
+      disabled: true
+    gpu-workload:
+      disabled: true

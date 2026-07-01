@@ -1,0 +1,6 @@
+# Hardware profile: Intel TDX + NVIDIA GPU
+# All components enabled — Intel device plugins, PCCS/QGS, GPU operator, NVIDIA GPU apps.
+# This is the "everything on" profile for Intel platforms with NVIDIA H100 GPUs.
+
+# No overrides needed — all subscriptions and applications default to enabled.
+# This file exists so the sharedValueFiles template resolves without error.
