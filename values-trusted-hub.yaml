@@ -113,11 +113,11 @@ clusterGroup:
       verbosity: -vvv
       timeout: 3600
   managedClusterGroups:
-    spoke:
-      name: spoke
+    azure-spoke:
+      name: azure-spoke
       acmlabels:
       - name: clusterGroup
-        value: spoke
+        value: azure-spoke
       helmOverrides:
       - name: clusterGroup.isHubCluster
         value: false

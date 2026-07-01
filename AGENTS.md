@@ -45,10 +45,10 @@ Use the **first** approach that fits your requirement:
 ├── rhdp/                           # Red Hat Demo Platform tooling
 ├── scripts/                        # Utility scripts
 ├── values-global.yaml              # Global configuration
-├── values-simple.yaml              # Cluster group: simple
+├── values-azure.yaml               # Cluster group: azure
 ├── values-baremetal.yaml           # Cluster group: baremetal
 ├── values-trusted-hub.yaml         # Cluster group: trusted-hub
-├── values-spoke.yaml               # Cluster group: spoke
+├── values-azure-spoke.yaml         # Cluster group: azure-spoke
 └── values-secret.yaml.template     # Secrets template (never commit filled-in copy)
 ```
 
@@ -59,8 +59,8 @@ These charts are published independently and consumed from the `charts.validated
 | Chart Name | Repository | Purpose |
 |---|---|---|
 | `trustee` | `validatedpatterns/trustee-chart` | Trustee / KBS configuration |
-| `sandboxed-policies` | `validatedpatterns/sandboxed-policies-chart` | ACM policies hub → spoke |
-| `sandboxed-containers` | `validatedpatterns/sandboxed-containers-chart` | Sandboxed runtime on spoke |
+| `sandboxed-policies` | `validatedpatterns/sandboxed-policies-chart` | ACM policies hub → azure-spoke |
+| `sandboxed-containers` | `validatedpatterns/sandboxed-containers-chart` | Sandboxed runtime on azure-spoke |
 
 Changes to companion charts require a release (Git tag) before the pattern can consume them. Update the `chartVersion:` field in the values files to pick up new releases.
 
@@ -70,11 +70,11 @@ Set via `main.clusterGroupName` in `values-global.yaml`.
 
 | Cluster Group | Values File | Role | Description |
 |---|---|---|---|
-| `simple` | `values-simple.yaml` | Hub (single cluster) | All components on one Azure cluster |
+| `azure` | `values-azure.yaml` | Hub (single cluster) | All components on one Azure cluster |
 | `baremetal` | `values-baremetal.yaml` | Hub (single cluster) | TDX/SNP + LVM storage on bare metal |
 | `baremetal-gpu` | `values-baremetal-gpu.yaml` | Hub (single cluster) | Bare metal + NVIDIA H100 GPU support |
 | `trusted-hub` | `values-trusted-hub.yaml` | Multi-cluster hub | Trustee + ACM policies |
-| `spoke` | `values-spoke.yaml` | Multi-cluster spoke | Sandbox runtime + workloads |
+| `azure-spoke` | `values-azure-spoke.yaml` | Multi-cluster spoke | Sandbox runtime + workloads (Azure) |
 
 ## Values File Hierarchy
 

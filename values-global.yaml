@@ -24,9 +24,11 @@ global:
       defaultVMFlavour: "Standard_DC2as_v5"
       VMFlavours: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
 main:
-  # WARNING
-  # This default configuration uses a single cluster on azure.
-  # It fundamentally violates the separation of duties.
+  # Set clusterGroupName to match your deployment topology:
+  #   azure         — Azure single-cluster (all components in one cluster)
+  #   azure-spoke   — Azure spoke (multi-cluster, imported into ACM from trusted-hub)
+  #   baremetal     — Bare metal (Intel TDX / AMD SEV-SNP, hardware profile gated)
+  #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
   clusterGroupName: baremetal
   singleArgoCD: true
   multiSourceConfig:

@@ -1,7 +1,10 @@
-# This is currently configured as an 'all in one' deployment in one cluster.
+# Azure spoke topology for confidential containers (multi-cluster).
+# Runs sandboxed containers operator and confidential workloads.
+# Paired with trusted-hub topology — spoke is imported into ACM from the hub.
+# Set main.clusterGroupName: azure-spoke in values-global.yaml on the spoke cluster.
 
 clusterGroup:
-  name: spoke
+  name: azure-spoke
   isHubCluster: false
   namespaces:
   - external-secrets-operator:

@@ -1,7 +1,9 @@
-# This is currently configured as an 'all in one' deployment in one cluster.
+# Azure single-cluster topology for confidential containers.
+# Deploys all components (Trustee, Vault, ACM, sandboxed containers, workloads) in one cluster.
+# Set main.clusterGroupName: azure in values-global.yaml to use.
 
 clusterGroup:
-  name: simple
+  name: azure
   isHubCluster: true
   # Override health check for Subscriptions to treat UpgradePending as healthy
   # Only applies to pinned CSV subscriptions (sandbox and trustee)

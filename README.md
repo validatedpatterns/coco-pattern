@@ -8,11 +8,11 @@ Confidential containers use hardware-backed Trusted Execution Environments (TEEs
 
 The pattern provides four deployment topologies:
 
-1. **Single cluster** (`simple` clusterGroup) — deploys all components (Trustee, Vault, ACM, sandboxed containers, workloads) in one cluster on Azure. This breaks the RACI separation expected in a remote attestation architecture but simplifies testing and demonstrations.
+1. **Single cluster** (`azure` clusterGroup) — deploys all components (Trustee, Vault, ACM, sandboxed containers, workloads) in one cluster on Azure. This breaks the RACI separation expected in a remote attestation architecture but simplifies testing and demonstrations.
 
-2. **Multi-cluster** (`trusted-hub` + `spoke` clusterGroups) — separates the trusted zone from the untrusted workload zone:
+2. **Multi-cluster** (`trusted-hub` + `azure-spoke` clusterGroups) — separates the trusted zone from the untrusted workload zone:
    - **Hub** (`trusted-hub`): Runs Trustee (KBS + attestation service), HashiCorp Vault, ACM, and cert-manager. This cluster is the trust anchor.
-   - **Spoke** (`spoke`): Runs the sandboxed containers operator and confidential workloads. The spoke is imported into ACM and managed from the hub.
+   - **Spoke** (`azure-spoke`): Runs the sandboxed containers operator and confidential workloads. The spoke is imported into ACM and managed from the hub.
 
 3. **Bare metal** (`baremetal` clusterGroup) — deploys all components on bare metal hardware with Intel TDX or AMD SEV-SNP support. NFD (Node Feature Discovery) auto-detects the CPU architecture and configures the appropriate runtime. Supports SNO (Single Node OpenShift) and multi-node clusters.
 
@@ -81,7 +81,7 @@ These scripts generate the cryptographic material and attestation reference valu
 
 ### Single cluster deployment (Azure)
 
-1. Set `main.clusterGroupName: simple` in `values-global.yaml`
+1. Set `main.clusterGroupName: azure` in `values-global.yaml`
 2. Ensure your Azure configuration is populated in `values-global.yaml` (see `global.azure.*` fields)
 3. `./pattern.sh make install`
 4. Wait for the cluster to reboot all nodes (the sandboxed containers operator triggers a MachineConfig update). Monitor progress in the ArgoCD UI.
@@ -92,9 +92,9 @@ These scripts generate the cryptographic material and attestation reference valu
 2. Deploy the hub cluster: `./pattern.sh make install`
 3. Wait for ACM (`MultiClusterHub`) to reach `Running` state on the hub
 4. Provision a second OpenShift 4.19.28+ cluster on Azure for the spoke
-5. Import the spoke into ACM with label `clusterGroup=spoke`
+5. Import the spoke into ACM with label `clusterGroup=azure-spoke`
    (see [importing a cluster](https://validatedpatterns.io/learn/importing-a-cluster/))
-6. ACM will automatically deploy the `spoke` clusterGroup applications (sandboxed containers, workloads) to the imported cluster
+6. ACM will automatically deploy the `azure-spoke` clusterGroup applications (sandboxed containers, workloads) to the imported cluster
 
 ### Bare metal deployment
 
@@ -130,7 +130,7 @@ Optional: pin PCCS to a specific node with `bash scripts/get-pccs-node.sh` and s
 
 ## Sample applications
 
-Two sample applications are deployed on the cluster running confidential workloads (the single cluster in `simple` mode, or the spoke in multi-cluster mode):
+Two sample applications are deployed on the cluster running confidential workloads (the single cluster in `azure` mode, or the spoke in multi-cluster mode):
 
 - **hello-openshift**: Three pods demonstrating CoCo security boundaries:
   - `standard` — a regular Kubernetes pod (no confidential computing)

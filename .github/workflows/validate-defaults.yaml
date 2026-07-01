@@ -26,9 +26,9 @@ jobs:
         with:
           yq-version: v4.30.7
 
-      - name: Validate clusterGroupName is simple
+      - name: Validate clusterGroupName is azure
         run: |
-          if [ "$(yq '.main.clusterGroupName' values-global.yaml)" != "simple" ]; then
-            echo "main.clusterGroupName must be 'simple'"
+          if [ "$(yq '.main.clusterGroupName' values-global.yaml)" != "azure" ]; then
+            echo "main.clusterGroupName must be 'azure'"
             exit 1
           fi
