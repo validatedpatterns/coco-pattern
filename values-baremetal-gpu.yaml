@@ -140,8 +140,6 @@ clusterGroup:
           value: "true"
         - name: kbs.baremetal.enabled
           value: "true"
-        - name: kbs.baremetal.enabled
-          value: "true"
 
     storage:
       name: storage
