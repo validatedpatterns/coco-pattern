@@ -24,6 +24,7 @@ kbs_cert = """{{ trustee_cert }}"""
 
 [image]
 image_security_policy_uri = 'kbs:///default/security-policy/{{ security_policy_flavour }}'
+authenticated_registry_credentials_uri = 'kbs:///default/credential/regcred'
 '''
 
 "policy.rego" = '''
