@@ -12,3 +12,37 @@ collect-firmware-refvals: ## Collect firmware reference values (bare metal, defa
 .PHONY: collect-azure-refvals
 collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect-firmware-refvals.sh --platform azure
+
+##@ Hardware Detection
+.PHONY: detect-hardware
+detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
+	@echo "Detecting hardware profile from cluster nodes..."
+	@echo "---"
+	@CPU_VENDOR=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-model\.vendor_id}' 2>/dev/null) && \
+	TDX_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.tdx\.enabled}' 2>/dev/null) && \
+	SNP_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.sev\.snp}' 2>/dev/null) && \
+	GPU_PRESENT=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.present}' 2>/dev/null) && \
+	echo "CPU Vendor:  $${CPU_VENDOR:-unknown}" && \
+	echo "TDX Enabled: $${TDX_ENABLED:-false}" && \
+	echo "SNP Enabled: $${SNP_ENABLED:-false}" && \
+	echo "GPU Present: $${GPU_PRESENT:-false}" && \
+	echo "---" && \
+	if [ "$${CPU_VENDOR}" = "Intel" ] && [ "$${TDX_ENABLED}" = "true" ]; then \
+		if [ "$${GPU_PRESENT}" = "true" ]; then \
+			echo "Recommended profile: intel-tdx-gpu"; \
+		else \
+			echo "Recommended profile: intel-tdx"; \
+		fi; \
+	elif [ "$${CPU_VENDOR}" = "AuthenticAMD" ] || [ "$${SNP_ENABLED}" = "true" ]; then \
+		if [ "$${GPU_PRESENT}" = "true" ]; then \
+			echo "Recommended profile: amd-snp-gpu"; \
+		else \
+			echo "Recommended profile: amd-snp"; \
+		fi; \
+	else \
+		echo "Could not determine hardware profile."; \
+		echo "Ensure NFD operator is running and node labels are populated."; \
+		echo "Set global.hardware.profile manually in values-global.yaml"; \
+	fi && \
+	echo "" && \
+	echo "To apply: edit values-global.yaml and set global.hardware.profile to the recommended value."
