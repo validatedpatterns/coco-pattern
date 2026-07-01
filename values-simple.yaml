@@ -154,6 +154,72 @@ clusterGroup:
           jsonPointers:
             - /metadata/labels
             - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: deletingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: generatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: imagevalidatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: mutatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: namespaceddeletingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: namespacedgeneratingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: namespacedimagevalidatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: namespacedmutatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: namespacedvalidatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: policyexceptions.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          name: validatingpolicies.policies.kyverno.io
+          jsonPointers:
+            - /metadata/labels
+            - /metadata/annotations
       extraValueFiles:
         - '/overrides/values-kyverno.yaml'
 
