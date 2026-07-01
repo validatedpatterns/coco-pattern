@@ -170,22 +170,23 @@ clusterGroup:
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     # For additional overrides that apply to the jobs, please refer to
     # https://validatedpatterns.io/imperative-actions/#additional-job-customizations
-    image: ghcr.io/butler54/imperative-container:latest
     jobs:
-    - name: install-deps
-      playbook: ansible/install-deps.yaml
+    - name: get-azure-deps
+      playbook: ansible/get-azure-deps.yaml
       verbosity: -vvv
       timeout: 3600
     - name: configure-azure-dns
       playbook: ansible/configure-issuer.yaml
-      # this image has not been changes. TBD would make sense 
-      #image: quay.io/hybridcloudpatterns/ansible-edge-gitops-ee:latest
       verbosity: -vvv
       timeout: 3600
     - name: configure-azure-nat-gateway
       playbook: ansible/azure-nat-gateway.yaml
       verbosity: -vvv
       timeout: 3600
+    - name: push-pull-secret-to-kbs
+      playbook: ansible/push-pull-secret-to-kbs.yaml
+      verbosity: -vvv
+      timeout: 120
     - name: init-data-gzipper
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv

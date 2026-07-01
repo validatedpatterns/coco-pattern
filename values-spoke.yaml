@@ -81,10 +81,9 @@ clusterGroup:
       path: charts/coco-supported/kbs-access
 
   imperative:
-    image: ghcr.io/butler54/imperative-container:latest
     jobs:
-    - name: install-deps
-      playbook: ansible/install-deps.yaml
+    - name: get-azure-deps
+      playbook: ansible/get-azure-deps.yaml
       verbosity: -vvv
       timeout: 3600
     - name: configure-azure-nat-gateway

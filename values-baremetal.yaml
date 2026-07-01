@@ -242,15 +242,14 @@ clusterGroup:
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     # For additional overrides that apply to the jobs, please refer to
     # https://validatedpatterns.io/imperative-actions/#additional-job-customizations
-    image: ghcr.io/butler54/imperative-container:latest
     serviceAccountCreate: true
     adminServiceAccountCreate: true
     serviceAccountName: imperative-admin-sa
     jobs:
-    - name: install-deps
-      playbook: ansible/install-deps.yaml
+    - name: push-pull-secret-to-kbs
+      playbook: ansible/push-pull-secret-to-kbs.yaml
       verbosity: -vvv
-      timeout: 3600
+      timeout: 120
     - name: init-data-gzipper
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv

@@ -1,4 +1,4 @@
-- name: Retrieve Credentials for AAP on OpenShift
+- name: Install Azure collection dependencies
   become: false
   connection: local
   hosts: localhost
