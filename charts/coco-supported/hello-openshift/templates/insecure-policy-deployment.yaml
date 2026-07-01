@@ -4,6 +4,8 @@ metadata:
   name: insecure-policy
   labels:
     app: insecure-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:

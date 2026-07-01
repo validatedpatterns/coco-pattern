@@ -92,6 +92,9 @@ clusterGroup:
       path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
+      overrides:
+        - name: global.coco.secured
+          value: "true"
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator #upstream config

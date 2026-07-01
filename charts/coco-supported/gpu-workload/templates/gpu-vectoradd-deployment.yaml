@@ -4,6 +4,8 @@ metadata:
   name: gpu-vectoradd
   labels:
     app: gpu-vectoradd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   strategy:
