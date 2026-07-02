@@ -4,10 +4,10 @@ metadata:
   name: secure
 spec:
   ports:
-  - name: 8888-tcp
-    port: 8888
+  - name: 8080-tcp
+    port: 8080
     protocol: TCP
-    targetPort: 8888
+    targetPort: 8080
   selector:
     app: secure
   sessionAffinity: None
