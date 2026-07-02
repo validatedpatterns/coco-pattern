@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kbs-access-sealed
+description: Test workload that retrieves secrets from KBS and serves via httpd
+type: application
+version: 0.1.0
+appVersion: "1.0"

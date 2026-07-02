@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: secure
+  name: kbs-access-curl
   labels:
-    app: secure
+    app: kbs-access-curl
   annotations:
     argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: secure
+      app: kbs-access-curl
   template:
     metadata:
       labels:
-        app: secure
+        app: kbs-access-curl
       annotations:
         peerpods: "true"
         coco.io/initdata-configmap: debug-initdata
@@ -25,23 +25,20 @@ spec:
     spec:
       runtimeClassName: {{ if .Values.runtimeClassName }}{{ .Values.runtimeClassName }}{{ else if or (eq .Values.global.clusterPlatform "Azure") (eq .Values.global.clusterPlatform "AWS") }}kata-remote{{ else }}kata-cc{{ end }}
       containers:
-        - name: python-access
-          image: ghcr.io/butler54/kbs-access-app:latest
+        - name: httpd
+          image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
           ports:
-            - containerPort: 5000
+            - containerPort: 8080
           volumeMounts:
-          - name: output-volume
-            mountPath: /output
-          envFrom:
-          - configMapRef:
-              name: kbsref
+          - name: shared-volume
+            mountPath: /var/www/html
       initContainers:
       - name: curl
         image: registry.access.redhat.com/ubi9/ubi:latest
-        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /output/kbsres1.txt']
+        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /var/www/html/secret.txt']
         volumeMounts:
-        - name: output-volume
-          mountPath: /output
+        - name: shared-volume
+          mountPath: /var/www/html
       volumes:
-      - name: output-volume
+      - name: shared-volume
         emptyDir: {}

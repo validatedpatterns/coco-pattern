@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secure-web-content
+  labels:
+    app: secure
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Hello OpenShift</title>
+    </head>
+    <body>
+        <h1>Hello, OpenShift!</h1>
+        <p>This confidential container is running on Red Hat httpd.</p>
+    </body>
+    </html>

@@ -1,12 +1,12 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: secure
+  name: kbs-access-curl
 spec:
   port:
-    targetPort: 5000
+    targetPort: 8080
   to:
     kind: Service
-    name: secure
+    name: kbs-access-curl
     weight: 100
   wildcardPolicy: None

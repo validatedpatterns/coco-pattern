@@ -1,0 +1,7 @@
+apiVersion: v2
+description: Demonstrates accessing keys within the KBS using httpd to serve the secret.
+keywords:
+- pattern
+- confidential-containers
+name: kbs-access-curl
+version: 0.1.0

@@ -1,0 +1,4 @@
+# Default values for kbs-access-sealed chart
+# Override via values-global.yaml or values-baremetal.yaml
+
+# Empty defaults - all configuration handled by global values

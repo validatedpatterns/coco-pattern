@@ -213,18 +213,6 @@ clusterGroup:
       targetRevision: dev/phase1-testing
       path: .
 
-    kbs-access:
-      name: kbs-access
-      namespace: kbs-access
-      project: workloads
-      path: charts/coco-supported/kbs-access
-      syncPolicy:
-        automated:
-          prune: true
-      overrides:
-        - name: defaultMemory
-          value: "8192"
-
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
@@ -233,6 +221,26 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+
+    kbs-access-curl:
+      name: kbs-access-curl
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-curl
+      syncPolicy:
+        automated:
+          prune: true
+      syncWave: 10
+
+    kbs-access-sealed:
+      name: kbs-access-sealed
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-sealed
+      syncPolicy:
+        automated:
+          prune: true
+      syncWave: 10
 
     kyverno:
       name: kyverno
