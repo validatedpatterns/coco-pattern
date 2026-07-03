@@ -4,6 +4,17 @@
 
 include Makefile-common
 
+##@ GPG Key Management
+.PHONY: cache-gpg-keys
+cache-gpg-keys: ## Download and cache Red Hat GPG public keys to ~/.coco-pattern/
+	@echo "Fetching Red Hat GPG public keys..."
+	@mkdir -p ~/.coco-pattern
+	@curl -fsSL https://access.redhat.com/security/data/fd431d51.txt -o ~/.coco-pattern/RPM-GPG-KEY-redhat-release
+	@echo "GPG key cached at ~/.coco-pattern/RPM-GPG-KEY-redhat-release"
+	@echo "Key fingerprint (verify this matches Red Hat official):"
+	@gpg --import-options show-only --import < ~/.coco-pattern/RPM-GPG-KEY-redhat-release 2>/dev/null | grep -A1 "^pub" || echo "Install gpg to verify fingerprint"
+
+
 ##@ Reference Value Collection
 .PHONY: collect-firmware-refvals
 collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
