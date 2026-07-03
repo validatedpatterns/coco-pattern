@@ -7,6 +7,14 @@ include Makefile-common
 ##@ GPG Key Management
 .PHONY: cache-gpg-keys
 cache-gpg-keys: ## Download and cache Red Hat GPG public keys to ~/.coco-pattern/
+
+.PHONY: cache-sigstore-keys
+cache-sigstore-keys: ## Download and cache Red Hat sigstore public keys to ~/.coco-pattern/
+	@echo "Fetching Red Hat sigstore public keys..."
+	@mkdir -p ~/.coco-pattern
+	@cp keys/SIGSTORE-redhat-release3 ~/.coco-pattern/SIGSTORE-redhat-release3
+	@echo "Sigstore key cached at ~/.coco-pattern/SIGSTORE-redhat-release3"
+	@echo "Key fingerprint: E60D446E63405576"
 	@echo "Fetching Red Hat GPG public keys..."
 	@mkdir -p ~/.coco-pattern
 	@curl -fsSL https://access.redhat.com/security/data/fd431d51.txt -o ~/.coco-pattern/RPM-GPG-KEY-redhat-release
