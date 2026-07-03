@@ -13,7 +13,7 @@ global:
   # This defines whether or not to use upstream resources for CoCo.
   # Defines whether or not the hub cluster can be used for confidential containers
   coco:
-    securityPolicyFlavour: "redhat-secure" # insecure, redhat-secure, signed or reject is expected.
+    securityPolicyFlavour: "redhat-secure-sigstore" # insecure, redhat-secure-gpg, redhat-secure-sigstore, signed or reject
     secured: true # true or false. If true, the cluster will be secured. If false, the cluster will be insecure.
     bypassAttestation: false
     # Enable SSH key injection into podvm for debugging. Do not enable in production.
