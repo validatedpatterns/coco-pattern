@@ -20,7 +20,7 @@ spec:
         coco.io/initdata-configmap: initdata
     spec:
       {{- if .Values.global.kata.enabled }}
-      runtimeClassName: kata
+      runtimeClassName: kata-cc
       {{- end }}
       containers:
       - name: httpd

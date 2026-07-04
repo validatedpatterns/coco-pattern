@@ -4,9 +4,9 @@ metadata:
   name: presync-verify-kbs-access-sealed
   namespace: {{ .Release.Namespace }}
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "9"
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   activeDeadlineSeconds: 300
   backoffLimit: 3
@@ -49,20 +49,20 @@ spec:
               fi
               echo "[$(date -Iseconds)] ✓ inject-coco-initdata ClusterPolicy is Ready"
 
-              # Check 2: Kyverno ClusterPolicy initdata-namespace-propagation is Ready
-              echo "[$(date -Iseconds)] Checking initdata-namespace-propagation ClusterPolicy..."
-              if ! kubectl get clusterpolicy initdata-namespace-propagation &>/dev/null; then
-                echo "[$(date -Iseconds)] ERROR: initdata-namespace-propagation ClusterPolicy not found"
+              # Check 2: Kyverno ClusterPolicy propagate-initdata-to-kbs-access is Ready
+              echo "[$(date -Iseconds)] Checking propagate-initdata-to-kbs-access ClusterPolicy..."
+              if ! kubectl get clusterpolicy propagate-initdata-to-kbs-access &>/dev/null; then
+                echo "[$(date -Iseconds)] ERROR: propagate-initdata-to-kbs-access ClusterPolicy not found"
                 exit 1
               fi
 
-              READY=$(kubectl get clusterpolicy initdata-namespace-propagation -o jsonpath='{.status.ready}')
-              echo "[$(date -Iseconds)] initdata-namespace-propagation ready=$READY"
+              READY=$(kubectl get clusterpolicy propagate-initdata-to-kbs-access -o jsonpath='{.status.ready}')
+              echo "[$(date -Iseconds)] propagate-initdata-to-kbs-access ready=$READY"
               if [ "$READY" != "true" ]; then
-                echo "[$(date -Iseconds)] ERROR: initdata-namespace-propagation ClusterPolicy not Ready"
+                echo "[$(date -Iseconds)] ERROR: propagate-initdata-to-kbs-access ClusterPolicy not Ready"
                 exit 1
               fi
-              echo "[$(date -Iseconds)] ✓ initdata-namespace-propagation ClusterPolicy is Ready"
+              echo "[$(date -Iseconds)] ✓ propagate-initdata-to-kbs-access ClusterPolicy is Ready"
 
               # Check 3: initdata ConfigMap exists in target namespace
               echo "[$(date -Iseconds)] Checking initdata ConfigMap in $NAMESPACE..."
