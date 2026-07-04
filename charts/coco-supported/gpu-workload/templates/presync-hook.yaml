@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: verify
-          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          image: registry.redhat.io/openshift4/ose-cli:latest
           command: ["/bin/bash", "-c"]
           args:
             - |
