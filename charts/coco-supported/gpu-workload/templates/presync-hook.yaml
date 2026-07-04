@@ -37,9 +37,9 @@ spec:
                 exit 1
               fi
 
-              READY=$(kubectl get clusterpolicy inject-coco-initdata -o jsonpath='{.status.ready}')
+              READY=$(kubectl get clusterpolicy inject-coco-initdata -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
               echo "[$(date -Iseconds)] inject-coco-initdata ready=$READY"
-              if [ "$READY" != "true" ]; then
+              if [ "$READY" != "True" ]; then
                 echo "[$(date -Iseconds)] ERROR: inject-coco-initdata ClusterPolicy not Ready"
                 exit 1
               fi
@@ -52,9 +52,9 @@ spec:
                 exit 1
               fi
 
-              READY=$(kubectl get clusterpolicy propagate-initdata-to-gpu-workload -o jsonpath='{.status.ready}')
+              READY=$(kubectl get clusterpolicy propagate-initdata-to-gpu-workload -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
               echo "[$(date -Iseconds)] propagate-initdata-to-gpu-workload ready=$READY"
-              if [ "$READY" != "true" ]; then
+              if [ "$READY" != "True" ]; then
                 echo "[$(date -Iseconds)] ERROR: propagate-initdata-to-gpu-workload ClusterPolicy not Ready"
                 exit 1
               fi
