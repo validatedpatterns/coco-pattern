@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: verify
-          image: registry.access.redhat.com/ubi9/ubi:latest
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -27,12 +27,8 @@ spec:
 
               NAMESPACE="{{ .Release.Namespace }}"
 
-              echo "[$(date -Iseconds)] Starting PreSync hook verification for $NAMESPACE"
+              echo "[$(date -Iseconds)] Starting Sync hook verification for $NAMESPACE"
 
-              # Install kubectl (lightweight, one-time download)
-              echo "[$(date -Iseconds)] Installing kubectl..."
-              curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc
-              ln -s /usr/local/bin/oc /usr/local/bin/kubectl
 
               # Check 1: Kyverno ClusterPolicy inject-coco-initdata is Ready
               echo "[$(date -Iseconds)] Checking inject-coco-initdata ClusterPolicy..."
