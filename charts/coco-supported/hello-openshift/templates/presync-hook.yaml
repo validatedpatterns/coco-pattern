@@ -1,0 +1,82 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: presync-verify-hello-openshift
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "9"
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: presync-verifier
+    spec:
+      serviceAccountName: presync-verifier
+      restartPolicy: Never
+      containers:
+        - name: verify
+          image: registry.access.redhat.com/ubi9/ubi:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+
+              NAMESPACE="{{ .Release.Namespace }}"
+
+              echo "[$(date -Iseconds)] Starting PreSync hook verification for $NAMESPACE"
+
+              # Install kubectl (lightweight, one-time download)
+              echo "[$(date -Iseconds)] Installing kubectl..."
+              curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc
+              ln -s /usr/local/bin/oc /usr/local/bin/kubectl
+
+              # Check 1: Kyverno ClusterPolicy inject-coco-initdata is Ready
+              echo "[$(date -Iseconds)] Checking inject-coco-initdata ClusterPolicy..."
+              if ! kubectl get clusterpolicy inject-coco-initdata &>/dev/null; then
+                echo "[$(date -Iseconds)] ERROR: inject-coco-initdata ClusterPolicy not found"
+                exit 1
+              fi
+
+              READY=$(kubectl get clusterpolicy inject-coco-initdata -o jsonpath='{.status.ready}')
+              echo "[$(date -Iseconds)] inject-coco-initdata ready=$READY"
+              if [ "$READY" != "true" ]; then
+                echo "[$(date -Iseconds)] ERROR: inject-coco-initdata ClusterPolicy not Ready"
+                exit 1
+              fi
+              echo "[$(date -Iseconds)] ✓ inject-coco-initdata ClusterPolicy is Ready"
+
+              # Check 2: Kyverno ClusterPolicy initdata-namespace-propagation is Ready
+              echo "[$(date -Iseconds)] Checking initdata-namespace-propagation ClusterPolicy..."
+              if ! kubectl get clusterpolicy initdata-namespace-propagation &>/dev/null; then
+                echo "[$(date -Iseconds)] ERROR: initdata-namespace-propagation ClusterPolicy not found"
+                exit 1
+              fi
+
+              READY=$(kubectl get clusterpolicy initdata-namespace-propagation -o jsonpath='{.status.ready}')
+              echo "[$(date -Iseconds)] initdata-namespace-propagation ready=$READY"
+              if [ "$READY" != "true" ]; then
+                echo "[$(date -Iseconds)] ERROR: initdata-namespace-propagation ClusterPolicy not Ready"
+                exit 1
+              fi
+              echo "[$(date -Iseconds)] ✓ initdata-namespace-propagation ClusterPolicy is Ready"
+
+              # Check 3: initdata ConfigMap exists in target namespace
+              echo "[$(date -Iseconds)] Checking initdata ConfigMap in $NAMESPACE..."
+              if ! kubectl get configmap -n $NAMESPACE initdata &>/dev/null; then
+                echo "[$(date -Iseconds)] ERROR: initdata ConfigMap not found in $NAMESPACE"
+                exit 1
+              fi
+              echo "[$(date -Iseconds)] ✓ initdata ConfigMap exists in $NAMESPACE"
+
+              echo "[$(date -Iseconds)] All PreSync checks passed for $NAMESPACE"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
