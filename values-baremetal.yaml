@@ -112,6 +112,8 @@ clusterGroup:
       project: vault
       chart: hashicorp-vault
       chartVersion: 0.1.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     secrets-operator:
       name: openshift-external-secrets
@@ -119,11 +121,15 @@ clusterGroup:
       project: external-secrets
       chart: openshift-external-secrets
       chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     trustee:
       name: trustee
       namespace: trustee-operator-system
       project: trustee
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
       # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
       repoURL: https://github.com/butler54/trustee-chart.git
       targetRevision: dev/phase1-testing
@@ -147,17 +153,23 @@ clusterGroup:
       namespace: openshift-storage
       project: hub
       path: charts/hub/storage
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     baremetal:
       name: baremetal
       namespace: baremetal
       project: hub
       path: charts/all/baremetal
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
 
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator
       project: sandbox
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
       # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
       repoURL: https://github.com/butler54/sandboxed-containers-chart.git
       targetRevision: dev/phase1-testing
@@ -178,6 +190,8 @@ clusterGroup:
       namespace: intel-dcap
       project: hub
       path: charts/all/intel-dcap
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
       ignoreDifferences:
         - group: deviceplugin.intel.com
           kind: SgxDevicePlugin
@@ -195,12 +209,16 @@ clusterGroup:
       namespace: nvidia-gpu-operator
       project: hub
       path: charts/all/nvidia-gpu
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
 
     gpu-workload:
       name: gpu-workload
       namespace: gpu-workload
       project: workloads
       path: charts/coco-supported/gpu-workload
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
       syncPolicy:
         automated:
           prune: true
@@ -212,12 +230,16 @@ clusterGroup:
       repoURL: https://github.com/butler54/sandboxed-policies-chart.git
       targetRevision: dev/phase1-testing
       path: .
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
 
     hello-openshift:
       name: hello-openshift
       namespace: hello-openshift
       project: workloads
       path: charts/coco-supported/hello-openshift
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
       syncPolicy:
         automated:
           prune: true
@@ -227,6 +249,8 @@ clusterGroup:
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access-curl
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
       syncPolicy:
         automated:
           prune: true
@@ -236,6 +260,8 @@ clusterGroup:
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access-sealed
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
       syncPolicy:
         automated:
           prune: true
@@ -244,6 +270,8 @@ clusterGroup:
       name: kyverno
       namespace: kyverno
       project: hub
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
       repoURL: https://kyverno.github.io/kyverno/
       chart: kyverno
       chartVersion: 3.7.*
@@ -340,6 +368,8 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       project: sandbox
       path: charts/all/coco-kyverno-policies
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
 
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
