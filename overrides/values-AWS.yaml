@@ -26,5 +26,7 @@
 #       path: common/letsencrypt
 
 global:
+  coco:
+    runtimeClassName: "kata-remote"
   objectStorage:
     backingStorageClass: "gp3-csi"

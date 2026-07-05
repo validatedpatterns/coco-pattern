@@ -51,16 +51,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Determine runtime class name.
-If runtimeClassName is explicitly set, use it.
-Otherwise, detect from cluster platform: "kata-remote" for Azure/AWS, "kata-cc" for other platforms.
+Determine runtime class name from global config.
 */}}
 {{- define "hello-openshift.runtimeClassName" -}}
-{{- if .Values.runtimeClassName -}}
-{{- .Values.runtimeClassName -}}
-{{- else if or (eq .Values.global.clusterPlatform "Azure") (eq .Values.global.clusterPlatform "AWS") -}}
-kata-remote
-{{- else -}}
-kata-cc
-{{- end -}}
+{{- .Values.global.coco.runtimeClassName -}}
 {{- end }}
