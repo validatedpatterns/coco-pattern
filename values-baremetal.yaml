@@ -121,17 +121,15 @@ clusterGroup:
                   - /bin/bash
                   - -c
                   - |
-                    echo "Waiting for vault to be unsealed before MCO-triggering apps deploy..."
+                    echo "Waiting for vault to be unsealed..."
                     while true; do
-                      RESPONSE=$(curl -sk https://vault.vault.svc:8200/v1/sys/seal-status 2>/dev/null)
-                      SEALED=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sealed','unknown'))" 2>/dev/null)
-                      if [ "$SEALED" = "False" ]; then
-                        echo "Vault is unsealed. Waiting 120s for secrets to load..."
+                      if curl -sk https://vault.vault.svc:8200/v1/sys/seal-status | grep -q '"sealed":false'; then
+                        echo "Vault unsealed. Waiting 120s for secrets to load..."
                         sleep 120
-                        echo "Delay complete. Proceeding with wave 10+ apps."
+                        echo "Done. Proceeding."
                         exit 0
                       fi
-                      echo "Vault sealed or not ready (sealed=$SEALED). Retrying in 15s..."
+                      echo "Vault not ready. Retrying in 15s..."
                       sleep 15
                     done
 
