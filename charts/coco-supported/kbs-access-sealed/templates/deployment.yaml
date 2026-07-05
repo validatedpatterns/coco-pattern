@@ -17,9 +17,7 @@ spec:
       annotations:
         coco.io/initdata-configmap: initdata
     spec:
-      {{- if .Values.global.kata.enabled }}
       runtimeClassName: kata-cc
-      {{- end }}
       containers:
       - name: httpd
         image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
