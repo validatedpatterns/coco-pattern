@@ -98,6 +98,42 @@ clusterGroup:
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
 
+  extraObjects:
+    wait-for-vault-unsealed:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: wait-for-vault-unsealed
+        annotations:
+          argocd.argoproj.io/hook: Sync
+          argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+          argocd.argoproj.io/sync-wave: "5"
+      spec:
+        backoffLimit: 10
+        activeDeadlineSeconds: 600
+        template:
+          spec:
+            restartPolicy: OnFailure
+            containers:
+              - name: wait-for-vault
+                image: registry.redhat.io/openshift4/ose-cli:latest
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    echo "Waiting for vault to be unsealed before MCO-triggering apps deploy..."
+                    while true; do
+                      SEALED=$(oc exec -n vault vault-0 -- vault status -format=json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sealed','unknown'))" 2>/dev/null)
+                      if [ "$SEALED" = "False" ]; then
+                        echo "Vault is unsealed. Waiting 120s for secrets to load..."
+                        sleep 120
+                        echo "Delay complete. Proceeding with wave 10+ apps."
+                        exit 0
+                      fi
+                      echo "Vault sealed or not ready (sealed=$SEALED). Retrying in 15s..."
+                      sleep 15
+                    done
+
   applications:
     acm:
       name: acm
