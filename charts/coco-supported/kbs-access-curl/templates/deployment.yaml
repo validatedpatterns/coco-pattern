@@ -4,8 +4,6 @@ metadata:
   name: kbs-access-curl
   labels:
     app: kbs-access-curl
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
@@ -32,6 +30,9 @@ spec:
           volumeMounts:
           - name: shared-volume
             mountPath: /var/www/html
+          - name: initdata
+            mountPath: /opt/confidential-containers/initdata
+            readOnly: true
       initContainers:
       - name: curl
         image: registry.access.redhat.com/ubi9/ubi:latest
@@ -42,3 +43,7 @@ spec:
       volumes:
       - name: shared-volume
         emptyDir: {}
+      - name: initdata
+        configMap:
+          name: debug-initdata
+          optional: false

@@ -230,7 +230,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      syncWave: 10
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -240,7 +239,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      syncWave: 10
 
     kyverno:
       name: kyverno

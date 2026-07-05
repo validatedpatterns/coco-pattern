@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: kbs-access-sealed
   namespace: {{ .Values.global.namespace }}
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
   labels:
     app: kbs-access-sealed
 spec:
@@ -32,6 +30,9 @@ spec:
         - name: secret-data
           mountPath: /var/www/html
           readOnly: true
+        - name: initdata
+          mountPath: /opt/confidential-containers/initdata
+          readOnly: true
         resources:
           limits:
             memory: "256Mi"
@@ -43,3 +44,7 @@ spec:
       - name: secret-data
         secret:
           secretName: kbs-sealed-secret
+      - name: initdata
+        configMap:
+          name: initdata
+          optional: false

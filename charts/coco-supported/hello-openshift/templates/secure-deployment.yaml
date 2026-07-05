@@ -4,8 +4,6 @@ metadata:
   name: secure
   labels:
     app: secure
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
@@ -29,6 +27,9 @@ spec:
           volumeMounts:
             - name: web-content
               mountPath: /var/www/html
+            - name: initdata
+              mountPath: /opt/confidential-containers/initdata
+              readOnly: true
           securityContext:
             privileged: false
             allowPrivilegeEscalation: false
@@ -42,3 +43,7 @@ spec:
         - name: web-content
           configMap:
             name: secure-web-content
+        - name: initdata
+          configMap:
+            name: initdata
+            optional: false
