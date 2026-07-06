@@ -4,6 +4,8 @@ metadata:
   name: kbs-access-curl
   labels:
     app: kbs-access-curl
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
