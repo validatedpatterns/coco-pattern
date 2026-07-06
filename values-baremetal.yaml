@@ -43,6 +43,8 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.12.0
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
@@ -50,6 +52,8 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.1.0
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
