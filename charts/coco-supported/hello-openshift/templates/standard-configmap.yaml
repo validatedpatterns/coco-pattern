@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: standard-web-content
+  labels:
+    app: standard
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Hello OpenShift</title>
+    </head>
+    <body>
+        <h1>Hello, OpenShift!</h1>
+        <p>This is a standard (non-confidential) container running on Red Hat httpd.</p>
+    </body>
+    </html>

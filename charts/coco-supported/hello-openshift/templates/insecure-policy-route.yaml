@@ -4,7 +4,7 @@ metadata:
   name: insecure-policy
 spec:
   port:
-    targetPort: 8888
+    targetPort: 8080
   to:
     kind: Service
     name: insecure-policy
