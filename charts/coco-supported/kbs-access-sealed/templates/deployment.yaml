@@ -35,10 +35,10 @@ spec:
           readOnly: true
         resources:
           limits:
-            memory: "256Mi"
+            memory: "2304Mi"
             cpu: "200m"
           requests:
-            memory: "128Mi"
+            memory: "2304Mi"
             cpu: "100m"
       volumes:
       - name: secret-data
