@@ -25,6 +25,8 @@ spec:
           ports:
             - containerPort: 8080
           volumeMounts:
+            - name: web-content
+              mountPath: /var/www/html
             - name: initdata
               mountPath: /opt/confidential-containers/initdata
               readOnly: true
@@ -38,6 +40,9 @@ spec:
             seccompProfile:
               type: RuntimeDefault
       volumes:
+        - name: web-content
+          configMap:
+            name: insecure-policy-web-content
         - name: initdata
           configMap:
             name: debug-initdata
