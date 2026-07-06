@@ -413,13 +413,8 @@ clusterGroup:
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     # For additional overrides that apply to the jobs, please refer to
     # https://validatedpatterns.io/imperative-actions/#additional-job-customizations
-    clusterRoleYaml:
-      - apiGroups:
-        - '*'
-        resources:
-        - '*'
-        verbs:
-        - '*'
+    serviceAccountCreate: false
+    serviceAccountName: imperative-admin-sa
     jobs:
     - name: init-data-gzipper
       playbook: ansible/init-data-gzipper.yaml
