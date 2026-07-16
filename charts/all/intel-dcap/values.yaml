@@ -3,5 +3,5 @@ baremetal:
     nodeSelector: ""  # optional: hostname for PCCS pinning. Empty = schedule anywhere with tolerations.
 
 secretStore:
-  name: ""
-  kind: ""
+  name: vault-backend
+  kind: ClusterSecretStore

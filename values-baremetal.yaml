@@ -221,11 +221,6 @@ clusterGroup:
           name: sgxdeviceplugin-sample
           jsonPointers:
             - /spec
-      overrides:
-        - name: secretStore.name
-          value: vault-backend
-        - name: secretStore.kind
-          value: ClusterSecretStore
 
     nvidia-gpu:
       name: nvidia-gpu
