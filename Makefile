@@ -4,23 +4,17 @@
 
 include Makefile-common
 
-##@ GPG Key Management
-.PHONY: cache-gpg-keys
-cache-gpg-keys: ## Download and cache Red Hat GPG public keys to ~/.coco-pattern/
-
-.PHONY: cache-sigstore-keys
-cache-sigstore-keys: ## Download and cache Red Hat sigstore public keys to ~/.coco-pattern/
-	@echo "Fetching Red Hat sigstore public keys..."
+##@ Key Management
+.PHONY: cache-keys
+cache-keys: ## Download Red Hat signing keys from official sources to ~/.coco-pattern/
 	@mkdir -p ~/.coco-pattern
-	@cp keys/SIGSTORE-redhat-release3 ~/.coco-pattern/SIGSTORE-redhat-release3
-	@echo "Sigstore key cached at ~/.coco-pattern/SIGSTORE-redhat-release3"
-	@echo "Key fingerprint: E60D446E63405576"
-	@echo "Fetching Red Hat GPG public keys..."
-	@mkdir -p ~/.coco-pattern
+	@echo "Fetching Red Hat sigstore public key (release key 3)..."
+	@curl -fsSL https://www.redhat.com/security/data/63405576.txt -o ~/.coco-pattern/SIGSTORE-redhat-release3
+	@echo "  Cached at ~/.coco-pattern/SIGSTORE-redhat-release3"
+	@echo "Fetching Red Hat GPG public key (release key 2)..."
 	@curl -fsSL https://access.redhat.com/security/data/fd431d51.txt -o ~/.coco-pattern/RPM-GPG-KEY-redhat-release
-	@echo "GPG key cached at ~/.coco-pattern/RPM-GPG-KEY-redhat-release"
-	@echo "Key fingerprint (verify this matches Red Hat official):"
-	@gpg --import-options show-only --import < ~/.coco-pattern/RPM-GPG-KEY-redhat-release 2>/dev/null | grep -A1 "^pub" || echo "Install gpg to verify fingerprint"
+	@echo "  Cached at ~/.coco-pattern/RPM-GPG-KEY-redhat-release"
+	@echo "Done. Verify fingerprints at https://access.redhat.com/security/team/key/"
 
 
 ##@ Reference Value Collection
