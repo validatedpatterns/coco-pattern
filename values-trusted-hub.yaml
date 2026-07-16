@@ -29,7 +29,6 @@ clusterGroup:
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
-      source: redhat-operators
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.1.0
@@ -75,7 +74,7 @@ clusterGroup:
 
     trustee:
       name: trustee
-      namespace: trustee-operator-system #upstream config
+      namespace: trustee-operator-system
       project: trustee
       chart: trustee
       chartVersion: 0.8.*
@@ -86,7 +85,8 @@ clusterGroup:
           value: "true"
     sandbox-policies:
       name: sandbox-policies
-      namespace: openshift-sandboxed-containers-operator #upstream config
+      namespace: openshift-sandboxed-containers-operator
+      project: sandbox
       chart: sandboxed-policies
       chartVersion: 0.2.*
       overrides:

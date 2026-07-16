@@ -39,7 +39,6 @@ clusterGroup:
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
-      source: redhat-operators
       channel: stable
       installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.12.0
@@ -48,7 +47,6 @@ clusterGroup:
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
-      source: redhat-operators
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.1.0
@@ -61,14 +59,10 @@ clusterGroup:
     lvm-operator:
       name: lvms-operator
       namespace: openshift-storage
-      source: redhat-operators
-      installPlanApproval: Automatic
     cnv:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
-      source: redhat-operators
       channel: stable
-      installPlanApproval: Automatic
     nfd:
       name: nfd
       namespace: openshift-nfd
@@ -261,6 +255,7 @@ clusterGroup:
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
+      project: sandbox
       chart: sandboxed-policies
       chartVersion: 0.2.*
       annotations:

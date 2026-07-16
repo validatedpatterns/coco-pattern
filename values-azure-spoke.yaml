@@ -24,9 +24,8 @@ clusterGroup:
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
-      source: redhat-operators
       channel: stable
-      installPlanApproval: Manual 
+      installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.12.0
     cert-manager:
       name: openshift-cert-manager-operator
@@ -57,7 +56,7 @@ clusterGroup:
 
     sandbox:
       name: sandbox
-      namespace: openshift-sandboxed-containers-operator #upstream config
+      namespace: openshift-sandboxed-containers-operator
       project: sandbox
       chart: sandboxed-containers
       chartVersion: 0.2.*
