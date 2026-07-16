@@ -4,8 +4,6 @@ echo "Creating secrets as required"
 echo
 
 COCO_SECRETS_DIR="${HOME}/.coco-pattern"
-KBS_PRIVATE_KEY="${COCO_SECRETS_DIR}/kbsPrivateKey"
-KBS_PUBLIC_KEY="${COCO_SECRETS_DIR}/kbsPublicKey"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_FILE="${HOME}/values-secret-coco-pattern.yaml"
 
@@ -19,13 +17,6 @@ if [ "${COCO_ENABLE_SSH_DEBUG:-false}" = "true" ]; then
 		rm -f "${SSH_KEY_FILE}.pub"
 		ssh-keygen -f "${SSH_KEY_FILE}" -N ""
 	fi
-fi
-
-if [ ! -f "${KBS_PRIVATE_KEY}" ]; then
-	echo "Creating kbs keys"
-	rm -f "${KBS_PUBLIC_KEY}"
-	openssl genpkey -algorithm ed25519 >${KBS_PRIVATE_KEY}
-	openssl pkey -in "${KBS_PRIVATE_KEY}" -pubout -out "${KBS_PUBLIC_KEY}"
 fi
 
 ## PCCS secrets for bare metal Intel TDX deployments
