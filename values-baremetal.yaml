@@ -169,10 +169,8 @@ clusterGroup:
       project: trustee
       annotations:
         argocd.argoproj.io/sync-wave: "20"
-      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
-      repoURL: https://github.com/butler54/trustee-chart.git
-      targetRevision: dev/phase1-testing
-      path: .
+      chart: trustee
+      chartVersion: 0.8.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -209,10 +207,8 @@ clusterGroup:
       project: sandbox
       annotations:
         argocd.argoproj.io/sync-wave: "10"
-      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
-      repoURL: https://github.com/butler54/sandboxed-containers-chart.git
-      targetRevision: dev/phase1-testing
-      path: .
+      chart: sandboxed-containers
+      chartVersion: 0.2.*
       overrides:
         - name: global.secretStore.backend
           value: vault
@@ -265,10 +261,8 @@ clusterGroup:
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
-      # DEV: git-based chart reference for testing. Revert to chart/chartVersion before upstream PR.
-      repoURL: https://github.com/butler54/sandboxed-policies-chart.git
-      targetRevision: dev/phase1-testing
-      path: .
+      chart: sandboxed-policies
+      chartVersion: 0.2.*
       annotations:
         argocd.argoproj.io/sync-wave: "20"
 
