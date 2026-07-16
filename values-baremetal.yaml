@@ -204,12 +204,6 @@ clusterGroup:
       chart: sandboxed-containers
       chartVersion: 0.2.*
       overrides:
-        - name: global.secretStore.backend
-          value: vault
-        - name: secretStore.name
-          value: vault-backend
-        - name: secretStore.kind
-          value: ClusterSecretStore
         - name: enablePeerPods
           value: "false"
 
