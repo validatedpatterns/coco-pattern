@@ -31,7 +31,7 @@ clusterGroup:
       namespace: trustee-operator-system
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.1.0
+      csv: trustee-operator.v1.2.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -77,7 +77,7 @@ clusterGroup:
       namespace: trustee-operator-system
       project: trustee
       chart: trustee
-      chartVersion: 0.8.*
+      chartVersion: 0.9.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
