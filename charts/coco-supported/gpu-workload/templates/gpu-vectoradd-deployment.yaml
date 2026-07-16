@@ -16,7 +16,7 @@ spec:
       labels:
         app: gpu-vectoradd
       annotations:
-        coco.io/initdata-configmap: debug-initdata
+        coco.io/initdata-configmap: initdata
         {{- if .Values.defaultMemory }}
         io.katacontainers.config.hypervisor.default_memory: {{ .Values.defaultMemory | quote }}
         {{- end }}
@@ -42,5 +42,5 @@ spec:
       volumes:
         - name: initdata
           configMap:
-            name: debug-initdata
+            name: initdata
             optional: false
