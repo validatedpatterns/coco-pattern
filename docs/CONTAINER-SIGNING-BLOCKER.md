@@ -110,6 +110,7 @@ All required infrastructure is **already deployed** and tested:
 ### ✅ Verified Working
 
 **Podman verification successful** (2026-07-03):
+
 - Platform: RHEL 10.2 jump host
 - Image: registry.access.redhat.com/ubi9/ubi-minimal:latest
 - Policy: sigstoreSigned with Red Hat sigstore key
