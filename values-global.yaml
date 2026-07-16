@@ -32,7 +32,7 @@ main:
   #   azure-spoke   — Azure spoke (multi-cluster, imported into ACM from trusted-hub)
   #   baremetal     — Bare metal (Intel TDX / AMD SEV-SNP, hardware profile gated)
   #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
-  clusterGroupName: baremetal
+  clusterGroupName: azure
   singleArgoCD: true
   multiSourceConfig:
     enabled: true

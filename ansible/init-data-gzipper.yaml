@@ -132,7 +132,9 @@
       ansible.builtin.shell: |
         set -o pipefail
         initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
-        PCR8_HASH=$(echo -n "${initial_pcr}{{ raw_hash.stdout }}" | python3 -c "import sys,hashlib; print(hashlib.sha256(bytes.fromhex(sys.stdin.read())).hexdigest())") && echo $PCR8_HASH
+        hash_input="${initial_pcr}{{ raw_hash.stdout }}"
+        hash_cmd='import sys,hashlib; print(hashlib.sha256(bytes.fromhex(sys.stdin.read())).hexdigest())'
+        PCR8_HASH=$(echo -n "${hash_input}" | python3 -c "${hash_cmd}") && echo $PCR8_HASH
       register: pcr8_hash
       changed_when: false
 
@@ -140,7 +142,9 @@
       ansible.builtin.shell: |
         set -o pipefail
         initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
-        PCR8_HASH=$(echo -n "${initial_pcr}{{ debug_raw_hash.stdout }}" | python3 -c "import sys,hashlib; print(hashlib.sha256(bytes.fromhex(sys.stdin.read())).hexdigest())") && echo $PCR8_HASH
+        hash_input="${initial_pcr}{{ debug_raw_hash.stdout }}"
+        hash_cmd='import sys,hashlib; print(hashlib.sha256(bytes.fromhex(sys.stdin.read())).hexdigest())'
+        PCR8_HASH=$(echo -n "${hash_input}" | python3 -c "${hash_cmd}") && echo $PCR8_HASH
       register: debug_pcr8_hash
       changed_when: false
 

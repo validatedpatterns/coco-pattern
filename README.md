@@ -125,6 +125,7 @@ The system auto-detects your hardware:
 Optional: pin PCCS to a specific node with `bash scripts/get-pccs-node.sh` and set `baremetal.pccs.nodeSelector` in the baremetal chart values.
 
 For GPU-enabled deployments (`intel-tdx-gpu` or `amd-snp-gpu` profiles):
+
 - IOMMU MachineConfig is deployed on all nodes and will trigger reboots
 - Approve the GPU Operator install plan when it appears (uses `installPlanApproval: Manual`)
 - A sample CUDA workload (`gpu-workload`) is deployed for CC GPU verification

@@ -17,7 +17,7 @@ Demonstrates KBS secret access using a Kubernetes Secret mounted as a volume. Th
 
 ## Route
 
-```
+```text
 https://kbs-access-sealed-kbs-access.apps.<cluster>/secret-key
 ```
 

@@ -2,7 +2,7 @@
 
 **Status**: ⛔ BLOCKED - Waiting for upstream fix  
 **Issue**: Red Hat container image signature verification fails with sigstore policies  
-**Upstream PR**: https://github.com/confidential-containers/guest-components/pull/1398
+**Upstream PR**: [guest-components#1398](https://github.com/confidential-containers/guest-components/pull/1398)
 
 ## Summary
 
@@ -18,11 +18,13 @@ Container image signature verification for Red Hat images (registry.redhat.io, r
 **Location**: `image-rs/src/signature/policy/cosign/mod.rs` line 69
 
 **Current code**:
+
 ```rust
 (Some(key_data), None) => key_data.as_bytes().to_vec(),  // ❌ Wrong: treats base64 string as raw bytes
 ```
 
 **Expected code**:
+
 ```rust
 (Some(key_data), None) => {
     use base64::Engine;
@@ -64,16 +66,18 @@ Key: Embedded base64-encoded PEM public key
 
 ## Upstream Fix Status
 
-**PR**: https://github.com/confidential-containers/guest-components/pull/1398  
+**PR**: [guest-components#1398](https://github.com/confidential-containers/guest-components/pull/1398)  
 **Repository**: confidential-containers/guest-components  
 **Component**: image-rs (used by attestation-agent in kata guest VMs)
 
 **Required for**:
+
 - Red Hat build of trustee-operator
 - OpenShift Sandboxed Containers
 - Confidential Containers on OpenShift
 
 **Waiting on**:
+
 1. PR merge to guest-components
 2. Release of updated guest-components version
 3. Integration into Red Hat build of trustee
@@ -162,10 +166,11 @@ The `keyData` field contains the Red Hat sigstore public key (release key 3) bas
 ## Why GPG Signatures Don't Work Either
 
 Red Hat dual-signs all container images:
+
 1. **GPG signatures** - Stored on separate HTTPS lookaside servers
 2. **Sigstore signatures** - Stored as OCI artifacts in the registry
 
-**GPG approach blocked**: image-rs does not support HTTP/HTTPS for fetching signatures from lookaside servers (tracked in confidential-containers/image-rs#9).
+**GPG approach blocked**: image-rs does not support HTTP/HTTPS for fetching signatures from lookaside servers (tracked in [image-rs#9](https://github.com/confidential-containers/image-rs/issues/9)).
 
 **Sigstore approach blocked**: This base64-decode bug.
 
@@ -174,12 +179,14 @@ Red Hat dual-signs all container images:
 When the upstream fix is available:
 
 ### 1. Verify Fix is Available
+
 ```bash
 # Check guest-components release notes for the fix
 # Confirm Red Hat trustee-operator includes updated image-rs
 ```
 
 ### 2. Update Configuration
+
 ```bash
 cd ~/coco-pattern
 git pull origin dev/phase1-modernization
@@ -190,12 +197,14 @@ git pull origin dev/phase1-modernization
 ```
 
 ### 3. Deploy Updated Pattern
+
 ```bash
 export KUBECONFIG=~/node-02-output/421_build/auth/kubeconfig
 ./pattern.sh make install
 ```
 
 ### 4. Verify Signature Enforcement
+
 ```bash
 # Delete confidential pod to force recreation
 oc delete pod -n hello-openshift -l app=secure
@@ -210,6 +219,7 @@ oc get pod -n hello-openshift -l app=secure -o yaml | grep -A 5 init_data
 ```
 
 ### 5. Test with Unsigned Image
+
 ```bash
 # Create test deployment with unsigned custom image
 oc apply -n hello-openshift -f - <<EOF
@@ -254,10 +264,10 @@ If unsigned images are rejected and Red Hat images start successfully, signature
 ## Related Documentation
 
 - **Phase 6 Context**: `.planning/phases/06-container-signing-policy-enforcement/06-CONTEXT.md`
-- **Phase 6 Blocker**: `.planning/phases/06-container-signing-policy-enforcement/06-BLOCKER.md` (in coco-gsd repo)
-- **Sigstore Success**: `.planning/phases/06-container-signing-policy-enforcement/06-SIGSTORE-SUCCESS.md` (in coco-gsd repo)
-- **Upstream PR**: https://github.com/confidential-containers/guest-components/pull/1398
-- **image-rs Issue**: https://github.com/confidential-containers/image-rs/issues (if filed)
+- **Phase 6 Blocker**: `.planning/phases/06-container-signing-policy-enforcement/06-BLOCKER.md` (in coco-gsd repository)
+- **Sigstore Success**: `.planning/phases/06-container-signing-policy-enforcement/06-SIGSTORE-SUCCESS.md` (in coco-gsd repository)
+- **Upstream PR**: [guest-components#1398](https://github.com/confidential-containers/guest-components/pull/1398)
+- **image-rs Issue**: [image-rs issues](https://github.com/confidential-containers/image-rs/issues)
 
 ---
 

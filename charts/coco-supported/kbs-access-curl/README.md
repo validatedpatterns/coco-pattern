@@ -18,7 +18,7 @@ Demonstrates KBS secret retrieval using the Confidential Data Hub (CDH) init con
 
 ## Route
 
-```
+```text
 http://kbs-access-curl-kbs-access.apps.<cluster>/secret.txt
 ```
 
