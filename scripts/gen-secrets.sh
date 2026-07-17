@@ -19,6 +19,22 @@ if [ "${COCO_ENABLE_SSH_DEBUG:-false}" = "true" ]; then
 	fi
 fi
 
+## JWK signing key for sealed secrets (P-256 EC key)
+JWK_SIGNING_KEY="${COCO_SECRETS_DIR}/sealed-secrets-signing.jwk"
+JWK_PUBLIC_KEY="${COCO_SECRETS_DIR}/sealed-secrets-signing-pub.jwk"
+
+if [ ! -f "${JWK_SIGNING_KEY}" ]; then
+	if command -v jose >/dev/null 2>&1; then
+		echo "Creating sealed secrets JWK signing key (P-256 EC) using jose"
+		jose jwk gen -i '{"alg":"ES256","kid":"coco-signing-key","use":"sig"}' -o "${JWK_SIGNING_KEY}"
+		jose jwk pub -i "${JWK_SIGNING_KEY}" -o "${JWK_PUBLIC_KEY}"
+	else
+		echo "ERROR: jose CLI not found. Install with: sudo dnf install jose"
+		echo "The jose package is available in rhel-10-for-x86_64-appstream-rpms"
+		exit 1
+	fi
+fi
+
 ## PCCS secrets for bare metal Intel TDX deployments
 PCCS_PRIVATE_KEY="${COCO_SECRETS_DIR}/pccs_private.pem"
 PCCS_CERTIFICATE="${COCO_SECRETS_DIR}/pccs_certificate.pem"
