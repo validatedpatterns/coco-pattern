@@ -173,8 +173,6 @@ clusterGroup:
           value: "true"
         - name: kbs.tdx.enabled
           value: "true"
-        - name: kbs.tdx.collateralService
-          value: "https://pccs-service.intel-dcap.svc.cluster.local:8042/sgx/certification/v4/"
         - name: kbs.gpu.enabled
           value: "true"
         - name: kbs.baremetal.enabled
