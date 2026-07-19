@@ -78,7 +78,7 @@ def cleanup(pattern_dir: pathlib.Path, cluster_configs: List[Dict]) -> None:
 def validate_dir():
     """Simple validation for directory"""
     assert pathlib.Path("values-global.yaml").exists()
-    assert pathlib.Path("values-simple.yaml").exists()
+    assert pathlib.Path("values-azure.yaml").exists()
 
 
 def setup_install(
