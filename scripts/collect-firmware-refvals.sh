@@ -28,7 +28,7 @@ PULL_SECRET="${HOME}/pull-secret.json"
 OCP_VERSION=""
 OSC_VERSION=""
 TEE="tdx"
-CONTAINER_IMAGE="quay.io/openshift_sandboxed_containers/coco-tools:1.12"
+CONTAINER_IMAGE="quay.io/openshift_sandboxed_containers/coco-tools:1.13"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
