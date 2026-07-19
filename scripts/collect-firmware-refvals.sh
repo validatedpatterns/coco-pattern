@@ -117,7 +117,7 @@ if [ "$PLATFORM" = "azure" ]; then
             OSC_VERSION="latest"
         fi
     fi
-    VERSION_ARGS="--osc-version $OSC_VERSION"
+    VERSION_ARGS="--image-tag $OSC_VERSION"
     VERSION_DISPLAY="OSC $OSC_VERSION"
 else
     if [ -z "$OCP_VERSION" ]; then
