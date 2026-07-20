@@ -86,8 +86,9 @@ clusterGroup:
       name: trustee
       namespace: trustee-operator-system
       project: trustee
-      chart: trustee
-      chartVersion: 0.9.*
+      repoURL: https://github.com/butler54/trustee-chart.git
+      targetRevision: dev/osc-1.13-upgrade
+      path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -119,11 +120,20 @@ clusterGroup:
         automated:
           prune: true
 
-    kbs-access:
-      name: kbs-access
+    kbs-access-curl:
+      name: kbs-access-curl
       namespace: kbs-access
       project: workloads
-      path: charts/coco-supported/kbs-access
+      path: charts/coco-supported/kbs-access-curl
+      syncPolicy:
+        automated:
+          prune: true
+
+    kbs-access-sealed:
+      name: kbs-access-sealed
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-sealed
       syncPolicy:
         automated:
           prune: true
