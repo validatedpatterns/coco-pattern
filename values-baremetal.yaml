@@ -163,9 +163,8 @@ clusterGroup:
       project: trustee
       annotations:
         argocd.argoproj.io/sync-wave: "20"
-      repoURL: https://github.com/butler54/trustee-chart.git
-      targetRevision: dev/osc-1.13-upgrade
-      path: .
+      chart: trustee
+      chartVersion: 0.9.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
