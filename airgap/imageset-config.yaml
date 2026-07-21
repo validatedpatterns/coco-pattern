@@ -23,7 +23,7 @@ mirror:
   # OCP release — single version
   platform:
     channels:
-      - name: stable-4.21
+      - name: fast-4.21
         minVersion: "4.21.24"
         maxVersion: "4.21.24"
         type: ocp
