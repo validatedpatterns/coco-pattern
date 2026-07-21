@@ -55,10 +55,9 @@ mirror:
         - name: openshift-cert-manager-operator
           channels:
             - name: stable-v1
-        # ACM
+        # ACM — use default channel (release-2.17 in 4.21 catalog)
+        # filtering to non-default channel causes oc-mirror error
         - name: advanced-cluster-management
-          channels:
-            - name: release-2.14
         # Storage (LVM)
         - name: lvms-operator
           channels:
@@ -85,12 +84,8 @@ mirror:
               minVersion: "26.3.0"
               maxVersion: "26.3.0"
 
-  # Community operators (Kyverno)
-    - catalog: registry.redhat.io/redhat/community-operator-index:v4.21
-      packages:
-        - name: kyverno
-          channels:
-            - name: stable
+  # NOTE: Kyverno is deployed via Helm chart (kyverno.github.io/kyverno), NOT via
+  # OLM operator from the community catalog. Its images are in additionalImages below.
 
   # Additional container images (application workloads)
   additionalImages:
@@ -98,6 +93,12 @@ mirror:
     - name: registry.redhat.io/ubi9/httpd-24:latest
     # Vault
     - name: docker.io/hashicorp/vault:1.21.4
+    # Kyverno (Helm chart, not OLM — images from ghcr.io)
+    - name: ghcr.io/kyverno/kyverno:v1.13.4
+    - name: ghcr.io/kyverno/kyvernopre:v1.13.4
+    - name: ghcr.io/kyverno/background-controller:v1.13.4
+    - name: ghcr.io/kyverno/cleanup-controller:v1.13.4
+    - name: ghcr.io/kyverno/reports-controller:v1.13.4
     # Patterns operator utility image (if needed)
     # - name: quay.io/hybridcloudpatterns/utility-container:latest
 
