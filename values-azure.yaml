@@ -104,8 +104,9 @@ clusterGroup:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
       project: sandbox
-      chart: sandboxed-policies
-      chartVersion: 0.2.*
+      repoURL: https://github.com/butler54/sandboxed-policies-chart.git
+      targetRevision: dev/phase1-testing
+      path: .
       overrides:
         - name: global.coco.azure.tags
           value: "key1=value1,key2=value2"
