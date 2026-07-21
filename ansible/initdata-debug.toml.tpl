@@ -24,6 +24,10 @@ kbs_cert = """{{ trustee_cert }}"""
 
 [image]
 image_security_policy_uri = 'kbs:///default/security-policy/{{ security_policy_flavour }}'
+# On baremetal (kata), CDH fetches this credential from KBS to authenticate
+# with container registries inside the CVM. On Azure peer-pods (kata-remote),
+# CDH does NOT use this URI — registry auth is handled via imagePullSecrets
+# on the workload's service account instead. Kept here for baremetal support.
 authenticated_registry_credentials_uri = 'kbs:///default/credential/regcred'
 '''
 
