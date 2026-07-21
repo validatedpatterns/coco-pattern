@@ -1,0 +1,117 @@
+---
+# ImageSetConfiguration for CoCo Validated Pattern airgap deployment
+# Target: quay.apac-tech-lab.net
+# OCP: 4.21.24
+# Topology: baremetal (full operator set from values-baremetal.yaml)
+#
+# Usage:
+#   # Mirror to mirror (jump host has both internet and quay access):
+#   oc-mirror -c airgap/imageset-config.yaml \
+#     --workspace file:///home/chbutler/oc-mirror-workspace \
+#     docker://quay.apac-tech-lab.net/ocp-mirror --v2
+#
+#   # Or mirror to disk first, then disk to mirror:
+#   oc-mirror -c airgap/imageset-config.yaml \
+#     file:///home/chbutler/oc-mirror-archive --v2
+#   oc-mirror -c airgap/imageset-config.yaml \
+#     --from file:///home/chbutler/oc-mirror-archive \
+#     docker://quay.apac-tech-lab.net/ocp-mirror --v2
+
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  # OCP release — single version
+  platform:
+    channels:
+      - name: stable-4.21
+        minVersion: "4.21.24"
+        maxVersion: "4.21.24"
+        type: ocp
+
+  # Red Hat operators (from values-baremetal.yaml subscriptions)
+  operators:
+    - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.21
+      packages:
+        # CoCo core
+        - name: sandboxed-containers-operator
+          channels:
+            - name: stable
+              minVersion: "1.13.0"
+              maxVersion: "1.13.0"
+        - name: trustee-operator
+          channels:
+            - name: stable
+              minVersion: "1.2.0"
+              maxVersion: "1.2.0"
+        # GitOps (ArgoCD)
+        - name: openshift-gitops-operator
+          channels:
+            - name: latest
+        # External Secrets
+        - name: openshift-external-secrets-operator
+          channels:
+            - name: stable-v1
+        # Cert Manager
+        - name: openshift-cert-manager-operator
+          channels:
+            - name: stable-v1
+        # ACM
+        - name: advanced-cluster-management
+          channels:
+            - name: release-2.14
+        # Storage (LVM)
+        - name: lvms-operator
+          channels:
+            - name: stable-4.21
+        # CNV (KubeVirt)
+        - name: kubevirt-hyperconverged
+          channels:
+            - name: stable
+        # Node Feature Discovery
+        - name: nfd
+          channels:
+            - name: stable
+        # Intel device plugins (for TDX SGX)
+        - name: intel-device-plugins-operator
+          channels:
+            - name: stable
+
+  # Certified operators
+    - catalog: registry.redhat.io/redhat/certified-operator-index:v4.21
+      packages:
+        - name: gpu-operator-certified
+          channels:
+            - name: v26.3
+              minVersion: "26.3.0"
+              maxVersion: "26.3.0"
+
+  # Community operators (Kyverno)
+    - catalog: registry.redhat.io/redhat/community-operator-index:v4.21
+      packages:
+        - name: kyverno
+          channels:
+            - name: stable
+
+  # Additional container images (application workloads)
+  additionalImages:
+    # Workload images from hello-openshift chart
+    - name: registry.redhat.io/ubi9/httpd-24:latest
+    # Vault
+    - name: docker.io/hashicorp/vault:1.21.4
+    # Patterns operator utility image (if needed)
+    # - name: quay.io/hybridcloudpatterns/utility-container:latest
+
+  # Helm charts (OCI artifacts from quay.io/validatedpatterns)
+  # NOTE: oc-mirror v2 may not support Helm OCI mirroring directly.
+  # If not, use skopeo to mirror these separately:
+  #   skopeo copy docker://quay.io/validatedpatterns/clustergroup:0.9.41 \
+  #     docker://quay.apac-tech-lab.net/validatedpatterns/clustergroup:0.9.41
+  #
+  # Charts to mirror:
+  #   quay.io/validatedpatterns/clustergroup (0.9.*)
+  #   quay.io/validatedpatterns/acm (0.1.*)
+  #   quay.io/validatedpatterns/hashicorp-vault (0.1.*)
+  #   quay.io/validatedpatterns/openshift-external-secrets (0.0.*)
+  #   charts.validatedpatterns.io/trustee (0.9.*)
+  #   charts.validatedpatterns.io/sandboxed-containers (0.2.*)
+  #   charts.validatedpatterns.io/sandboxed-policies (0.3.*)
