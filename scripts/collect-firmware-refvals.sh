@@ -28,7 +28,7 @@ PULL_SECRET="${HOME}/pull-secret.json"
 OCP_VERSION=""
 OSC_VERSION=""
 TEE="tdx"
-CONTAINER_IMAGE="quay.io/openshift_sandboxed_containers/coco-tools:1.12"
+CONTAINER_IMAGE="quay.io/openshift_sandboxed_containers/coco-tools:0.5.1"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -117,7 +117,7 @@ if [ "$PLATFORM" = "azure" ]; then
             OSC_VERSION="latest"
         fi
     fi
-    VERSION_ARGS="--osc-version $OSC_VERSION"
+    VERSION_ARGS="--image-tag $OSC_VERSION"
     VERSION_DISPLAY="OSC $OSC_VERSION"
 else
     if [ -z "$OCP_VERSION" ]; then

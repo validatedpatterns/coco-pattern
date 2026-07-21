@@ -74,11 +74,17 @@ clusterGroup:
       project: workloads
       path: charts/coco-supported/hello-openshift
 
-    kbs-access:
-      name: kbs-access
+    kbs-access-curl:
+      name: kbs-access-curl
       namespace: kbs-access
       project: workloads
-      path: charts/coco-supported/kbs-access
+      path: charts/coco-supported/kbs-access-curl
+
+    kbs-access-sealed:
+      name: kbs-access-sealed
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-sealed
 
   imperative:
     jobs:

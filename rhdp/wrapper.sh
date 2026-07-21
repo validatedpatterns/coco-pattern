@@ -97,14 +97,14 @@ fi
 # Extract clusterGroupName from values-global.yaml using yq
 CLUSTER_GROUP_NAME=$(yq eval '.main.clusterGroupName' values-global.yaml)
 
-if [ "$CLUSTER_GROUP_NAME" != "simple" ]; then
+if [ "$CLUSTER_GROUP_NAME" != "azure" ]; then
     echo "ERROR: Incorrect clusterGroupName configuration"
-    echo "Expected: simple"
+    echo "Expected: azure"
     echo "Found: $CLUSTER_GROUP_NAME"
     echo ""
     echo "Please update values-global.yaml:"
     echo "  main:"
-    echo "    clusterGroupName: simple"
+    echo "    clusterGroupName: azure"
     exit 1
 fi
 
@@ -189,7 +189,7 @@ bash ./scripts/gen-secrets.sh
 echo "---------------------"
 echo "retrieving PCR measurements"
 echo "---------------------"
-bash ./scripts/collect-firmware-refvals.sh --platform azure
+bash ./scripts/collect-firmware-refvals.sh --platform azure --tee snp
 
 sleep 60
 echo "---------------------"

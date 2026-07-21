@@ -4,8 +4,6 @@ echo "Creating secrets as required"
 echo
 
 COCO_SECRETS_DIR="${HOME}/.coco-pattern"
-KBS_PRIVATE_KEY="${COCO_SECRETS_DIR}/kbsPrivateKey"
-KBS_PUBLIC_KEY="${COCO_SECRETS_DIR}/kbsPublicKey"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_FILE="${HOME}/values-secret-coco-pattern.yaml"
 
@@ -21,11 +19,20 @@ if [ "${COCO_ENABLE_SSH_DEBUG:-false}" = "true" ]; then
 	fi
 fi
 
-if [ ! -f "${KBS_PRIVATE_KEY}" ]; then
-	echo "Creating kbs keys"
-	rm -f "${KBS_PUBLIC_KEY}"
-	openssl genpkey -algorithm ed25519 >${KBS_PRIVATE_KEY}
-	openssl pkey -in "${KBS_PRIVATE_KEY}" -pubout -out "${KBS_PUBLIC_KEY}"
+## JWK signing key for sealed secrets (P-256 EC key)
+JWK_SIGNING_KEY="${COCO_SECRETS_DIR}/sealed-secrets-signing.jwk"
+JWK_PUBLIC_KEY="${COCO_SECRETS_DIR}/sealed-secrets-signing-pub.jwk"
+
+if [ ! -f "${JWK_SIGNING_KEY}" ]; then
+	if command -v jose >/dev/null 2>&1; then
+		echo "Creating sealed secrets JWK signing key (P-256 EC) using jose"
+		jose jwk gen -i '{"alg":"ES256","kid":"coco-signing-key","use":"sig"}' -o "${JWK_SIGNING_KEY}"
+		jose jwk pub -i "${JWK_SIGNING_KEY}" -o "${JWK_PUBLIC_KEY}"
+	else
+		echo "ERROR: jose CLI not found. Install with: sudo dnf install jose"
+		echo "The jose package is available in rhel-10-for-x86_64-appstream-rpms"
+		exit 1
+	fi
 fi
 
 ## PCCS secrets for bare metal Intel TDX deployments

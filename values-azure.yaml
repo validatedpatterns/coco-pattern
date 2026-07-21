@@ -36,13 +36,13 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       channel: stable
       installPlanApproval: Manual
-      csv: sandboxed-containers-operator.v1.12.0
+      csv: sandboxed-containers-operator.v1.13.0
     trustee:
       name: trustee-operator
       namespace: trustee-operator-system
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.1.0
+      csv: trustee-operator.v1.2.0
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -87,7 +87,7 @@ clusterGroup:
       namespace: trustee-operator-system
       project: trustee
       chart: trustee
-      chartVersion: 0.8.*
+      chartVersion: 0.9.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -104,7 +104,7 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       project: sandbox
       chart: sandboxed-policies
-      chartVersion: 0.2.*
+      chartVersion: 0.3.*
       overrides:
         - name: global.coco.azure.tags
           value: "key1=value1,key2=value2"
@@ -119,11 +119,20 @@ clusterGroup:
         automated:
           prune: true
 
-    kbs-access:
-      name: kbs-access
+    kbs-access-curl:
+      name: kbs-access-curl
       namespace: kbs-access
       project: workloads
-      path: charts/coco-supported/kbs-access
+      path: charts/coco-supported/kbs-access-curl
+      syncPolicy:
+        automated:
+          prune: true
+
+    kbs-access-sealed:
+      name: kbs-access-sealed
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-sealed
       syncPolicy:
         automated:
           prune: true
