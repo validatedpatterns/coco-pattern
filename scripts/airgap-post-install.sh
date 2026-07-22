@@ -332,6 +332,74 @@ add_argocd_ca() {
     done
 }
 
+# ─── Step 7b: Configure ArgoCD Helm OCI registry auth ────────────
+configure_argocd_helm_auth() {
+    step "7b" "Configure ArgoCD Helm OCI registry auth"
+
+    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+
+    # Check if ArgoCD namespace exists
+    local argocd_ns=""
+    for ns in vp-gitops openshift-gitops; do
+        if oc get namespace "$ns" >/dev/null 2>&1; then
+            argocd_ns="$ns"
+            break
+        fi
+    done
+
+    if [[ -z "$argocd_ns" ]]; then
+        warn "No ArgoCD namespace yet — run this step again after Pattern CR is deployed"
+        return
+    fi
+
+    # Create docker config secret from the cluster's pull-secret
+    local pull_secret_json
+    pull_secret_json=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | base64 -d || true)
+
+    if [[ -z "$pull_secret_json" ]]; then
+        warn "Could not read cluster pull-secret — using local pull-secret.json"
+        if [[ -f "${HOME}/pull-secret.json" ]]; then
+            pull_secret_json=$(cat "${HOME}/pull-secret.json")
+        else
+            warn "No pull-secret found — ArgoCD may not be able to pull from private OCI repos"
+            return
+        fi
+    fi
+
+    # Create the helm registry config secret
+    oc create secret generic helm-registry-config -n "$argocd_ns" \
+        --from-literal=config.json="$pull_secret_json" \
+        --dry-run=client -o yaml | oc apply -f - 2>/dev/null
+    info "Helm registry config secret created in $argocd_ns"
+
+    # Patch ArgoCD CR to mount docker config for Helm OCI auth
+    # HELM_REGISTRY_CONFIG tells Helm where to find registry credentials
+    if oc get argocd -n "$argocd_ns" -o name >/dev/null 2>&1; then
+        local argocd_name
+        argocd_name=$(oc get argocd -n "$argocd_ns" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [[ -n "$argocd_name" ]]; then
+            oc patch argocd "$argocd_name" -n "$argocd_ns" --type merge -p '
+spec:
+  repo:
+    env:
+    - name: HELM_REGISTRY_CONFIG
+      value: /tmp/helm-config/config.json
+    volumes:
+    - name: helm-registry-config
+      secret:
+        secretName: helm-registry-config
+    volumeMounts:
+    - name: helm-registry-config
+      mountPath: /tmp/helm-config
+      readOnly: true
+' 2>/dev/null
+            info "ArgoCD $argocd_name patched with Helm OCI registry auth"
+        fi
+    else
+        warn "No ArgoCD CR found yet — will need to patch after Pattern CR creates it"
+    fi
+}
+
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
 enable_routing_via_host() {
     step 8 "OVN routingViaHost (test-lab only)"
@@ -591,6 +659,11 @@ case "$MODE" in
         validate_prereqs
         create_operator_config
         deploy_pattern_cr
+        info ""
+        info "Waiting 30s for ArgoCD to be created by patterns-operator..."
+        sleep 30
+        add_argocd_ca
+        configure_argocd_helm_auth
         exit 0
         ;;
     fix-manifests)
