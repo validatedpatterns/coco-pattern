@@ -37,8 +37,6 @@ main:
   git:
     repoURL: http://172.25.36.135/~chbutler/git/coco-pattern.git
     revision: dev/airgap-testing
-  tokenSecret: private-repo
-  tokenSecretNamespace: openshift-operators
   patternsOperator:
     source: cs-redhat-operator-index-v4-21
   gitops:

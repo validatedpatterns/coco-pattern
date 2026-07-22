@@ -26,6 +26,15 @@ collect-firmware-refvals: ## Collect firmware reference values (bare metal, defa
 collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect-firmware-refvals.sh --platform azure
 
+##@ Disconnected Deployment
+.PHONY: airgap-post-install
+airgap-post-install: ## Post-install bootstrap for disconnected clusters (after oc-mirror, before make install)
+	@scripts/airgap-post-install.sh
+
+.PHONY: airgap-sync-repos
+airgap-sync-repos: ## Push working copy changes to bare HTTP repos
+	@scripts/airgap-post-install.sh --sync-repos-only
+
 ##@ Hardware Detection
 .PHONY: detect-hardware
 detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
