@@ -51,7 +51,7 @@ validate_prereqs() {
     step 1 "Validate prerequisites"
 
     local missing=()
-    for cmd in oc git skopeo; do
+    for cmd in oc git; do
         command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
@@ -151,8 +151,13 @@ mirror_oci_charts() {
     # Mirror pattern-install (all tags)
     info "Mirroring pattern-install chart (all tags)..."
     local pi_tags
-    pi_tags=$(skopeo list-tags "docker://quay.io/validatedpatterns/pattern-install" 2>/dev/null \
-        | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+    if command -v skopeo >/dev/null 2>&1; then
+        pi_tags=$(skopeo list-tags "docker://quay.io/validatedpatterns/pattern-install" 2>/dev/null \
+            | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+    else
+        pi_tags=""
+        warn "  skopeo not available — cannot list tags, skipping pattern-install mirror"
+    fi
     if [[ -n "$pi_tags" ]]; then
         while IFS= read -r tag; do
             [[ -z "$tag" ]] && continue
