@@ -37,7 +37,6 @@ airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGIS
 	oc-mirror -c $(IMAGESET_CONFIG) \
 		--workspace $(OC_MIRROR_WORKSPACE) \
 		--dest-tls-verify=false \
-		-a $(AUTHFILE) \
 		docker://$(MIRROR_REGISTRY) --v2
 
 .PHONY: airgap-post-install
