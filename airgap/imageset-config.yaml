@@ -99,20 +99,41 @@ mirror:
     - name: ghcr.io/kyverno/background-controller:v1.13.4
     - name: ghcr.io/kyverno/cleanup-controller:v1.13.4
     - name: ghcr.io/kyverno/reports-controller:v1.13.4
-    # Patterns operator utility image (if needed)
-    # - name: quay.io/hybridcloudpatterns/utility-container:latest
 
-  # Helm charts (OCI artifacts from quay.io/validatedpatterns)
-  # NOTE: oc-mirror v2 may not support Helm OCI mirroring directly.
-  # If not, use skopeo to mirror these separately:
-  #   skopeo copy docker://quay.io/validatedpatterns/clustergroup:0.9.41 \
-  #     docker://quay.apac-tech-lab.net/validatedpatterns/clustergroup:0.9.41
-  #
-  # Charts to mirror:
-  #   quay.io/validatedpatterns/clustergroup (0.9.*)
-  #   quay.io/validatedpatterns/acm (0.1.*)
-  #   quay.io/validatedpatterns/hashicorp-vault (0.1.*)
-  #   quay.io/validatedpatterns/openshift-external-secrets (0.0.*)
-  #   charts.validatedpatterns.io/trustee (0.9.*)
-  #   charts.validatedpatterns.io/sandboxed-containers (0.2.*)
-  #   charts.validatedpatterns.io/sandboxed-policies (0.3.*)
+    # --- VP Helm OCI charts (additionalImages — oc-mirror v2 handles these) ---
+    # Core VP charts (versions are latest matching glob in values-baremetal.yaml)
+    - name: quay.io/validatedpatterns/clustergroup:0.9.56
+    - name: quay.io/validatedpatterns/acm:0.1.27
+    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8
+    - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
+    # External VP charts (also published to quay.io/validatedpatterns/)
+    - name: quay.io/validatedpatterns/trustee:0.9.0
+    - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
+    - name: quay.io/validatedpatterns/sandboxed-policies:0.2.0
+
+    # --- Kyverno Helm chart OCI artifact (chartVersion: 3.7.* in values-baremetal) ---
+    - name: ghcr.io/kyverno/charts/kyverno:3.7.2
+
+    # --- VP framework utility images ---
+    - name: quay.io/validatedpatterns/utility-container:latest
+    - name: quay.io/validatedpatterns/imperative-container:latest
+
+    # --- oc-debug support-tools (D-05: enables oc debug node/ on disconnected) ---
+    - name: registry.redhat.io/rhel9/support-tools:latest
+
+    # --- VP infrastructure images ---
+    - name: registry.redhat.io/openshift4/ose-cli:latest
+
+    # --- Intel DCAP chart images ---
+    # Tag-based (establishes IDMS mirror path):
+    - name: registry.redhat.io/openshift-sandboxed-containers/osc-pccs-rhel9:latest
+    - name: registry.redhat.io/openshift-sandboxed-containers/osc-tdx-qgs-rhel9:latest
+    - name: registry.connect.redhat.com/intel/intel-sgx-plugin:latest
+    # Digest-pinned (exact refs from intel-dcap chart templates):
+    - name: registry.redhat.io/openshift-sandboxed-containers/osc-pccs@sha256:edf57087220516115512dc6687b96045cbc69472a3d6d381619f66beae032ad6
+    - name: registry.redhat.io/openshift-sandboxed-containers/osc-tdx-qgs@sha256:308d66da94d3116cc16530a4a2cd60a995458f331e1cb3487c6ea3fdae60545b
+    - name: registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b
+
+    # --- Workload images ---
+    - name: registry.access.redhat.com/ubi9/ubi:latest
+    - name: registry.access.redhat.com/ubi9/ubi:9.7-1764578509
