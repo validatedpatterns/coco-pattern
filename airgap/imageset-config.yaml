@@ -84,6 +84,11 @@ mirror:
               minVersion: "26.3.0"
               maxVersion: "26.3.0"
 
+  # Community operators (patterns-operator is NOT in redhat-operator-index for 4.21)
+    - catalog: registry.redhat.io/redhat/community-operator-index:v4.21
+      packages:
+        - name: patterns-operator
+
   # NOTE: Kyverno is deployed via Helm chart (kyverno.github.io/kyverno), NOT via
   # OLM operator from the community catalog. Its images are in additionalImages below.
 
