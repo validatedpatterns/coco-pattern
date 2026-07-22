@@ -38,8 +38,12 @@ main:
     repoURL: http://172.25.36.135/~chbutler/git/coco-pattern.git
     revision: dev/airgap-testing
   patternsOperator:
-    source: cs-redhat-operator-index-v4-21
+    # Mirrored CatalogSource name — must match the CatalogSource created by
+    # labctl apply-mirror-resources (from oc-mirror workspace).
+    # patterns-operator is in community-operator-index, NOT redhat-operator-index.
+    source: cs-community-operator-index-v4-21
   gitops:
+    # Mirrored CatalogSource name for the GitOps operator.
     operatorSource: cs-redhat-operator-index-v4-21
   multiSourceConfig:
     enabled: true
