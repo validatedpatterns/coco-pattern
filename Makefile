@@ -28,23 +28,30 @@ collect-azure-refvals: ## Collect PCR reference values (Azure)
 
 ##@ Disconnected Deployment
 MIRROR_REGISTRY ?= quay.example.com:443/mirror
-AUTHFILE ?= $(HOME)/pull-secret.json
 IMAGESET_CONFIG ?= airgap/imageset-config.yaml
 OC_MIRROR_WORKSPACE ?= file://$(HOME)/oc-mirror-workspace
 
 .PHONY: airgap-mirror
-airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGISTRY, AUTHFILE)
+airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGISTRY)
 	oc-mirror -c $(IMAGESET_CONFIG) \
 		--workspace $(OC_MIRROR_WORKSPACE) \
 		--dest-tls-verify=false \
 		docker://$(MIRROR_REGISTRY) --v2
 
 .PHONY: airgap-post-install
-airgap-post-install: ## Post-install bootstrap for disconnected clusters (after airgap-mirror, before make install)
+airgap-post-install: ## Post-install bootstrap (after airgap-mirror + labctl apply-mirror-resources)
 	@scripts/airgap-post-install.sh
 
+.PHONY: airgap-deploy-pattern
+airgap-deploy-pattern: ## Deploy Pattern CR directly (skip pattern.sh, use values-global.yaml config)
+	@scripts/airgap-post-install.sh --deploy-pattern
+
+.PHONY: airgap-fix-manifests
+airgap-fix-manifests: ## Fix oc-mirror manifest list failures with fallback mirroring
+	@scripts/airgap-post-install.sh --fix-manifest-lists
+
 .PHONY: airgap-sync-repos
-airgap-sync-repos: ## Push working copy changes to bare HTTP repos
+airgap-sync-repos: ## Push working copy changes to bare HTTP repos and restart git server
 	@scripts/airgap-post-install.sh --sync-repos-only
 
 ##@ Hardware Detection

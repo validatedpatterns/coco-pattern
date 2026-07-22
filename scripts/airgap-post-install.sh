@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-install bootstrap for disconnected CoCo pattern deployment.
-# Run after oc-mirror completes and before `make install`.
+# Run after oc-mirror completes and before deploying the pattern.
 #
 # Idempotent — safe to re-run. Each step checks current state before acting.
 #
@@ -10,15 +10,16 @@
 #
 # Optional env:
 #   EXTRA_CA_CERT           — path to CA cert file for the mirror registry
+#   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
-#                             (default: auto-detect from ~/coco-pattern and ~/trustee-chart etc.)
-#   ENABLE_ROUTINGVIAHOST   — set to "true" to enable OVN routingViaHost
-#                             (APAC lab workaround — not needed on properly routed networks)
+#   ENABLE_ROUTINGVIAHOST   — set to "true" to enable OVN routingViaHost (test-lab only)
 #
 # Modes:
-#   (no args)           — run all steps
-#   --sync-repos-only   — only sync working copies to bare HTTP repos
+#   (no args)             — run all steps
+#   --sync-repos-only     — only sync working copies to bare HTTP repos
+#   --deploy-pattern      — deploy the Pattern CR directly (skip pattern.sh)
+#   --fix-manifest-lists  — fix oc-mirror manifest list failures with skopeo
 
 set -euo pipefail
 
@@ -26,6 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PATTERN_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 GIT_REPO_ROOT="${GIT_REPO_ROOT:-${HOME}/public_html/git}"
+GIT_HTTP_PORT="${GIT_HTTP_PORT:-8080}"
 MIRROR_REGISTRY="${MIRROR_REGISTRY:-}"
 
 RED='\033[0;31m'
@@ -39,19 +41,19 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 step()  { echo -e "\n${GREEN}===${NC} Step $1: $2 ${GREEN}===${NC}"; }
 
 # ─── Mode dispatch ───────────────────────────────────────────────
-if [[ "${1:-}" == "--sync-repos-only" ]]; then
-    SYNC_ONLY=true
-    shift
-else
-    SYNC_ONLY=false
-fi
+MODE="full"
+case "${1:-}" in
+    --sync-repos-only)    MODE="sync"; shift ;;
+    --deploy-pattern)     MODE="deploy"; shift ;;
+    --fix-manifest-lists) MODE="fix-manifests"; shift ;;
+esac
 
 # ─── Step 1: Validate prerequisites ─────────────────────────────
 validate_prereqs() {
     step 1 "Validate prerequisites"
 
     local missing=()
-    for cmd in oc git; do
+    for cmd in oc git python3; do
         command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
@@ -89,155 +91,253 @@ disable_default_catalogs() {
     current=$(oc get operatorhub cluster -o jsonpath='{.spec.disableAllDefaultSources}' 2>/dev/null || echo "")
     if [[ "$current" == "true" ]]; then
         info "Already disabled — skipping"
-        return
+    else
+        oc patch OperatorHub cluster --type json \
+            -p '[{"op":"add","path":"/spec/disableAllDefaultSources","value":true}]'
+        info "Default CatalogSources disabled"
     fi
 
-    oc patch OperatorHub cluster --type json \
-        -p '[{"op":"add","path":"/spec/disableAllDefaultSources","value":true}]'
-    info "Default CatalogSources disabled"
-
-    info "Remaining catalogs:"
+    info "Active catalogs:"
     oc get catalogsource -n openshift-marketplace --no-headers 2>/dev/null || true
 }
 
-# ─── Step 3: Mirror OCI Helm charts ─────────────────────────────
+# ─── Step 3: Create missing CatalogSources ───────────────────────
+create_catalog_sources() {
+    step 3 "Create mirrored CatalogSources"
+
+    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+    # If MIRROR_REGISTRY is host:port/mirror, registry_base is host:port
+
+    for catalog in \
+        "cs-redhat-operator-index-v4-21|${registry_base}/mirror/redhat/redhat-operator-index:v4.21" \
+        "cs-certified-operator-index-v4-21|${registry_base}/mirror/redhat/certified-operator-index:v4.21" \
+        "cs-community-operator-index-v4-21|${registry_base}/mirror/redhat/community-operator-index:v4.21"; do
+        local name="${catalog%%|*}"
+        local image="${catalog#*|}"
+
+        if oc get catalogsource "$name" -n openshift-marketplace >/dev/null 2>&1; then
+            info "$name already exists — skipping"
+            continue
+        fi
+
+        info "Creating CatalogSource $name"
+        cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${name}
+  namespace: openshift-marketplace
+spec:
+  image: ${image}
+  sourceType: grpc
+EOF
+    done
+}
+
+# ─── Step 4: Create ITMS for tag-based image pulls ───────────────
+create_itms() {
+    step 4 "Create ImageTagMirrorSet for tag-based pulls"
+
+    if oc get itms itms-tag-mirrors >/dev/null 2>&1; then
+        info "ITMS itms-tag-mirrors already exists — skipping"
+        return
+    fi
+
+    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+
+    info "Creating ITMS for tag-based image redirects"
+    cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: itms-tag-mirrors
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${registry_base}/mirror/ubi9
+    source: registry.redhat.io/ubi9
+  - mirrors:
+    - ${registry_base}/mirror/ubi8
+    source: registry.redhat.io/ubi8
+  - mirrors:
+    - ${registry_base}/mirror/openshift-gitops-1
+    source: registry.redhat.io/openshift-gitops-1
+  - mirrors:
+    - ${registry_base}/mirror/rhel9
+    source: registry.redhat.io/rhel9
+  - mirrors:
+    - ${registry_base}/mirror/validatedpatterns
+    source: quay.io/validatedpatterns
+EOF
+    info "ITMS created — MCO will roll out node config (may take a few minutes)"
+}
+
+# ─── Step 5: Mirror OCI Helm charts and utility images ───────────
 mirror_oci_charts() {
-    step 3 "Mirror OCI Helm charts"
+    step 5 "Mirror OCI Helm charts and utility images"
 
     local imageset="${PATTERN_DIR}/airgap/imageset-config.yaml"
     if [[ ! -f "$imageset" ]]; then
-        warn "No imageset-config.yaml found at $imageset — skipping OCI chart mirroring"
+        warn "No imageset-config.yaml found at $imageset — skipping"
         return
     fi
 
-    local registry_host="${MIRROR_REGISTRY%%/*}"
+    # OCI Helm charts (oc-mirror additionalImages can't handle these)
+    info "Mirroring OCI Helm chart artifacts..."
+    local charts
+    charts=$(grep -E '^\s*- name: (quay\.io/validatedpatterns/|ghcr\.io/kyverno/charts/)' "$imageset" \
+        | sed 's/.*- name: //' | tr -d ' ' \
+        | grep -vE '(utility-container|imperative-container|pattern-ui-catalog|ubi-minimal)' || true)
 
-    # Extract VP charts from imageset-config (quay.io/validatedpatterns/* entries)
-    local vp_charts
-    vp_charts=$(grep -E '^\s*- name: quay\.io/validatedpatterns/' "$imageset" \
-        | sed 's/.*- name: //' | tr -d ' ' || true)
+    while IFS= read -r chart; do
+        [[ -z "$chart" ]] && continue
+        local src_registry="${chart%%/*}"
+        local path_and_tag="${chart#*/}"
+        local dest
+        if [[ "$src_registry" == "quay.io" ]]; then
+            dest="${MIRROR_REGISTRY}/${path_and_tag}"
+        else
+            dest="${MIRROR_REGISTRY}/${path_and_tag}"
+        fi
+        info "  $chart → $dest"
+        oc image mirror --insecure=true "$chart" "$dest" 2>&1 | tail -1 || \
+            warn "  Failed (may already exist)"
+    done <<< "$charts"
 
-    # Extract Kyverno chart
-    local kyverno_charts
-    kyverno_charts=$(grep -E '^\s*- name: ghcr\.io/kyverno/charts/' "$imageset" \
-        | sed 's/.*- name: //' | tr -d ' ' || true)
-
-    # Mirror VP charts
-    if [[ -n "$vp_charts" ]]; then
-        info "Mirroring VP Helm OCI charts..."
-        while IFS= read -r chart; do
-            [[ -z "$chart" ]] && continue
-            local name="${chart#quay.io/}"
-            local dest="${MIRROR_REGISTRY}/${name#mirror/}"
-            info "  $chart → $dest"
-            oc image mirror --insecure=true "$chart" "$dest" 2>&1 | tail -1 || \
-                warn "  Failed to mirror $chart (may already exist)"
-        done <<< "$vp_charts"
-    fi
-
-    # Mirror Kyverno chart
-    if [[ -n "$kyverno_charts" ]]; then
-        info "Mirroring Kyverno Helm OCI charts..."
-        while IFS= read -r chart; do
-            [[ -z "$chart" ]] && continue
-            local name="${chart#ghcr.io/}"
-            local dest="${MIRROR_REGISTRY}/${name}"
-            info "  $chart → $dest"
-            oc image mirror --insecure=true "$chart" "$dest" 2>&1 | tail -1 || \
-                warn "  Failed to mirror $chart (may already exist)"
-        done <<< "$kyverno_charts"
-    fi
-
-    # Mirror pattern-install (all tags)
-    info "Mirroring pattern-install chart (all tags)..."
-    local pi_tags
-    if command -v skopeo >/dev/null 2>&1; then
-        pi_tags=$(skopeo list-tags "docker://quay.io/validatedpatterns/pattern-install" 2>/dev/null \
-            | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
-    else
-        pi_tags=""
-        warn "  skopeo not available — cannot list tags, skipping pattern-install mirror"
-    fi
-    if [[ -n "$pi_tags" ]]; then
-        while IFS= read -r tag; do
-            [[ -z "$tag" ]] && continue
-            oc image mirror --insecure=true \
-                "quay.io/validatedpatterns/pattern-install:${tag}" \
-                "${MIRROR_REGISTRY}/validatedpatterns/pattern-install:${tag}" 2>/dev/null || true
-        done <<< "$pi_tags"
-        info "  Mirrored $(echo "$pi_tags" | wc -l) tags"
-    else
-        warn "  Could not list pattern-install tags (internet access required)"
-    fi
-
-    # Mirror :latest tags that oc-mirror sometimes misses
-    info "Mirroring :latest tags for VP utility images..."
+    # VP utility images (need both :latest and :v1)
+    info "Mirroring VP utility images..."
     for img in \
         "quay.io/validatedpatterns/utility-container:latest" \
         "quay.io/validatedpatterns/imperative-container:latest" \
+        "quay.io/validatedpatterns/imperative-container:v1" \
+        "quay.io/validatedpatterns/pattern-ui-catalog:stable-v1" \
         "registry.redhat.io/ubi9/ubi-minimal:latest"; do
-        local dest_path="${img#*/}"
-        dest_path="${dest_path%%:*}"
-        local dest_tag="${img##*:}"
-        oc image mirror --insecure=true "$img" "${MIRROR_REGISTRY}/${dest_path}:${dest_tag}" 2>/dev/null || \
+        local path="${img#*/}"
+        local dest="${MIRROR_REGISTRY}/${path}"
+        info "  $img"
+        oc image mirror --insecure=true "$img" "$dest" 2>/dev/null || \
             warn "  Failed to mirror $img"
     done
-    info "OCI chart mirroring complete"
+
+    # pattern-install chart (all tags if skopeo available)
+    if command -v skopeo >/dev/null 2>&1; then
+        info "Mirroring pattern-install chart..."
+        local pi_tags
+        pi_tags=$(skopeo list-tags "docker://quay.io/validatedpatterns/pattern-install" 2>/dev/null \
+            | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+        if [[ -n "$pi_tags" ]]; then
+            while IFS= read -r tag; do
+                [[ -z "$tag" ]] && continue
+                oc image mirror --insecure=true \
+                    "quay.io/validatedpatterns/pattern-install:${tag}" \
+                    "${MIRROR_REGISTRY}/validatedpatterns/pattern-install:${tag}" 2>/dev/null || true
+            done <<< "$pi_tags"
+            info "  Mirrored $(echo "$pi_tags" | wc -l | tr -d ' ') tags"
+        fi
+    else
+        warn "  skopeo not available — skipping pattern-install tag enumeration"
+    fi
+
+    info "OCI mirroring complete"
 }
 
-# ─── Step 4: Add extra CA certificate to ArgoCD ─────────────────
-add_argocd_ca() {
-    step 4 "Add extra CA certificate to ArgoCD"
+# ─── Step 6: Fix oc-mirror manifest list failures ────────────────
+fix_manifest_lists() {
+    step 6 "Fix oc-mirror manifest list failures"
 
-    if [[ -z "${EXTRA_CA_CERT:-}" ]]; then
-        info "EXTRA_CA_CERT not set — skipping"
-        info "If ArgoCD shows TLS errors for $MIRROR_REGISTRY, set EXTRA_CA_CERT to the CA cert path"
+    local workspace="${HOME}/oc-mirror-workspace"
+    local error_log
+    error_log=$(ls -t "${workspace}/working-dir/logs/mirroring_errors_"*.txt 2>/dev/null | head -1 || true)
+
+    if [[ -z "$error_log" ]] || [[ ! -f "$error_log" ]]; then
+        info "No mirroring error log found — skipping"
         return
     fi
+
+    local failed_images
+    failed_images=$(grep -oP 'docker://\S+' "$error_log" | sed 's/docker:\/\///' | sort -u || true)
+
+    if [[ -z "$failed_images" ]]; then
+        info "No failed images in error log — skipping"
+        return
+    fi
+
+    warn "Found $(echo "$failed_images" | wc -l | tr -d ' ') failed images from oc-mirror"
+
+    while IFS= read -r img; do
+        [[ -z "$img" ]] && continue
+        local src_registry="${img%%/*}"
+        local path_tag="${img#*/}"
+        # Strip digest for tag-based fallback
+        local path_notag="${path_tag%%@*}"
+        local dest="${MIRROR_REGISTRY}/${path_notag}"
+
+        info "  Fixing: $img"
+
+        # Try 1: oc image mirror with --keep-manifest-list (preserves multi-arch)
+        if oc image mirror --insecure=true --keep-manifest-list=true "$img" "$dest" 2>/dev/null; then
+            info "    OK (manifest list preserved)"
+            continue
+        fi
+
+        # Try 2: oc image mirror with --filter-by-os (single arch, tag-based)
+        local tag_img="${path_notag##*/}"
+        local tag_base="${img%%@*}"
+        if [[ "$tag_base" != "$img" ]]; then
+            # Has a digest — try by-tag equivalent
+            local repo_path="${path_notag%/*}"
+            # Mirror the tag version instead
+            info "    Fallback: mirroring by tag"
+            oc image mirror --insecure=true --filter-by-os="linux/amd64" \
+                "${tag_base}:latest" "${dest}:latest" 2>/dev/null || \
+                warn "    Tag-based fallback also failed"
+        fi
+    done <<< "$failed_images"
+}
+
+# ─── Step 7: Add extra CA certificate to ArgoCD ──────────────────
+add_argocd_ca() {
+    step 7 "Add extra CA certificate to ArgoCD"
+
+    if [[ -z "${EXTRA_CA_CERT:-}" ]]; then
+        # Try to extract from cluster's additionalTrustBundle
+        local cluster_ca
+        cluster_ca=$(oc get cm user-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || true)
+        if [[ -n "$cluster_ca" ]]; then
+            info "Using CA from cluster's additionalTrustBundle"
+            echo "$cluster_ca" > /tmp/mirror-ca.crt
+            EXTRA_CA_CERT="/tmp/mirror-ca.crt"
+        else
+            info "No EXTRA_CA_CERT and no cluster CA bundle — skipping"
+            return
+        fi
+    fi
+
     if [[ ! -f "$EXTRA_CA_CERT" ]]; then
         error "CA cert file not found: $EXTRA_CA_CERT"
         return
     fi
 
     local registry_host="${MIRROR_REGISTRY%%:*}"
-    # ArgoCD namespace may be vp-gitops (patterns-operator) or openshift-gitops
-    local argocd_ns=""
+
+    # Apply to all ArgoCD namespaces that exist
     for ns in vp-gitops openshift-gitops; do
-        if oc get namespace "$ns" >/dev/null 2>&1; then
-            argocd_ns="$ns"
-            break
+        if ! oc get namespace "$ns" >/dev/null 2>&1; then
+            continue
         fi
+        oc create configmap argocd-tls-certs-cm -n "$ns" \
+            --from-file="${registry_host}=${EXTRA_CA_CERT}" \
+            --dry-run=client -o yaml | oc apply -f - 2>/dev/null
+        info "CA cert added to argocd-tls-certs-cm in $ns"
     done
-
-    if [[ -z "$argocd_ns" ]]; then
-        warn "No ArgoCD namespace found yet (vp-gitops or openshift-gitops)"
-        warn "Run this script again after 'make install' creates the ArgoCD namespace"
-        return
-    fi
-
-    # Check if CM already has the cert
-    local existing
-    existing=$(oc get cm argocd-tls-certs-cm -n "$argocd_ns" \
-        -o jsonpath="{.data.${registry_host}}" 2>/dev/null || true)
-    if [[ -n "$existing" ]]; then
-        info "CA cert for $registry_host already in argocd-tls-certs-cm — skipping"
-        return
-    fi
-
-    oc create configmap argocd-tls-certs-cm -n "$argocd_ns" \
-        --from-file="${registry_host}=${EXTRA_CA_CERT}" \
-        --dry-run=client -o yaml | oc apply -f -
-    info "Added CA cert for $registry_host to argocd-tls-certs-cm in $argocd_ns"
 }
 
-# ─── Step 5: Enable OVN routingViaHost (opt-in) ─────────────────
+# ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
 enable_routing_via_host() {
-    step 5 "OVN routingViaHost"
+    step 8 "OVN routingViaHost (test-lab only)"
 
     if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" ]]; then
         info "Skipped (set ENABLE_ROUTINGVIAHOST=true to enable)"
-        info "This is only needed when pods must reach hosts on subnets"
-        info "that the OVN default gateway cannot route to (e.g. APAC lab)."
         return
     fi
 
@@ -255,13 +355,13 @@ enable_routing_via_host() {
     info "routingViaHost enabled"
 }
 
-# ─── Step 6: Create bare git repos for HTTP serving ──────────────
-setup_git_repos() {
-    step 6 "Create bare git repos for HTTP serving"
+# ─── Step 9: Set up git HTTP server ─────────────────────────────
+setup_git_server() {
+    step 9 "Set up smart HTTP git server"
 
     mkdir -p "$GIT_REPO_ROOT"
 
-    # Auto-detect repos or use GIT_REPOS env
+    # Auto-detect repos
     local repos=()
     if [[ -n "${GIT_REPOS:-}" ]]; then
         read -ra repos <<< "$GIT_REPOS"
@@ -280,17 +380,17 @@ setup_git_repos() {
         return
     fi
 
+    # Create/update bare repos
     for repo_path in "${repos[@]}"; do
         local repo_name
         repo_name=$(basename "$repo_path")
         local bare_path="${GIT_REPO_ROOT}/${repo_name}.git"
 
         if [[ -d "$bare_path" ]]; then
-            info "Updating existing bare repo: $repo_name"
+            info "Syncing: $repo_name"
             local branch
             branch=$(git -C "$repo_path" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-            git -C "$repo_path" push "$bare_path" "$branch" 2>/dev/null || \
-                warn "  Push failed for $repo_name (may need force push)"
+            git -C "$repo_path" push "$bare_path" "$branch" --force 2>/dev/null || true
         else
             info "Creating bare repo: $repo_name"
             git clone --bare --no-hardlinks "$repo_path" "$bare_path"
@@ -298,28 +398,147 @@ setup_git_repos() {
         git -C "$bare_path" update-server-info
     done
 
-    # Fix SELinux contexts (critical for Apache UserDir serving)
-    if command -v restorecon >/dev/null 2>&1; then
-        restorecon -R "$GIT_REPO_ROOT/"
-        info "SELinux contexts fixed"
-    fi
-
-    # Fix permissions
+    # SELinux + permissions
+    command -v restorecon >/dev/null 2>&1 && restorecon -R "$GIT_REPO_ROOT/"
     chmod -R a+rX "$GIT_REPO_ROOT/"
     find "$GIT_REPO_ROOT/" -type f -exec chmod a+r {} \;
 
-    info "Bare repos ready at $GIT_REPO_ROOT"
-    info ""
-    info "HTTP URLs for values-global.yaml:"
+    # Start smart HTTP server (go-git can't handle dumb HTTP from Apache)
+    local server_script="${SCRIPT_DIR}/git-http-server.py"
+    if [[ ! -f "$server_script" ]]; then
+        warn "git-http-server.py not found at $server_script"
+        return
+    fi
+
+    # Check if already running
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GIT_HTTP_PORT}/coco-pattern.git/info/refs?service=git-upload-pack" 2>/dev/null | grep -q 200; then
+        info "Smart HTTP server already running on port $GIT_HTTP_PORT"
+    else
+        # Try systemd user service first
+        if systemctl --user is-enabled git-http.service >/dev/null 2>&1; then
+            systemctl --user restart git-http.service
+            info "Restarted git-http systemd service"
+        else
+            # Create and start systemd service
+            mkdir -p ~/.config/systemd/user
+            cat > ~/.config/systemd/user/git-http.service <<SVCEOF
+[Unit]
+Description=Git Smart HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 ${server_script} ${GIT_HTTP_PORT} ${GIT_REPO_ROOT}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+SVCEOF
+            systemctl --user daemon-reload
+            systemctl --user enable --now git-http.service
+            info "Started git-http systemd service on port $GIT_HTTP_PORT"
+        fi
+    fi
+
+    # Report URLs
     local host_ip
     host_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "JUMP_HOST_IP")
-    local user
-    user=$(whoami)
+    info ""
+    info "Git HTTP URLs:"
     for repo_path in "${repos[@]}"; do
         local repo_name
         repo_name=$(basename "$repo_path")
-        info "  http://${host_ip}/~${user}/git/${repo_name}.git"
+        info "  http://${host_ip}:${GIT_HTTP_PORT}/${repo_name}.git"
     done
+}
+
+# ─── Step 10: Create patterns-operator-config ConfigMap ──────────
+create_operator_config() {
+    step 10 "Create patterns-operator-config ConfigMap"
+
+    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+
+    # Read gitops channel from values-global.yaml
+    local gitops_channel
+    gitops_channel=$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+    print(d.get('main',{}).get('gitops',{}).get('channel','latest'))
+" 2>/dev/null || echo "latest")
+
+    local gitops_source
+    gitops_source=$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+    print(d.get('main',{}).get('gitops',{}).get('operatorSource','cs-redhat-operator-index-v4-21'))
+" 2>/dev/null || echo "cs-redhat-operator-index-v4-21")
+
+    info "GitOps channel: $gitops_channel (from values-global.yaml)"
+    info "GitOps source: $gitops_source"
+
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patterns-operator-config
+  namespace: openshift-operators
+data:
+  gitops.channel: "${gitops_channel}"
+  gitops.catalogSource: "${gitops_source}"
+  gitops.sourceNamespace: "openshift-marketplace"
+EOF
+    info "patterns-operator-config ConfigMap created"
+}
+
+# ─── Step 11: Deploy Pattern CR directly ─────────────────────────
+deploy_pattern_cr() {
+    step 11 "Deploy Pattern CR"
+
+    # Read values from values-global.yaml
+    local cluster_group repo_url revision helm_repo_url chart_version
+    eval "$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+    m = d.get('main', {})
+    print(f'cluster_group=\"{m.get(\"clusterGroupName\", \"baremetal\")}\"')
+    print(f'repo_url=\"{m.get(\"git\", {}).get(\"repoURL\", \"\")}\"')
+    print(f'revision=\"{m.get(\"git\", {}).get(\"revision\", \"main\")}\"')
+    print(f'helm_repo_url=\"{m.get(\"multiSourceConfig\", {}).get(\"helmRepoUrl\", \"\")}\"')
+    print(f'chart_version=\"{m.get(\"multiSourceConfig\", {}).get(\"clusterGroupChartVersion\", \"0.9.*\")}\"')
+" 2>/dev/null)"
+
+    if [[ -z "$repo_url" ]]; then
+        error "git.repoURL not set in values-global.yaml"
+        return
+    fi
+
+    info "Deploying Pattern CR:"
+    info "  clusterGroupName: $cluster_group"
+    info "  targetRepo: $repo_url"
+    info "  targetRevision: $revision"
+    info "  helmRepoUrl: $helm_repo_url"
+
+    cat <<EOF | oc apply -f -
+apiVersion: gitops.hybrid-cloud-patterns.io/v1alpha1
+kind: Pattern
+metadata:
+  name: coco-pattern
+  namespace: openshift-operators
+spec:
+  clusterGroupName: ${cluster_group}
+  gitSpec:
+    targetRepo: ${repo_url}
+    targetRevision: ${revision}
+  multiSourceConfig:
+    enabled: true
+    helmRepoUrl: ${helm_repo_url}
+    clusterGroupChartVersion: "${chart_version}"
+EOF
+    info "Pattern CR deployed"
 }
 
 # ─── Sync-only mode ─────────────────────────────────────────────
@@ -352,24 +571,34 @@ sync_repos() {
         local branch
         branch=$(git -C "$repo_path" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
         info "Pushing $repo_name ($branch) → $bare_path"
-        git -C "$repo_path" push "$bare_path" "$branch" 2>&1 || \
-            warn "  Push failed (may need: git -C $repo_path push $bare_path $branch --force)"
+        git -C "$repo_path" push "$bare_path" "$branch" --force 2>&1 || \
+            warn "  Push failed"
         git -C "$bare_path" update-server-info
     done
 
-    if command -v restorecon >/dev/null 2>&1; then
-        restorecon -R "$GIT_REPO_ROOT/"
-    fi
+    command -v restorecon >/dev/null 2>&1 && restorecon -R "$GIT_REPO_ROOT/"
     chmod -R a+rX "$GIT_REPO_ROOT/"
-
     info "Sync complete"
 }
 
 # ─── Main ────────────────────────────────────────────────────────
-if [[ "$SYNC_ONLY" == "true" ]]; then
-    sync_repos
-    exit 0
-fi
+case "$MODE" in
+    sync)
+        sync_repos
+        exit 0
+        ;;
+    deploy)
+        validate_prereqs
+        create_operator_config
+        deploy_pattern_cr
+        exit 0
+        ;;
+    fix-manifests)
+        validate_prereqs
+        fix_manifest_lists
+        exit 0
+        ;;
+esac
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  CoCo Pattern — Disconnected Post-Install Bootstrap         ║"
@@ -378,16 +607,22 @@ echo ""
 
 validate_prereqs
 disable_default_catalogs
+create_catalog_sources
+create_itms
 mirror_oci_charts
+fix_manifest_lists
 add_argocd_ca
 enable_routing_via_host
-setup_git_repos
+setup_git_server
+create_operator_config
 
 echo ""
 info "Post-install bootstrap complete."
 info ""
 info "Next steps:"
-info "  1. Update values-global.yaml git.repoURL to the HTTP URL above"
-info "  2. Run: make install"
-info "  3. After ArgoCD namespace exists, re-run to add CA cert:"
-info "     EXTRA_CA_CERT=/path/to/ca.crt $0"
+info "  1. Wait for patterns-operator to install via OLM (~2 min)"
+info "  2. Deploy the pattern:"
+info "     make airgap-deploy-pattern"
+info "  3. Wait for ArgoCD apps to sync (~10 min)"
+info "  4. Load secrets into Vault:"
+info "     ./pattern.sh make load-secrets"
