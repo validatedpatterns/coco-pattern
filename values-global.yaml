@@ -35,7 +35,7 @@ main:
   clusterGroupName: baremetal
   singleArgoCD: true
   git:
-    repoURL: ssh://chbutler@user-jump.int.apac-tech-lab.net/home/chbutler/coco-pattern
+    repoURL: chbutler@172.25.36.135:/home/chbutler/coco-pattern
     revision: dev/airgap-testing
   tokenSecret: private-repo
   tokenSecretNamespace: openshift-operators
