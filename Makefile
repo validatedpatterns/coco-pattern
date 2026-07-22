@@ -27,8 +27,21 @@ collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect-firmware-refvals.sh --platform azure
 
 ##@ Disconnected Deployment
+MIRROR_REGISTRY ?= quay.example.com:443/mirror
+AUTHFILE ?= $(HOME)/pull-secret.json
+IMAGESET_CONFIG ?= airgap/imageset-config.yaml
+OC_MIRROR_WORKSPACE ?= file://$(HOME)/oc-mirror-workspace
+
+.PHONY: airgap-mirror
+airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGISTRY, AUTHFILE)
+	oc-mirror -c $(IMAGESET_CONFIG) \
+		--workspace $(OC_MIRROR_WORKSPACE) \
+		--dest-tls-verify=false \
+		-a $(AUTHFILE) \
+		docker://$(MIRROR_REGISTRY) --v2
+
 .PHONY: airgap-post-install
-airgap-post-install: ## Post-install bootstrap for disconnected clusters (after oc-mirror, before make install)
+airgap-post-install: ## Post-install bootstrap for disconnected clusters (after airgap-mirror, before make install)
 	@scripts/airgap-post-install.sh
 
 .PHONY: airgap-sync-repos
