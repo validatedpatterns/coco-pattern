@@ -32,11 +32,21 @@ main:
   #   azure-spoke   — Azure spoke (multi-cluster, imported into ACM from trusted-hub)
   #   baremetal     — Bare metal (Intel TDX / AMD SEV-SNP, hardware profile gated)
   #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
-  clusterGroupName: azure
+  clusterGroupName: baremetal
   singleArgoCD: true
+  git:
+    repoURL: ssh://chbutler@user-jump.int.apac-tech-lab.net/home/chbutler/coco-pattern
+    revision: dev/airgap-testing
+  tokenSecret: private-repo
+  tokenSecretNamespace: openshift-operators
+  patternsOperator:
+    source: cs-redhat-operator-index-v4-21
+  gitops:
+    operatorSource: cs-redhat-operator-index-v4-21
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.*
+    helmRepoUrl: quay.apac-tech-lab.net:443/mirror/validatedpatterns
 
 # Common secret store configuration used across multiple charts.
 # NOTE: Charts reference secretStore.* (top-level, not global.secretStore.*).
