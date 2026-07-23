@@ -54,6 +54,28 @@ airgap-fix-manifests: ## Fix oc-mirror manifest list failures with fallback mirr
 airgap-sync-repos: ## Push working copy changes to bare HTTP repos and restart git server
 	@scripts/airgap-post-install.sh --sync-repos-only
 
+.PHONY: argocd-login
+argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd CLI
+	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null) && \
+	ARGOCD_NAME=$$(oc get argocd -n $$ARGOCD_NS -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) && \
+	ARGOCD_ROUTE=$$(oc get route $${ARGOCD_NAME}-server -n $$ARGOCD_NS -o jsonpath='{.spec.host}' 2>/dev/null) && \
+	ARGOCD_PASS=$$(oc get secret $${ARGOCD_NAME}-cluster -n $$ARGOCD_NS -o jsonpath='{.data.admin\.password}' 2>/dev/null | base64 -d) && \
+	echo "ArgoCD URL:  https://$$ARGOCD_ROUTE" && \
+	echo "Username:    admin" && \
+	echo "Password:    $$ARGOCD_PASS" && \
+	echo "" && \
+	if command -v argocd >/dev/null 2>&1; then \
+		argocd login "$$ARGOCD_ROUTE" --username admin --password "$$ARGOCD_PASS" --insecure --grpc-web && \
+		echo "" && \
+		echo "Logged in. Try: argocd app list"; \
+	else \
+		echo "argocd CLI not installed. To install:" && \
+		echo "  curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64" && \
+		echo "  chmod +x /usr/local/bin/argocd" && \
+		echo "" && \
+		echo "Or use the web UI at: https://$$ARGOCD_ROUTE"; \
+	fi
+
 ##@ Hardware Detection
 .PHONY: detect-hardware
 detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
