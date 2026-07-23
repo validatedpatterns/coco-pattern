@@ -87,9 +87,10 @@ argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd 
 	echo "Password:    $$ARGOCD_PASS" && \
 	echo "" && \
 	if command -v argocd >/dev/null 2>&1; then \
-		argocd login --core --namespace $$ARGOCD_NS && \
+		argocd login --core && \
 		echo "" && \
-		echo "Logged in (core mode). Try: argocd app list --port-forward --port-forward-namespace $$ARGOCD_NS"; \
+		echo "Logged in (core mode, namespace $$ARGOCD_NS)." && \
+		echo "Usage: argocd app list --core -n $$ARGOCD_NS"; \
 	else \
 		echo "argocd CLI not installed. To install:" && \
 		echo "  curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64" && \
