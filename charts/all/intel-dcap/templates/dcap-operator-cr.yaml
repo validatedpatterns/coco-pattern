@@ -1,0 +1,11 @@
+apiVersion: trustedservices.intel.com/v1
+kind: TdxQuoteGenerationService
+metadata:
+  name: intel-tdx-dcap
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  platformRegistration:
+    Offline: {}
+  nodeSelector:
+    intel.feature.node.kubernetes.io/sgx: "true"

@@ -1,10 +1,9 @@
 apiVersion: v2
-description: Intel DCAP services (PCCS and QGS) for TDX remote attestation.
+description: Intel DCAP operator CR (TDX QGS offline mode) and SGX device plugin.
 keywords:
 - pattern
 - intel
 - tdx
-- pccs
-- qgs
+- dcap-operator
 name: intel-dcap
-version: 0.0.1
+version: 0.1.0
