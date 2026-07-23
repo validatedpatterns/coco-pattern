@@ -174,8 +174,8 @@ echo "Extracting reference values..."
 # -r ensures the embedded JSON string is output raw (not quoted),
 # which is required for yq v3 (kislyuk/yq) compatibility.
 # yq v4 (mikefarah/yq) outputs raw scalars by default but -r is harmless.
-yq -r '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" | \
-  jq '[.[] | {(.name): .value}] | add' > "$OUTPUT_FILE"
+yq -r '.data.reference_value' "$TEMP_DIR/rvps-reference-values.yaml" | \
+  jq 'map_values(@base64d | fromjson)' > "$OUTPUT_FILE"
 
 # Save output
 mkdir -p "$(dirname "$OUTPUT_FILE")"
