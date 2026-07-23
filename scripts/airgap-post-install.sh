@@ -168,6 +168,9 @@ spec:
   - mirrors:
     - ${registry_base}/mirror/validatedpatterns
     source: quay.io/validatedpatterns
+  - mirrors:
+    - ${registry_base}/mirror/hashicorp
+    source: registry.connect.redhat.com/hashicorp
 EOF
     info "ITMS created — MCO will roll out node config (may take a few minutes)"
 }

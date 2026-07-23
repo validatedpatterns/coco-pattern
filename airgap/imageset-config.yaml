@@ -96,8 +96,9 @@ mirror:
   additionalImages:
     # Workload images from hello-openshift chart
     - name: registry.redhat.io/ubi9/httpd-24:latest
-    # Vault
-    - name: docker.io/hashicorp/vault:1.21.4
+    # Vault — the VP Helm chart uses the Red Hat certified UBI image,
+    # NOT the Docker Hub image. Mirror from registry.connect.redhat.com.
+    - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi
     # Kyverno (Helm chart, not OLM — images from ghcr.io)
     - name: ghcr.io/kyverno/kyverno:v1.13.4
     - name: ghcr.io/kyverno/kyvernopre:v1.13.4
