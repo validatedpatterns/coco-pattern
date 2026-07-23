@@ -54,6 +54,26 @@ airgap-fix-manifests: ## Fix oc-mirror manifest list failures with fallback mirr
 airgap-sync-repos: ## Push working copy changes to bare HTTP repos and restart git server
 	@scripts/airgap-post-install.sh --sync-repos-only
 
+ARGOCD_CLI_DIR ?= $(HOME)/.local/bin
+
+.PHONY: argocd-install
+argocd-install: ## Download argocd CLI from the cluster's ArgoCD image into ~/.local/bin
+	@mkdir -p $(ARGOCD_CLI_DIR)
+	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null) && \
+	ARGOCD_IMG=$$(oc get deployment -n $$ARGOCD_NS -l app.kubernetes.io/name=argocd-server \
+		-o jsonpath='{.items[0].spec.template.spec.containers[0].image}' 2>/dev/null) && \
+	echo "Extracting argocd CLI from $$ARGOCD_IMG ..." && \
+	POD_NAME="argocd-cli-extract-$$$$" && \
+	oc run "$$POD_NAME" -n $$ARGOCD_NS --image="$$ARGOCD_IMG" \
+		--restart=Never --command -- sleep 300 2>/dev/null && \
+	echo "Waiting for extract pod..." && \
+	oc wait --for=condition=Ready pod/"$$POD_NAME" -n $$ARGOCD_NS --timeout=60s 2>/dev/null && \
+	oc cp "$$ARGOCD_NS/$$POD_NAME:/usr/local/bin/argocd" "$(ARGOCD_CLI_DIR)/argocd" 2>/dev/null && \
+	chmod +x "$(ARGOCD_CLI_DIR)/argocd" && \
+	oc delete pod "$$POD_NAME" -n $$ARGOCD_NS --force --grace-period=0 2>/dev/null && \
+	echo "Installed: $(ARGOCD_CLI_DIR)/argocd" && \
+	$(ARGOCD_CLI_DIR)/argocd version --client 2>/dev/null | head -1
+
 .PHONY: argocd-login
 argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd CLI
 	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null) && \
