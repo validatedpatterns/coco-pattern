@@ -53,10 +53,9 @@ main:
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.*
-    # Disconnected: Traditional Helm HTTP repo (not OCI — ArgoCD OCI auth is broken).
-    # Charts extracted from OCI and served via Apache UserDir.
+    # Disconnected: OCI Helm charts on Quay mirror (repos must be public).
     # Connected: quay.io/validatedpatterns
-    helmRepoUrl: http://172.25.36.135/~chbutler/helm-charts
+    helmRepoUrl: quay.apac-tech-lab.net:443/mirror/validatedpatterns
 
 # Common secret store configuration used across multiple charts.
 # NOTE: Charts reference secretStore.* (top-level, not global.secretStore.*).
