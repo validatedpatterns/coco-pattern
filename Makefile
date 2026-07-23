@@ -59,20 +59,22 @@ ARGOCD_CLI_DIR ?= $(HOME)/.local/bin
 .PHONY: argocd-install
 argocd-install: ## Download argocd CLI from the cluster's ArgoCD image into ~/.local/bin
 	@mkdir -p $(ARGOCD_CLI_DIR)
-	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null) && \
+	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}') || \
+		{ echo "ERROR: No ArgoCD instance found. Is KUBECONFIG set and the pattern deployed?"; exit 1; }; \
 	ARGOCD_IMG=$$(oc get deployment -n $$ARGOCD_NS -l app.kubernetes.io/name=argocd-server \
-		-o jsonpath='{.items[0].spec.template.spec.containers[0].image}' 2>/dev/null) && \
-	echo "Extracting argocd CLI from $$ARGOCD_IMG ..." && \
-	POD_NAME="argocd-cli-extract-$$$$" && \
+		-o jsonpath='{.items[0].spec.template.spec.containers[0].image}') || \
+		{ echo "ERROR: Could not find ArgoCD server deployment in $$ARGOCD_NS"; exit 1; }; \
+	echo "Extracting argocd CLI from $$ARGOCD_IMG ..."; \
+	POD_NAME="argocd-cli-extract-$$$$"; \
 	oc run "$$POD_NAME" -n $$ARGOCD_NS --image="$$ARGOCD_IMG" \
-		--restart=Never --command -- sleep 300 2>/dev/null && \
-	echo "Waiting for extract pod..." && \
-	oc wait --for=condition=Ready pod/"$$POD_NAME" -n $$ARGOCD_NS --timeout=60s 2>/dev/null && \
-	oc cp "$$ARGOCD_NS/$$POD_NAME:/usr/local/bin/argocd" "$(ARGOCD_CLI_DIR)/argocd" 2>/dev/null && \
-	chmod +x "$(ARGOCD_CLI_DIR)/argocd" && \
-	oc delete pod "$$POD_NAME" -n $$ARGOCD_NS --force --grace-period=0 2>/dev/null && \
-	echo "Installed: $(ARGOCD_CLI_DIR)/argocd" && \
-	$(ARGOCD_CLI_DIR)/argocd version --client 2>/dev/null | head -1
+		--restart=Never --command -- sleep 300; \
+	echo "Waiting for extract pod..."; \
+	oc wait --for=condition=Ready pod/"$$POD_NAME" -n $$ARGOCD_NS --timeout=120s; \
+	oc cp "$$ARGOCD_NS/$$POD_NAME:/usr/local/bin/argocd" "$(ARGOCD_CLI_DIR)/argocd"; \
+	chmod +x "$(ARGOCD_CLI_DIR)/argocd"; \
+	oc delete pod "$$POD_NAME" -n $$ARGOCD_NS --force --grace-period=0 2>/dev/null; \
+	echo "Installed: $(ARGOCD_CLI_DIR)/argocd"; \
+	$(ARGOCD_CLI_DIR)/argocd version --client | head -1
 
 .PHONY: argocd-login
 argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd CLI
