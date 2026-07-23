@@ -87,7 +87,7 @@ argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd 
 	echo "Password:    $$ARGOCD_PASS" && \
 	echo "" && \
 	if command -v argocd >/dev/null 2>&1; then \
-		argocd login "$$ARGOCD_ROUTE" --username admin --password "$$ARGOCD_PASS" --insecure --grpc-web && \
+		argocd login "$$ARGOCD_ROUTE" --username admin --password "$$ARGOCD_PASS" --insecure && \
 		echo "" && \
 		echo "Logged in. Try: argocd app list"; \
 	else \
