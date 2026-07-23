@@ -61,7 +61,7 @@ argocd-install: ## Download argocd CLI from the cluster's ArgoCD image into ~/.l
 	@mkdir -p $(ARGOCD_CLI_DIR)
 	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}') || \
 		{ echo "ERROR: No ArgoCD instance found. Is KUBECONFIG set and the pattern deployed?"; exit 1; }; \
-	ARGOCD_IMG=$$(oc get deployment -n $$ARGOCD_NS -l app.kubernetes.io/name=argocd-server \
+	ARGOCD_IMG=$$(oc get deployment -n $$ARGOCD_NS -l app.kubernetes.io/component=server,app.kubernetes.io/part-of=argocd \
 		-o jsonpath='{.items[0].spec.template.spec.containers[0].image}') || \
 		{ echo "ERROR: Could not find ArgoCD server deployment in $$ARGOCD_NS"; exit 1; }; \
 	echo "Extracting argocd CLI from $$ARGOCD_IMG ..."; \
