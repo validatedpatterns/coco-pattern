@@ -18,6 +18,9 @@ cache-keys: ## Download Red Hat signing keys from official sources to ~/.coco-pa
 
 
 ##@ Reference Value Collection
+FMSPC ?=
+INTEL_PCS_API_KEY ?=
+
 .PHONY: collect-firmware-refvals
 collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
 	@scripts/collect-firmware-refvals.sh
@@ -25,6 +28,15 @@ collect-firmware-refvals: ## Collect firmware reference values (bare metal, defa
 .PHONY: collect-azure-refvals
 collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect-firmware-refvals.sh --platform azure
+
+.PHONY: collect-dcap-collateral
+collect-dcap-collateral: ## Collect TDX DCAP collateral from Intel PCS (requires FMSPC, INTEL_PCS_API_KEY)
+	@scripts/collect-dcap-collateral.sh --fmspc $(FMSPC) --api-key $(INTEL_PCS_API_KEY)
+
+.PHONY: dcap-offline-provision
+dcap-offline-provision: ## Full DCAP offline provisioning workflow (collect collateral + load secrets)
+	$(MAKE) collect-dcap-collateral
+	$(MAKE) load-secrets
 
 ##@ Disconnected Deployment
 MIRROR_REGISTRY ?= quay.example.com:443/mirror
