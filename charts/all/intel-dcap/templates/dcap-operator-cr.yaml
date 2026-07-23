@@ -8,4 +8,4 @@ spec:
   platformRegistration:
     Offline: {}
   nodeSelector:
-    intel.feature.node.kubernetes.io/sgx: "true"
+    - "intel.feature.node.kubernetes.io/sgx=true"
