@@ -1,5 +1,8 @@
 global:
   pattern: coco-pattern
+  # singleArgoCD must be under global: (not main:) for the clustergroup chart to read it.
+  # When true, child apps are managed by the vp-gitops ArgoCD instance — no second ArgoCD.
+  singleArgoCD: true
   storageProvider: hpp  # Options: hpp, lvm, external
   clusterVersion: "4.21"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
   secretStore:
@@ -33,7 +36,6 @@ main:
   #   baremetal     — Bare metal (Intel TDX / AMD SEV-SNP, hardware profile gated)
   #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
   clusterGroupName: baremetal
-  singleArgoCD: true
   git:
     # Disconnected: HTTP URL served by git-http-server.py on jump host port 8080.
     # Connected: https://github.com/butler54/coco-pattern.git
