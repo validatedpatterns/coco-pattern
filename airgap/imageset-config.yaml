@@ -83,6 +83,10 @@ mirror:
         - name: intel-device-plugins-operator
           channels:
             - name: stable
+        # Intel TDX DCAP operator — QGS lifecycle management (D-07)
+        - name: intel-tdx-dcap-operator
+          channels:
+            - name: alpha
 
   # Community operators (patterns-operator is NOT in redhat-operator-index for 4.21)
     - catalog: registry.redhat.io/redhat/community-operator-index:v4.21

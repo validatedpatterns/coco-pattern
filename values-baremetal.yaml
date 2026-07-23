@@ -80,6 +80,11 @@ clusterGroup:
       namespace: openshift-operators
       source: cs-certified-operator-index-v4-21
       channel: stable
+    intel-tdx-dcap:
+      name: intel-tdx-dcap-operator
+      namespace: openshift-operators
+      source: cs-certified-operator-index-v4-21
+      channel: alpha
     gpu-operator:
       name: gpu-operator-certified
       namespace: nvidia-gpu-operator
@@ -227,6 +232,12 @@ clusterGroup:
           name: sgxdeviceplugin-sample
           jsonPointers:
             - /spec
+        - group: trustedservices.intel.com
+          kind: TdxQuoteGenerationService
+          name: intel-tdx-dcap
+          jsonPointers:
+            - /spec
+            - /status
 
     nvidia-gpu:
       name: nvidia-gpu
