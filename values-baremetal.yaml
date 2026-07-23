@@ -178,6 +178,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "20"
       repoURL: http://172.25.36.135:8080/trustee-chart.git
       targetRevision: dev/airgap-testing
+      path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
