@@ -110,26 +110,6 @@ clusterGroup:
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
 
   extraObjects:
-    allow-vault-internal:
-      apiVersion: networking.k8s.io/v1
-      kind: NetworkPolicy
-      metadata:
-        name: allow-vault-internal
-        namespace: external-secrets
-      spec:
-        podSelector:
-          matchLabels:
-            app.kubernetes.io/name: external-secrets
-        policyTypes:
-        - Egress
-        egress:
-        - to:
-          - namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: vault
-          ports:
-          - port: 8200
-            protocol: TCP
     wait-for-vault-unsealed:
       apiVersion: batch/v1
       kind: Job
@@ -191,13 +171,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "0"
       overrides:
         - name: ocpExternalSecrets.vault.externalAddress
-          value: "https://vault.vault.svc:8200"
-        - name: ocpExternalSecrets.caProvider.hostCluster.name
-          value: "openshift-service-ca.crt"
-        - name: ocpExternalSecrets.caProvider.hostCluster.key
-          value: "service-ca.crt"
-        - name: ocpExternalSecrets.caProvider.hostCluster.namespace
-          value: "vault"
+          value: "https://vault-vault.apps.node-02.apac-tech-lab.net"
 
     trustee:
       name: trustee
