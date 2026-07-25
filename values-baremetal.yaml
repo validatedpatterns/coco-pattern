@@ -151,6 +151,9 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
+      overrides:
+        - name: acm.mce_operator.source
+          value: "cs-redhat-operator-index-v4-21"
 
     vault:
       name: vault
