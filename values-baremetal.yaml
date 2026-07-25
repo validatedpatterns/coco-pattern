@@ -110,6 +110,26 @@ clusterGroup:
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
 
   extraObjects:
+    allow-vault-internal:
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: allow-vault-internal
+        namespace: external-secrets
+      spec:
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: external-secrets
+        policyTypes:
+        - Egress
+        egress:
+        - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: vault
+          ports:
+          - port: 8200
+            protocol: TCP
     wait-for-vault-unsealed:
       apiVersion: batch/v1
       kind: Job
