@@ -2,6 +2,9 @@
 # OpenShift security context compatibility: null all securityContext fields.
 # Disable wgpolicyk8s CRDs and reports controller (not needed for coco-pattern).
 # Profile-specific overrides (backgroundController.resources) stay inline in values-<profile>.yaml.
+global:
+  image:
+    registry: quay.apac-tech-lab.net:443/mirror
 admissionController:
   container:
     securityContext: null
