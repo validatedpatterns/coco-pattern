@@ -86,8 +86,7 @@ fi
 
 # Prerequisites check
 command -v podman >/dev/null 2>&1 || { echo "Error: podman is required but not installed." >&2; exit 1; }
-command -v yq >/dev/null 2>&1 || { echo "Error: yq is required but not installed." >&2; exit 1; }
-command -v jq >/dev/null 2>&1 || { echo "Error: jq is required but not installed." >&2; exit 1; }
+python3 -c "import yaml" 2>/dev/null || { echo "Error: python3 with PyYAML module is required. Install with: pip3 install pyyaml" >&2; exit 1; }
 
 # Check pull secret exists
 if [ ! -f "$PULL_SECRET" ]; then
@@ -168,21 +167,46 @@ podman run --rm \
     "$CONTAINER_IMAGE" \
     $VERITAS_CMD
 
-# Extract reference-values.json from ConfigMap and transform array -> object
+# Extract reference values from ConfigMap YAML (supports both old and new veritas formats)
 echo ""
 echo "Extracting reference values..."
-# -r ensures the embedded JSON string is output raw (not quoted),
-# which is required for yq v3 (kislyuk/yq) compatibility.
-# yq v4 (mikefarah/yq) outputs raw scalars by default but -r is harmless.
-yq -r '.data["reference-values.json"]' "$TEMP_DIR/rvps-reference-values.yaml" | \
-  jq '[.[] | {(.name): .value}] | add' > "$OUTPUT_FILE"
-
-# Save output
 mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+python3 -c "
+import yaml, json, base64, sys
+
+with open(sys.argv[1]) as f:
+    doc = yaml.safe_load(f)
+
+data = doc.get('data', {})
+result = {}
+
+if 'reference_value' in data:
+    # New format (veritas 0.5.1+ / coco-tools 0.5.1): JSON object with base64-encoded RVPS entries
+    raw = data['reference_value']
+    entries = json.loads(raw) if isinstance(raw, str) else raw
+    for claim_name, b64_value in entries.items():
+        padded = b64_value + '=' * (-len(b64_value) % 4)
+        decoded = json.loads(base64.urlsafe_b64decode(padded))
+        result[claim_name] = decoded.get('value', decoded)
+elif 'reference-values.json' in data:
+    # Old format: JSON array of {name, hash-value} entries
+    raw = data['reference-values.json']
+    entries = json.loads(raw) if isinstance(raw, str) else raw
+    for entry in entries:
+        name = entry.get('name', '')
+        value = entry.get('value', entry.get('hash-value', []))
+        result[name] = value
+else:
+    print('Error: ConfigMap has neither reference_value nor reference-values.json key', file=sys.stderr)
+    sys.exit(1)
+
+print(json.dumps(result, indent=2))
+" "$TEMP_DIR/rvps-reference-values.yaml" > "$OUTPUT_FILE"
 
 echo ""
 echo "Collected firmware reference values:"
-jq . "$OUTPUT_FILE"
+python3 -m json.tool "$OUTPUT_FILE"
 echo ""
 echo "Saved to: $OUTPUT_FILE"
 echo ""
