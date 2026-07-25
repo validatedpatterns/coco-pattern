@@ -190,6 +190,8 @@ clusterGroup:
           value: "true"
         - name: kbs.baremetal.enabled
           value: "true"
+        - name: kbs.registryCa.enabled
+          value: "true"
         - name: kbs.tdx.collateralService
           value: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
         - name: kbs.tdx.collateralMountPath

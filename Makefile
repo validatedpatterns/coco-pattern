@@ -17,6 +17,18 @@ cache-keys: ## Download Red Hat signing keys from official sources to ~/.coco-pa
 	@echo "Done. Verify fingerprints at https://access.redhat.com/security/team/key/"
 
 
+.PHONY: cache-registry-ca
+cache-registry-ca: ## Copy registry CA certificate chain to ~/.coco-pattern/
+	@mkdir -p ~/.coco-pattern
+	@if [ -f ~/quay-ca-chain.pem ]; then \
+		cp ~/quay-ca-chain.pem ~/.coco-pattern/quay-ca-cert.pem; \
+		echo "  Cached at ~/.coco-pattern/quay-ca-cert.pem"; \
+	else \
+		echo "ERROR: ~/quay-ca-chain.pem not found."; \
+		echo "  Copy your registry CA certificate chain to ~/quay-ca-chain.pem first."; \
+		exit 1; \
+	fi
+
 ##@ Reference Value Collection
 
 .PHONY: collect-firmware-refvals

@@ -29,6 +29,10 @@ image_security_policy_uri = 'kbs:///default/security-policy/{{ security_policy_f
 # CDH does NOT use this URI — registry auth is handled via imagePullSecrets
 # on the workload's service account instead. Kept here for baremetal support.
 authenticated_registry_credentials_uri = 'kbs:///default/credential/regcred'
+{% if registry_ca_certs | default([]) | length > 0 %}
+extra_root_certificates = [{% for cert in registry_ca_certs %}"""
+{{ cert }}"""{%- if not loop.last %}, {% endif %}{% endfor %}]
+{% endif %}
 '''
 
 "policy.rego" = '''

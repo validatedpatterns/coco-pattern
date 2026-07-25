@@ -35,6 +35,48 @@
         msg: "KBS TLS certificate not found in secret 'kbs-tls-self-signed' in namespace 'imperative'"
       when: kbs_secret_result.resources | length == 0
 
+    - name: Read registry CA cert from Kubernetes
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ lookup('env', 'KUBECONFIG') }}"
+        api_version: v1
+        kind: Secret
+        name: registry-ca
+        namespace: imperative
+      register: ca_secret_result
+
+    - name: Extract and split CA certificates
+      ansible.builtin.shell: |
+        set -o pipefail
+        python3 -c "
+        import base64, sys
+        raw = base64.b64decode(sys.argv[1]).decode('utf-8')
+        certs = []
+        current = []
+        for line in raw.splitlines():
+            if line.strip() == '-----BEGIN CERTIFICATE-----':
+                current = [line]
+            elif line.strip() == '-----END CERTIFICATE-----':
+                current.append(line)
+                certs.append(chr(10).join(current))
+                current = []
+            elif current:
+                current.append(line)
+        print('---CERT_BOUNDARY---'.join(certs), end='')
+        " "{{ ca_secret_result.resources[0].data.pem }}"
+      register: ca_certs_raw
+      changed_when: false
+      when: ca_secret_result.resources | default([]) | length > 0
+
+    - name: Build CA certificate list
+      ansible.builtin.set_fact:
+        registry_ca_certs: "{{ ca_certs_raw.stdout.split('---CERT_BOUNDARY---') | select | list }}"
+      when: ca_certs_raw is defined and ca_certs_raw.rc is defined and ca_certs_raw.rc == 0
+
+    - name: Set empty CA cert list when secret not found
+      ansible.builtin.set_fact:
+        registry_ca_certs: []
+      when: ca_secret_result.resources | default([]) | length == 0
+
     - name: Define temp file paths
       ansible.builtin.set_fact:
         rendered_path: "{{ tmpdir.path }}/rendered.toml"
