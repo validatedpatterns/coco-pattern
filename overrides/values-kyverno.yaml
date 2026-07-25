@@ -4,7 +4,7 @@
 # Profile-specific overrides (backgroundController.resources) stay inline in values-<profile>.yaml.
 global:
   image:
-    registry: quay.apac-tech-lab.net:443/mirror/kyverno
+    registry: quay.apac-tech-lab.net:443/mirror
 admissionController:
   container:
     securityContext: null
