@@ -11,11 +11,9 @@
 # does NOT change per-cluster — only per CPU family (identified by FMSPC).
 #
 # Usage:
-#   ./scripts/collect-dcap-collateral.sh --fmspc FMSPC --api-key KEY [OPTIONS]
+#   ./scripts/collect-dcap-collateral.sh [OPTIONS]
 #
 # Options:
-#   --fmspc FMSPC               Platform FMSPC hex string (REQUIRED, e.g. "00606A000000")
-#   --api-key KEY               Intel PCS API key (REQUIRED, or set INTEL_PCS_API_KEY env var)
 #   --pcsclient-dir PATH        Path to PcsClientTool directory
 #                               (default: ~/confidential-computing.tee.dcap/tools/PcsClientTool)
 #   -o, --output PATH           Override output directory (default: ~/.coco-pattern/dcap-offline)
@@ -25,26 +23,19 @@
 #   git clone https://github.com/intel/confidential-computing.tee.dcap.git \
 #       ~/confidential-computing.tee.dcap
 #   pip install -r ~/confidential-computing.tee.dcap/tools/PcsClientTool/requirements.txt
+#
+# The Intel PCS API key must be configured in the OS keyring. On first run,
+# pcsclient.py will prompt for the key and optionally save it.
 
 set -euo pipefail
 
 # Defaults
-FMSPC=""
-API_KEY="${INTEL_PCS_API_KEY:-}"
 PCSCLIENT_DIR="${HOME}/confidential-computing.tee.dcap/tools/PcsClientTool"
 OUTPUT_DIR="${HOME}/.coco-pattern/dcap-offline"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --fmspc)
-            FMSPC="$2"
-            shift 2
-            ;;
-        --api-key)
-            API_KEY="$2"
-            shift 2
-            ;;
         --pcsclient-dir)
             PCSCLIENT_DIR="$2"
             shift 2
@@ -54,7 +45,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            sed -n '2,28p' "$0" | sed 's/^# \?//'
+            sed -n '2,30p' "$0" | sed 's/^# \?//'
             exit 0
             ;;
         *)
@@ -64,21 +55,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Validate required parameters
-if [ -z "$FMSPC" ]; then
-    echo "Error: --fmspc is required (e.g. --fmspc 00606A000000)" >&2
-    echo "The FMSPC identifies your platform's CPU family for collateral lookup." >&2
-    echo "Run with --help for usage information." >&2
-    exit 1
-fi
-
-if [ -z "$API_KEY" ]; then
-    echo "Error: Intel PCS API key is required." >&2
-    echo "Provide via --api-key KEY or set INTEL_PCS_API_KEY environment variable." >&2
-    echo "Get an API key from: https://api.portal.trustedservices.intel.com/" >&2
-    exit 1
-fi
 
 # Check that pcsclient.py exists
 PCSCLIENT_PY="${PCSCLIENT_DIR}/pcsclient.py"
@@ -98,7 +74,6 @@ mkdir -p "$OUTPUT_DIR"
 OUTPUT_FILE="${OUTPUT_DIR}/platform_collaterals.json"
 
 echo "Collecting TDX DCAP verification collateral..."
-echo "  FMSPC:      $FMSPC"
 echo "  Tool:       $PCSCLIENT_PY"
 echo "  Output:     $OUTPUT_FILE"
 echo ""
@@ -106,10 +81,15 @@ echo ""
 # Run pcsclient.py fetch to collect collateral
 # IMPORTANT: Use 'fetch' subcommand (produces JSON for Trustee dcap_verifier file:// mode)
 # Do NOT use 'cache' (produces binary QPL cache files for QCNL library)
+#
+# pcsclient.py fetch retrieves all FMSPCs from Intel PCS and downloads
+# TCB info, QE identity, and CRL data. The API key must be pre-configured
+# in the OS keyring (pcsclient.py prompts interactively on first run).
+# Use -t early for early TCB update type (matches kbs-config.toml).
 python3 "$PCSCLIENT_PY" fetch \
-    --fmspc "$FMSPC" \
-    --api_key "$API_KEY" \
-    -o "$OUTPUT_FILE"
+    -o "$OUTPUT_FILE" \
+    -t early \
+    -p all
 
 # Verify output file exists and is valid JSON
 if [ ! -f "$OUTPUT_FILE" ]; then
