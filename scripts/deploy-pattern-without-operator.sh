@@ -141,9 +141,9 @@ spec:
       - name: global.targetRevision
         value: ${PATTERN_BRANCH}
       - name: global.hubClusterDomain
-        value: $(oc get ingress.config cluster -o jsonpath='{.spec.domain}' | sed 's/^apps\.//')
+        value: $(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
       - name: global.localClusterDomain
-        value: $(oc get ingress.config cluster -o jsonpath='{.spec.domain}' | sed 's/^apps\.//')
+        value: $(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
       - name: clusterGroup.name
         value: baremetal
       - name: clusterGroup.isHubCluster

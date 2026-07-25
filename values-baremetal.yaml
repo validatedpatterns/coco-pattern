@@ -169,9 +169,6 @@ clusterGroup:
       chartVersion: 0.0.*
       annotations:
         argocd.argoproj.io/sync-wave: "0"
-      overrides:
-        - name: ocpExternalSecrets.vault.externalAddress
-          value: "https://vault-vault.apps.node-02.apac-tech-lab.net"
 
     trustee:
       name: trustee
