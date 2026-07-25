@@ -58,6 +58,9 @@ mirror:
         # ACM — use default channel (release-2.17 in 4.21 catalog)
         # filtering to non-default channel causes oc-mirror error
         - name: advanced-cluster-management
+        # MCE — required dependency of ACM, must be mirrored explicitly
+        # ACM creates an MCE subscription; OLM needs the package in the catalog
+        - name: multicluster-engine
         # Storage (LVM)
         - name: lvms-operator
           channels:
