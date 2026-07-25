@@ -169,6 +169,15 @@ clusterGroup:
       chartVersion: 0.0.*
       annotations:
         argocd.argoproj.io/sync-wave: "0"
+      overrides:
+        - name: ocpExternalSecrets.vault.externalAddress
+          value: "https://vault.vault.svc:8200"
+        - name: ocpExternalSecrets.caProvider.hostCluster.name
+          value: "openshift-service-ca.crt"
+        - name: ocpExternalSecrets.caProvider.hostCluster.key
+          value: "service-ca.crt"
+        - name: ocpExternalSecrets.caProvider.hostCluster.namespace
+          value: "vault"
 
     trustee:
       name: trustee
