@@ -92,6 +92,8 @@ clusterGroup:
       channel: v26.3
       installPlanApproval: Manual
       csv: gpu-operator-certified.v26.3.0
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
   projects:
   - hub
   - vault
