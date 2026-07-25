@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: hello-openshift
-          image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+          image: {{ .Values.image }}
           ports:
             - containerPort: 8080
           volumeMounts:

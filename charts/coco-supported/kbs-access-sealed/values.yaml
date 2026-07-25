@@ -1,4 +1,4 @@
 # Default values for kbs-access-sealed chart
 # Override via values-global.yaml or values-baremetal.yaml
 
-# Empty defaults - all configuration handled by global values
+image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2

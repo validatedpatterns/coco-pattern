@@ -284,6 +284,9 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        - name: image
+          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
 
     kbs-access-curl:
       name: kbs-access-curl
@@ -295,6 +298,11 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        - name: image
+          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
+        - name: initImage
+          value: "quay.apac-tech-lab.net:443/mirror/ubi9/ubi:latest"
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -306,6 +314,9 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        - name: image
+          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
 
     kyverno:
       name: kyverno

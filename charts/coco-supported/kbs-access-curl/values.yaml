@@ -1,6 +1,9 @@
 # Chart-specific values
 # Common values are inherited from values-global.yaml
 
+image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+initImage: registry.access.redhat.com/ubi9/ubi:latest
+
 defaultMemory: ""
 
 runtimeClassName: ""

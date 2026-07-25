@@ -26,7 +26,7 @@ spec:
       runtimeClassName: {{ .Values.global.coco.runtimeClassName }}
       containers:
         - name: httpd
-          image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+          image: {{ .Values.image }}
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -37,7 +37,7 @@ spec:
             readOnly: true
       initContainers:
       - name: curl
-        image: registry.access.redhat.com/ubi9/ubi:latest
+        image: {{ .Values.initImage }}
         command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /var/www/html/secret.txt']
         volumeMounts:
         - name: shared-volume

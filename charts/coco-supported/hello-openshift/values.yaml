@@ -1,6 +1,8 @@
 # Chart-specific values
 # Common values are inherited from values-global.yaml
 
+image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+
 # Runtime class for confidential containers.
 # When empty, auto-detected from global.clusterPlatform (kata-remote for Azure/AWS, kata-cc otherwise).
 # Bare metal: set to "kata-cc" via values-baremetal.yaml overrides.
