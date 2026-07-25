@@ -141,9 +141,7 @@ clusterGroup:
       name: kyverno
       namespace: kyverno
       project: hub
-      repoURL: https://kyverno.github.io/kyverno/
-      chart: kyverno
-      chartVersion: 3.7.*
+      path: charts/all/kyverno
       syncPolicy:
         automated: {}
         retry:

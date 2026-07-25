@@ -311,13 +311,9 @@ clusterGroup:
       name: kyverno
       namespace: kyverno
       project: hub
+      path: charts/all/kyverno
       annotations:
         argocd.argoproj.io/sync-wave: "0"
-      # Kyverno chart re-mirrored under validatedpatterns path to share
-      # the same public Quay namespace as other VP OCI charts.
-      repoURL: oci://quay.apac-tech-lab.net:443/mirror/validatedpatterns
-      chart: kyverno
-      chartVersion: 3.7.*
       syncPolicy:
         automated: {}
         retry:

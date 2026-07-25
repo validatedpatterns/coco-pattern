@@ -143,3 +143,16 @@ detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECON
 	fi && \
 	echo "" && \
 	echo "To apply: edit values-global.yaml and set global.hardware.profile to the recommended value."
+
+##@ Chart Management
+KYVERNO_VERSION ?= 3.7.2
+KYVERNO_REPO ?= https://kyverno.github.io/kyverno/
+
+.PHONY: update-kyverno-chart
+update-kyverno-chart: ## Pull and embed upstream Kyverno Helm chart (requires internet)
+	@echo "Pulling kyverno chart v$(KYVERNO_VERSION)..."
+	@rm -rf charts/all/kyverno
+	@helm pull kyverno --repo $(KYVERNO_REPO) --version $(KYVERNO_VERSION) --untar -d charts/all/
+	@find charts/all/kyverno -name "README.md" -o -name "README.md.gotmpl" | xargs rm -f
+	@echo "Embedded charts/all/kyverno (v$(KYVERNO_VERSION))"
+	@echo "Next: commit, push, and sync ArgoCD"
