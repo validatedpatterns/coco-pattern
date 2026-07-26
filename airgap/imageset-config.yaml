@@ -150,11 +150,9 @@ mirror:
     - name: registry.redhat.io/openshift4/ose-cli:latest
 
     # --- Intel DCAP chart images ---
-    # Tag-based (establishes IDMS mirror path):
-    - name: registry.redhat.io/openshift-sandboxed-containers/osc-pccs-rhel9:latest
-    - name: registry.redhat.io/openshift-sandboxed-containers/osc-tdx-qgs-rhel9:latest
-    - name: registry.connect.redhat.com/intel/intel-sgx-plugin:latest
-    # Digest-pinned (exact refs from intel-dcap chart templates):
+    # Digest-pinned (exact refs from intel-dcap chart templates).
+    # NOTE: osc-pccs-rhel9:latest and osc-tdx-qgs-rhel9:latest tags do not exist
+    # on registry.redhat.io — only digest-pinned refs work.
     - name: registry.redhat.io/openshift-sandboxed-containers/osc-pccs@sha256:edf57087220516115512dc6687b96045cbc69472a3d6d381619f66beae032ad6
     - name: registry.redhat.io/openshift-sandboxed-containers/osc-tdx-qgs@sha256:308d66da94d3116cc16530a4a2cd60a995458f331e1cb3487c6ea3fdae60545b
     - name: registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b
