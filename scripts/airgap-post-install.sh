@@ -308,48 +308,60 @@ fix_vp_operator_manifests() {
 
     local registry_base="${MIRROR_REGISTRY%%/mirror*}"
 
-    # VP operator images with hybrid manifests (OCI index + Docker v2 children)
-    # Format: source_image|parent_index_digest|amd64_child_digest
-    local VP_HYBRID_IMAGES=(
-        "quay.io/validatedpatterns/patterns-operator|sha256:eeb82d8c13fdb0c18603f11ee5cb16b8411806c1df3ebca75911fb2b87906306|sha256:e6c2bbb5d30ac9a8aff18b4bf7267d29469a68dad74adb201300795923aaef12"
-        "quay.io/validatedpatterns/patterns-operator-console|sha256:ba657cf52ee099709d069db06359b588b7344f2472996ba8973f3d6a62cbb3e8|sha256:4bc1351becc5cb13b2ce4af40fcb2fc1e2e1526698d2942ecbeccdbe85b92521"
+    # Images that oc-mirror fails to mirror (hybrid manifests or missing signatures).
+    # Format: source_image|digest_to_mirror (the digest the CSV/catalog references)
+    # For hybrid manifests: digest is the amd64 child extracted from the OCI index.
+    # For signature failures: digest is the original (single-arch, just not copied).
+    local FIXUP_IMAGES=(
+        "quay.io/validatedpatterns/patterns-operator|sha256:e6c2bbb5d30ac9a8aff18b4bf7267d29469a68dad74adb201300795923aaef12"
+        "quay.io/validatedpatterns/patterns-operator-console|sha256:4bc1351becc5cb13b2ce4af40fcb2fc1e2e1526698d2942ecbeccdbe85b92521"
+        "registry.connect.redhat.com/intel/intel-deviceplugin-operator|sha256:d195bcb3278601478a92f36e5efec94b716647c4db68fef87fcaeacb953c7ebb"
+        "registry.connect.redhat.com/intel/intel-tdx-dcap-operator|sha256:34c0bcd0e931e51b5bd93e607851d510e0a7aff6833c4b6a1d1daad8a1ab8471"
     )
 
-    for entry in "${VP_HYBRID_IMAGES[@]}"; do
-        IFS='|' read -r src_image parent_digest amd64_digest <<< "$entry"
+    for entry in "${FIXUP_IMAGES[@]}"; do
+        IFS='|' read -r src_image digest <<< "$entry"
         local repo_name="${src_image##*/}"
         local dest="${MIRROR_REGISTRY}/${src_image#*/}"
 
-        info "  Mirroring amd64: ${repo_name}"
-        oc image mirror --insecure=true --filter-by-os="linux/amd64" \
-            "${src_image}@${amd64_digest}" "${dest}" 2>/dev/null || {
+        info "  Mirroring: ${repo_name}@${digest:0:20}..."
+        oc image mirror --insecure=true \
+            "${src_image}@${digest}" "${dest}" 2>/dev/null || {
             warn "  Failed to mirror ${repo_name} — operator may fail to install"
             continue
         }
-        info "    OK: ${amd64_digest}"
+        info "    OK"
     done
 
-    # Create IDMS mapping parent index digests to amd64 child digests
-    if ! oc get idms idms-vp-operator-hybrid >/dev/null 2>&1; then
-        info "Creating IDMS idms-vp-operator-hybrid"
+    # Create IDMS for certified operator images that oc-mirror fails to mirror
+    # (signature lookup failures, hybrid manifests). Maps source repos to Quay mirror.
+    if ! oc get idms idms-certified-operators >/dev/null 2>&1; then
+        info "Creating IDMS idms-certified-operators"
         cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
-  name: idms-vp-operator-hybrid
+  name: idms-certified-operators
 spec:
   imageDigestMirrors:
   - mirrors:
     - ${registry_base}/mirror/validatedpatterns/patterns-operator
     source: quay.io/validatedpatterns/patterns-operator
-    mirrorSourcePolicy: NeverContactSource
   - mirrors:
     - ${registry_base}/mirror/validatedpatterns/patterns-operator-console
     source: quay.io/validatedpatterns/patterns-operator-console
-    mirrorSourcePolicy: NeverContactSource
+  - mirrors:
+    - ${registry_base}/mirror/intel
+    source: registry.connect.redhat.com/intel
+  - mirrors:
+    - ${registry_base}/mirror/nvidia
+    source: registry.connect.redhat.com/nvidia
+  - mirrors:
+    - ${registry_base}/mirror/hashicorp
+    source: registry.connect.redhat.com/hashicorp
 EOF
     else
-        info "IDMS idms-vp-operator-hybrid already exists — skipping"
+        info "IDMS idms-certified-operators already exists — skipping"
     fi
 
     info "VP operator hybrid manifest workaround applied"
