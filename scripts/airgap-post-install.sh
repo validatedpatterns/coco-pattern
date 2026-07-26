@@ -134,6 +134,27 @@ EOF
     done
 }
 
+# ─── Step 3b: Apply oc-mirror IDMS/ITMS ──────────────────────────
+apply_ocmirror_resources() {
+    step "3b" "Apply oc-mirror IDMS/ITMS"
+
+    local workspace="${HOME}/oc-mirror-workspace"
+    local resources="${workspace}/working-dir/cluster-resources"
+
+    if [[ ! -d "$resources" ]]; then
+        warn "No oc-mirror cluster-resources at $resources — skipping"
+        return
+    fi
+
+    for f in "$resources"/idms-*.yaml "$resources"/itms-*.yaml; do
+        [[ -f "$f" ]] || continue
+        info "  Applying $(basename "$f")"
+        oc apply -f "$f" 2>/dev/null || warn "  Failed to apply $(basename "$f")"
+    done
+
+    info "oc-mirror IDMS/ITMS applied"
+}
+
 # ─── Step 4: Create ITMS for tag-based image pulls ───────────────
 create_itms() {
     step 4 "Create ImageTagMirrorSet for tag-based pulls"
@@ -755,6 +776,7 @@ echo ""
 validate_prereqs
 disable_default_catalogs
 create_catalog_sources
+apply_ocmirror_resources
 create_itms
 mirror_oci_charts
 fix_manifest_lists
