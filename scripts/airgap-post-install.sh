@@ -192,6 +192,9 @@ spec:
   - mirrors:
     - ${registry_base}/mirror/hashicorp
     source: registry.connect.redhat.com/hashicorp
+  - mirrors:
+    - ${registry_base}/mirror/community-operator-pipeline-prod
+    source: quay.io/community-operator-pipeline-prod
 EOF
     info "ITMS created — MCO will roll out node config (may take a few minutes)"
 }
