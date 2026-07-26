@@ -90,23 +90,13 @@ EOCM
     echo "TLS cert added for ${QUAY_HOST}"
 fi
 
-# Step 5: Configure Helm OCI auth (if pull-secret available)
+# Step 5: Helm OCI auth — SKIPPED
+# Quay repos are public (ANONYMOUS_ACCESS: true). Mounting the pull-secret
+# as HELM_REGISTRY_CONFIG causes 401 errors because Quay rejects the Basic
+# auth format from the pull-secret when Bearer is expected. Unauthenticated
+# Helm OCI pulls work correctly.
 echo ""
-echo "=== Step 5: Configure Helm OCI auth ==="
-if [ -f ~/pull-secret.json ]; then
-    oc create secret generic helm-registry-config -n openshift-gitops \
-        --from-file=config.json=~/pull-secret.json \
-        --dry-run=client -o yaml | oc apply -f - 2>&1 | tail -1
-
-    # Patch repo-server
-    oc patch deployment openshift-gitops-repo-server -n openshift-gitops --type=json -p '[
-      {"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "HELM_REGISTRY_CONFIG", "value": "/tmp/helm-config/config.json"}},
-      {"op": "add", "path": "/spec/template/spec/volumes/-", "value": {"name": "helm-registry-config", "secret": {"secretName": "helm-registry-config"}}},
-      {"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "helm-registry-config", "mountPath": "/tmp/helm-config", "readOnly": true}}
-    ]' 2>/dev/null || echo "Repo-server already patched or patch conflict"
-
-    sleep 10
-fi
+echo "=== Step 5: Helm OCI auth — skipped (public repos) ==="
 
 # Step 6: Create the parent ArgoCD Application
 echo ""

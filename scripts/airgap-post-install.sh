@@ -723,7 +723,8 @@ case "$MODE" in
         info "Waiting 30s for ArgoCD to be created by patterns-operator..."
         sleep 30
         add_argocd_ca
-        configure_argocd_helm_auth
+        # Helm OCI auth skipped — Quay repos are public (ANONYMOUS_ACCESS: true).
+        # Mounting pull-secret as HELM_REGISTRY_CONFIG causes 401 errors.
         exit 0
         ;;
     fix-manifests)
