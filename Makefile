@@ -29,6 +29,21 @@ cache-registry-ca: ## Copy registry CA certificate chain to ~/.coco-pattern/
 		exit 1; \
 	fi
 
+.PHONY: pck-register
+pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_API_KEY)
+	@if [ -z "$(INTEL_PCS_API_KEY)" ]; then \
+		echo "ERROR: Set INTEL_PCS_API_KEY environment variable"; \
+		echo "  Usage: make pck-register INTEL_PCS_API_KEY=<key>"; \
+		exit 1; \
+	fi
+	@PCS_TOOL="$(HOME)/confidential-computing.tee.dcap/tools/PcsClientTool/pcsclient.py"; \
+	if [ ! -f "$$PCS_TOOL" ]; then \
+		echo "ERROR: PCS Client Tool not found at $$PCS_TOOL"; \
+		echo "  Clone: git clone https://github.com/intel/confidential-computing.tee.dcap ~/confidential-computing.tee.dcap"; \
+		exit 1; \
+	fi; \
+	cd "$$(dirname $$PCS_TOOL)" && python3 pcsclient.py -t register -k "$(INTEL_PCS_API_KEY)"
+
 ##@ Reference Value Collection
 
 .PHONY: collect-firmware-refvals
