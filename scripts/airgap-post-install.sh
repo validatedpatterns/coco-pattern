@@ -334,10 +334,21 @@ fix_vp_operator_manifests() {
     # For hybrid manifests: digest is the amd64 child extracted from the OCI index.
     # For signature failures: digest is the original (single-arch, just not copied).
     local FIXUP_IMAGES=(
+        # VP operator — hybrid OCI/Docker manifests (upstream bug #778)
         "quay.io/validatedpatterns/patterns-operator|sha256:e6c2bbb5d30ac9a8aff18b4bf7267d29469a68dad74adb201300795923aaef12"
         "quay.io/validatedpatterns/patterns-operator-console|sha256:4bc1351becc5cb13b2ce4af40fcb2fc1e2e1526698d2942ecbeccdbe85b92521"
+        # Intel/NVIDIA/Hashicorp — oc-mirror fails on cosign signature lookup
         "registry.connect.redhat.com/intel/intel-deviceplugin-operator|sha256:d195bcb3278601478a92f36e5efec94b716647c4db68fef87fcaeacb953c7ebb"
         "registry.connect.redhat.com/intel/intel-tdx-dcap-operator|sha256:34c0bcd0e931e51b5bd93e607851d510e0a7aff6833c4b6a1d1daad8a1ab8471"
+        "registry.connect.redhat.com/intel/intel-sgx-plugin|sha256:dd74e1f7436ca29b88843ecdd385021a5977da22531a5403920a7cc0f09f6cf6"
+        "registry.connect.redhat.com/intel/intel-sgx-plugin|sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b"
+        "registry.connect.redhat.com/intel/intel-dsa-plugin|sha256:18b1cd603a57255ac387ea056ef5d96f325d59eb66ce78c3cc0fa4f5c0534b6c"
+        "registry.connect.redhat.com/intel/intel-gpu-plugin|sha256:2569cfa01f54d7f73acc889c380bc2f7f5a3098866b9b43b48ae2fa9fa34355c"
+        "registry.connect.redhat.com/intel/intel-idxd-config-initcontainer|sha256:d5dbc172c138e987e8e0f64a47776c2bce99b58e2c0f28cb91acdfe9afae659b"
+        "registry.connect.redhat.com/intel/intel-qat-initcontainer|sha256:36701916dfc68db303ba2e5897a59243dc9e9cce8b1eee859d0339ff24322ecd"
+        "registry.connect.redhat.com/intel/intel-qat-plugin|sha256:2d619eee302e10c6813f056f7320c6c5f0c1fc989b73e617892bc6311b5576af"
+        "registry.connect.redhat.com/intel/intel-tdx-qgs|sha256:5dae30c8008c5a3a39f0eeb0db081292126491faf177c611a4f18f23f5f9f59c"
+        "registry.connect.redhat.com/hashicorp/vault|sha256:e43f420cb0ab0a6a1fc7af826d778e103184fb2bc1daaebc51cebc1330e38f12"
     )
 
     for entry in "${FIXUP_IMAGES[@]}"; do
