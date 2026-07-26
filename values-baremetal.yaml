@@ -74,8 +74,6 @@ clusterGroup:
       namespace: openshift-cnv
       channel: stable
       source: cs-redhat-operator-index-v4-21
-      annotations:
-        argocd.argoproj.io/sync-wave: "10"
     nfd:
       name: nfd
       namespace: openshift-nfd
