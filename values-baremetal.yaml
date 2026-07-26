@@ -33,11 +33,15 @@ clusterGroup:
       name: advanced-cluster-management
       namespace: open-cluster-management
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     eso:
       name: openshift-external-secrets-operator
       namespace: external-secrets-operator
       channel: stable-v1
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
@@ -61,30 +65,42 @@ clusterGroup:
       namespace: cert-manager-operator
       channel: stable-v1
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     lvm-operator:
       name: lvms-operator
       namespace: openshift-storage
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     cnv:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
       channel: stable
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     nfd:
       name: nfd
       namespace: openshift-nfd
       channel: stable
       source: cs-redhat-operator-index-v4-21
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     intel-device-plugins:
       name: intel-device-plugins-operator
       namespace: openshift-operators
       source: cs-certified-operator-index-v4-21
       channel: stable
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     intel-tdx-dcap:
       name: intel-tdx-dcap-operator
       namespace: openshift-operators
       source: cs-certified-operator-index-v4-21
       channel: alpha
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     # GPU operator disabled — NVIDIA bundle image has oc-mirror signature issue.
     # Re-enable when NVIDIA bundle is mirrored or upstream fix lands.
     # gpu-operator:
