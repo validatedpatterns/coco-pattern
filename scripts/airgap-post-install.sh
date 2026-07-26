@@ -298,6 +298,63 @@ fix_manifest_lists() {
     done <<< "$failed_images"
 }
 
+# ─── Step 6b: VP operator hybrid manifest workaround ─────────────
+# Upstream bug: https://github.com/validatedpatterns/patterns-operator/issues/778
+# VP operator images use hybrid OCI/Docker manifests that Quay rejects.
+# Extract amd64 single-arch and create IDMS to map parent index digest
+# to the amd64 child digest.
+fix_vp_operator_manifests() {
+    step "6b" "Fix VP operator hybrid manifest images"
+
+    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+
+    # VP operator images with hybrid manifests (OCI index + Docker v2 children)
+    # Format: source_image|parent_index_digest|amd64_child_digest
+    local VP_HYBRID_IMAGES=(
+        "quay.io/validatedpatterns/patterns-operator|sha256:eeb82d8c13fdb0c18603f11ee5cb16b8411806c1df3ebca75911fb2b87906306|sha256:e6c2bbb5d30ac9a8aff18b4bf7267d29469a68dad74adb201300795923aaef12"
+        "quay.io/validatedpatterns/patterns-operator-console|sha256:ba657cf52ee099709d069db06359b588b7344f2472996ba8973f3d6a62cbb3e8|sha256:4bc1351becc5cb13b2ce4af40fcb2fc1e2e1526698d2942ecbeccdbe85b92521"
+    )
+
+    for entry in "${VP_HYBRID_IMAGES[@]}"; do
+        IFS='|' read -r src_image parent_digest amd64_digest <<< "$entry"
+        local repo_name="${src_image##*/}"
+        local dest="${MIRROR_REGISTRY}/${src_image#*/}"
+
+        info "  Mirroring amd64: ${repo_name}"
+        oc image mirror --insecure=true --filter-by-os="linux/amd64" \
+            "${src_image}@${amd64_digest}" "${dest}" 2>/dev/null || {
+            warn "  Failed to mirror ${repo_name} — operator may fail to install"
+            continue
+        }
+        info "    OK: ${amd64_digest}"
+    done
+
+    # Create IDMS mapping parent index digests to amd64 child digests
+    if ! oc get idms idms-vp-operator-hybrid >/dev/null 2>&1; then
+        info "Creating IDMS idms-vp-operator-hybrid"
+        cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: idms-vp-operator-hybrid
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${registry_base}/mirror/validatedpatterns/patterns-operator
+    source: quay.io/validatedpatterns/patterns-operator
+    mirrorSourcePolicy: NeverContactSource
+  - mirrors:
+    - ${registry_base}/mirror/validatedpatterns/patterns-operator-console
+    source: quay.io/validatedpatterns/patterns-operator-console
+    mirrorSourcePolicy: NeverContactSource
+EOF
+    else
+        info "IDMS idms-vp-operator-hybrid already exists — skipping"
+    fi
+
+    info "VP operator hybrid manifest workaround applied"
+}
+
 # ─── Step 7: Add extra CA certificate to ArgoCD ──────────────────
 add_argocd_ca() {
     step 7 "Add extra CA certificate to ArgoCD"
@@ -672,6 +729,7 @@ case "$MODE" in
     fix-manifests)
         validate_prereqs
         fix_manifest_lists
+        fix_vp_operator_manifests
         exit 0
         ;;
 esac
@@ -687,6 +745,7 @@ create_catalog_sources
 create_itms
 mirror_oci_charts
 fix_manifest_lists
+fix_vp_operator_manifests
 add_argocd_ca
 enable_routing_via_host
 setup_git_server
