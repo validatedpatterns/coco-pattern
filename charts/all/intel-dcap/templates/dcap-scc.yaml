@@ -10,7 +10,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 subjects:
   - kind: ServiceAccount
-    name: default
+    name: intel-tdx-dcap
     namespace: openshift-operators
 roleRef:
   kind: ClusterRole
