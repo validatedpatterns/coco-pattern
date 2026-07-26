@@ -322,25 +322,42 @@ fix_manifest_lists() {
     done <<< "$failed_images"
 }
 
-# ─── Step 6b: VP operator hybrid manifest workaround ─────────────
-# Upstream bug: https://github.com/validatedpatterns/patterns-operator/issues/778
-# VP operator images use hybrid OCI/Docker manifests that Quay rejects.
-# Extract amd64 single-arch and create IDMS to map parent index digest
-# to the amd64 child digest.
+# ─── Step 6b: Mirror fixup images and create IDMS ────────────────
+# Handles two categories of images that oc-mirror fails on:
+# 1. VP operator — hybrid OCI/Docker manifests → mirror-registry (preserves parent digest)
+# 2. Intel/NVIDIA/Hashicorp — cosign signature lookup fails → Quay (single-arch, no issue)
+# Also creates IDMS for both registries.
 fix_vp_operator_manifests() {
-    step "6b" "Fix VP operator hybrid manifest images"
+    step "6b" "Mirror fixup images and create IDMS"
 
     local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+    local MIRROR_REGISTRY_LOCAL="${MIRROR_REGISTRY_LOCAL:-172.25.36.135:8443}"
 
-    # Images that oc-mirror fails to mirror (hybrid manifests or missing signatures).
-    # Format: source_image|digest_to_mirror (the digest the CSV/catalog references)
-    # For hybrid manifests: digest is the amd64 child extracted from the OCI index.
-    # For signature failures: digest is the original (single-arch, just not copied).
-    local FIXUP_IMAGES=(
-        # VP operator — hybrid OCI/Docker manifests (upstream bug #778)
-        "quay.io/validatedpatterns/patterns-operator|sha256:e6c2bbb5d30ac9a8aff18b4bf7267d29469a68dad74adb201300795923aaef12"
-        "quay.io/validatedpatterns/patterns-operator-console|sha256:4bc1351becc5cb13b2ce4af40fcb2fc1e2e1526698d2942ecbeccdbe85b92521"
-        # Intel/NVIDIA/Hashicorp — oc-mirror fails on cosign signature lookup
+    # --- VP hybrid manifest images → mirror-registry (preserves parent OCI index digest) ---
+    # Upstream bug: https://github.com/validatedpatterns/patterns-operator/issues/778
+    local VP_HYBRID_IMAGES=(
+        "quay.io/validatedpatterns/patterns-operator|sha256:eeb82d8c13fdb0c18603f11ee5cb16b8411806c1df3ebca75911fb2b87906306"
+        "quay.io/validatedpatterns/patterns-operator-console|sha256:ba657cf52ee099709d069db06359b588b7344f2472996ba8973f3d6a62cbb3e8"
+    )
+
+    info "Mirroring VP hybrid images to mirror-registry (${MIRROR_REGISTRY_LOCAL})..."
+    for entry in "${VP_HYBRID_IMAGES[@]}"; do
+        IFS='|' read -r src_image digest <<< "$entry"
+        local repo_name="${src_image##*/}"
+        local dest="${MIRROR_REGISTRY_LOCAL}/${src_image#*/}"
+
+        info "  ${repo_name} → mirror-registry (keep manifest list)"
+        oc image mirror --keep-manifest-list=true \
+            --src-tls-verify=true --dest-tls-verify=false \
+            "${src_image}@${digest}" "${dest}" 2>/dev/null || {
+            warn "  Failed — operator may not install"
+            continue
+        }
+        info "    OK (parent digest preserved)"
+    done
+
+    # --- Certified operator images → Quay (signature lookup failures, single-arch) ---
+    local QUAY_FIXUP_IMAGES=(
         "registry.connect.redhat.com/intel/intel-deviceplugin-operator|sha256:d195bcb3278601478a92f36e5efec94b716647c4db68fef87fcaeacb953c7ebb"
         "registry.connect.redhat.com/intel/intel-tdx-dcap-operator|sha256:34c0bcd0e931e51b5bd93e607851d510e0a7aff6833c4b6a1d1daad8a1ab8471"
         "registry.connect.redhat.com/intel/intel-sgx-plugin|sha256:dd74e1f7436ca29b88843ecdd385021a5977da22531a5403920a7cc0f09f6cf6"
@@ -354,24 +371,45 @@ fix_vp_operator_manifests() {
         "registry.connect.redhat.com/hashicorp/vault|sha256:e43f420cb0ab0a6a1fc7af826d778e103184fb2bc1daaebc51cebc1330e38f12"
     )
 
-    for entry in "${FIXUP_IMAGES[@]}"; do
+    info "Mirroring certified operator fixup images to Quay..."
+    for entry in "${QUAY_FIXUP_IMAGES[@]}"; do
         IFS='|' read -r src_image digest <<< "$entry"
         local repo_name="${src_image##*/}"
         local dest="${MIRROR_REGISTRY}/${src_image#*/}"
 
-        info "  Mirroring: ${repo_name}@${digest:0:20}..."
+        info "  ${repo_name}@${digest:0:20}..."
         oc image mirror --insecure=true \
             "${src_image}@${digest}" "${dest}" 2>/dev/null || {
-            warn "  Failed to mirror ${repo_name} — operator may fail to install"
+            warn "  Failed to mirror ${repo_name}"
             continue
         }
         info "    OK"
     done
 
-    # Create IDMS for certified operator images that oc-mirror fails to mirror
-    # (signature lookup failures, hybrid manifests). Maps source repos to Quay mirror.
+    # --- IDMS: mirror-registry for VP hybrid images ---
+    if ! oc get idms idms-mirror-registry >/dev/null 2>&1; then
+        info "Creating IDMS idms-mirror-registry (VP hybrid → mirror-registry)"
+        cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: idms-mirror-registry
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_LOCAL}/validatedpatterns/patterns-operator
+    source: quay.io/validatedpatterns/patterns-operator
+  - mirrors:
+    - ${MIRROR_REGISTRY_LOCAL}/validatedpatterns/patterns-operator-console
+    source: quay.io/validatedpatterns/patterns-operator-console
+EOF
+    else
+        info "IDMS idms-mirror-registry already exists — skipping"
+    fi
+
+    # --- IDMS: Quay for certified operator images ---
     if ! oc get idms idms-certified-operators >/dev/null 2>&1; then
-        info "Creating IDMS idms-certified-operators"
+        info "Creating IDMS idms-certified-operators (Intel/NVIDIA/Hashicorp → Quay)"
         cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -379,12 +417,6 @@ metadata:
   name: idms-certified-operators
 spec:
   imageDigestMirrors:
-  - mirrors:
-    - ${registry_base}/mirror/validatedpatterns/patterns-operator
-    source: quay.io/validatedpatterns/patterns-operator
-  - mirrors:
-    - ${registry_base}/mirror/validatedpatterns/patterns-operator-console
-    source: quay.io/validatedpatterns/patterns-operator-console
   - mirrors:
     - ${registry_base}/mirror/intel
     source: registry.connect.redhat.com/intel
