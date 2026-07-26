@@ -40,8 +40,6 @@ clusterGroup:
       namespace: external-secrets-operator
       channel: stable-v1
       source: cs-redhat-operator-index-v4-21
-      annotations:
-        argocd.argoproj.io/sync-wave: "10"
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
@@ -71,8 +69,6 @@ clusterGroup:
       name: lvms-operator
       namespace: openshift-storage
       source: cs-redhat-operator-index-v4-21
-      annotations:
-        argocd.argoproj.io/sync-wave: "10"
     cnv:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
