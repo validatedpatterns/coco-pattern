@@ -85,15 +85,17 @@ clusterGroup:
       namespace: openshift-operators
       source: cs-certified-operator-index-v4-21
       channel: alpha
-    gpu-operator:
-      name: gpu-operator-certified
-      namespace: nvidia-gpu-operator
-      source: cs-certified-operator-index-v4-21
-      channel: v26.3
-      installPlanApproval: Manual
-      csv: gpu-operator-certified.v26.3.0
-      annotations:
-        argocd.argoproj.io/sync-wave: "10"
+    # GPU operator disabled — NVIDIA bundle image has oc-mirror signature issue.
+    # Re-enable when NVIDIA bundle is mirrored or upstream fix lands.
+    # gpu-operator:
+    #   name: gpu-operator-certified
+    #   namespace: nvidia-gpu-operator
+    #   source: cs-certified-operator-index-v4-21
+    #   channel: v26.3
+    #   installPlanApproval: Manual
+    #   csv: gpu-operator-certified.v26.3.0
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "25"
   projects:
   - hub
   - vault
@@ -253,24 +255,25 @@ clusterGroup:
             - /spec
             - /status
 
-    nvidia-gpu:
-      name: nvidia-gpu
-      namespace: nvidia-gpu-operator
-      project: hub
-      path: charts/all/nvidia-gpu
-      annotations:
-        argocd.argoproj.io/sync-wave: "10"
+    # GPU apps disabled — depends on gpu-operator subscription (disabled above).
+    # nvidia-gpu:
+    #   name: nvidia-gpu
+    #   namespace: nvidia-gpu-operator
+    #   project: hub
+    #   path: charts/all/nvidia-gpu
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "25"
 
-    gpu-workload:
-      name: gpu-workload
-      namespace: gpu-workload
-      project: workloads
-      path: charts/coco-supported/gpu-workload
-      annotations:
-        argocd.argoproj.io/sync-wave: "30"
-      syncPolicy:
-        automated:
-          prune: true
+    # gpu-workload:
+    #   name: gpu-workload
+    #   namespace: gpu-workload
+    #   project: workloads
+    #   path: charts/coco-supported/gpu-workload
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "30"
+    #   syncPolicy:
+    #     automated:
+    #       prune: true
 
     sandbox-policies:
       name: sandbox-policies
