@@ -135,7 +135,7 @@ clusterGroup:
           argocd.argoproj.io/sync-wave: "5"
       spec:
         backoffLimit: 10
-        activeDeadlineSeconds: 600
+        activeDeadlineSeconds: 1800
         template:
           spec:
             restartPolicy: OnFailure
