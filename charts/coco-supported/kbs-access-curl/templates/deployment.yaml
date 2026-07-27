@@ -23,25 +23,32 @@ spec:
         {{- end }}
         io.katacontainers.config.runtime.create_container_timeout: "900"
     spec:
+      serviceAccountName: kbs-access-curl
       runtimeClassName: {{ .Values.global.coco.runtimeClassName }}
+      securityContext:
+        runAsUser: 0
       containers:
         - name: httpd
           image: {{ .Values.image }}
           ports:
             - containerPort: 8080
+          securityContext:
+            privileged: true
           volumeMounts:
           - name: shared-volume
-            mountPath: /tmp/shared
+            mountPath: /var/www/html
           - name: initdata
             mountPath: /opt/confidential-containers/initdata
             readOnly: true
       initContainers:
       - name: curl
         image: {{ .Values.initImage }}
-        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /tmp/shared/secret.txt']
+        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /var/www/html/secret.txt']
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: shared-volume
-          mountPath: /tmp/shared
+          mountPath: /var/www/html
       volumes:
       - name: shared-volume
         emptyDir: {}
