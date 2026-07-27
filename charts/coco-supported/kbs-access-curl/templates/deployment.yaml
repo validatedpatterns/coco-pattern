@@ -29,8 +29,6 @@ spec:
           image: {{ .Values.image }}
           ports:
             - containerPort: 8080
-          securityContext:
-            privileged: true
           volumeMounts:
           - name: shared-volume
             mountPath: /var/www/html
@@ -40,9 +38,7 @@ spec:
       initContainers:
       - name: curl
         image: {{ .Values.initImage }}
-        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /var/www/html/secret.txt']
-        securityContext:
-          privileged: true
+        command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /tmp/secret.txt && cp /tmp/secret.txt /var/www/html/secret.txt']
         volumeMounts:
         - name: shared-volume
           mountPath: /var/www/html
