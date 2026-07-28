@@ -24,6 +24,9 @@ clusterGroup:
   - openshift-nfd
   - baremetal
   - intel-dcap
+  - intel-dcap-operator-system:
+      operatorGroup: true
+      targetNamespaces: []
   - nvidia-gpu-operator
   - gpu-workload
   - kyverno
@@ -90,7 +93,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "10"
     intel-tdx-dcap:
       name: intel-tdx-dcap-operator
-      namespace: openshift-operators
+      namespace: intel-dcap-operator-system
       source: cs-certified-operator-index-v4-21
       channel: alpha
       annotations:

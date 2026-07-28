@@ -11,7 +11,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: intel-tdx-dcap
-    namespace: openshift-operators
+    namespace: intel-dcap-operator-system
 roleRef:
   kind: ClusterRole
   name: system:openshift:scc:privileged
