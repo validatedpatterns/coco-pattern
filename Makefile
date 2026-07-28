@@ -63,6 +63,23 @@ dcap-offline-provision: ## Full DCAP offline provisioning workflow (collect coll
 	$(MAKE) collect-dcap-collateral
 	$(MAKE) load-secrets
 
+##@ AMD SEV-SNP VCEK Provisioning
+
+.PHONY: snp-collect-vcek-urls
+snp-collect-vcek-urls: ## Collect VCEK URLs from AMD SNP nodes (requires KUBECONFIG)
+	@scripts/collect-snp-vcek-urls.sh
+
+.PHONY: snp-download-vcek
+snp-download-vcek: ## Download VCEK certs from AMD KDS (requires internet)
+	@scripts/download-snp-vcek.sh
+
+.PHONY: snp-gen-overrides
+snp-gen-overrides: ## Generate SNP VCEK values override from cached certs (local only)
+	@scripts/gen-snp-vcek-overrides.sh
+
+.PHONY: snp-offline-provision
+snp-offline-provision: snp-collect-vcek-urls snp-download-vcek snp-gen-overrides ## Full SNP VCEK offline provisioning
+
 ##@ Disconnected Deployment
 MIRROR_REGISTRY ?= quay.example.com:443/mirror
 IMAGESET_CONFIG ?= airgap/imageset-config.yaml
