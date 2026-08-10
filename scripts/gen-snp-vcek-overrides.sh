@@ -62,8 +62,12 @@ for HWID in "${HWIDS[@]}"; do
     vaultPrefixes:
     - hub
     fields:
+    # base64: true is required because vcek.der is a binary DER certificate.
+    # Vault KV-v2 stores JSON (UTF-8 strings only); the VP base64 flag encodes
+    # binary before the Vault write. ESO decodingStrategy: Base64 decodes on read.
     - name: vcek.der
       path: ~/.coco-pattern/snp-vcek/${HWID}/vcek.der
+      base64: true
 
 EOF
 done
