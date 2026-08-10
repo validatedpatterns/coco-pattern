@@ -115,7 +115,7 @@ mirror:
 
     # --- VP Helm OCI charts (additionalImages — oc-mirror v2 handles these) ---
     # Core VP charts (versions are latest matching glob in values-baremetal.yaml)
-    - name: quay.io/validatedpatterns/clustergroup:0.9.56
+    - name: quay.io/validatedpatterns/clustergroup:0.9.58
     - name: quay.io/validatedpatterns/acm:0.1.27
     - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4

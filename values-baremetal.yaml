@@ -125,6 +125,7 @@ clusterGroup:
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
+  - '/values-baremetal-airgap.yaml'
 
   extraObjects:
     wait-for-vault-unsealed:
