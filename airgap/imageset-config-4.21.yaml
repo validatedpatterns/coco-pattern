@@ -4,13 +4,9 @@
 # OCP: 4.21.24
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
-# SUPERSEDED: use airgap/imageset-config-4.21.yaml (OCP 4.21) or
-#             airgap/imageset-config-4.22.yaml (OCP 4.22) instead.
-# Naming convention: imageset-config-<minor>.yaml
-#
 # Usage:
 #   # Mirror to mirror (jump host has both internet and quay access):
-#   oc-mirror -c airgap/imageset-config-4.22.yaml \
+#   oc-mirror -c airgap/imageset-config.yaml \
 #     --workspace file:///home/chbutler/oc-mirror-workspace \
 #     docker://quay.apac-tech-lab.net/ocp-mirror --v2
 #
