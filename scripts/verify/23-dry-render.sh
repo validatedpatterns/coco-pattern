@@ -18,7 +18,9 @@ pass() { echo -e "${GREEN}PASS${NC} $1"; }
 fail() { echo -e "${RED}FAIL${NC} $1: $2"; return 1; }
 skip() { echo -e "${YELLOW}SKIP${NC} $1: $2"; return 0; }
 
-# DEL-1: Overlay deep-merge — subscription repoints
+# DEL-1: Overlay shape — 2-line global catalogSource (D-05 migration)
+# After D-05, the overlay shrinks from 10 per-subscription entries to
+# 2 global keys: global.catalogSource + global.catalogSourceNamespace.
 check_del1_overlay_merge() {
   local OVERLAY="values-baremetal-airgap.yaml"
 
@@ -27,71 +29,64 @@ check_del1_overlay_merge() {
     return 0
   fi
 
-  # Check if helm and yq are available
-  if ! command -v helm >/dev/null 2>&1; then
-    skip "check_del1_overlay_merge" "helm not available"
-    return 0
+  local FAILED=0
+
+  # Assert global: key is present (new shape)
+  if ! grep -q "^global:" "${OVERLAY}"; then
+    fail "check_del1_overlay_merge" "global: key not found in ${OVERLAY} — overlay may still be using old per-subscription shape"
+    FAILED=1
   fi
 
-  if ! command -v yq >/dev/null 2>&1; then
-    skip "check_del1_overlay_merge" "yq not available"
-    return 0
+  # Assert catalogSource: key is present under global
+  if ! grep -q "catalogSource:" "${OVERLAY}"; then
+    fail "check_del1_overlay_merge" "catalogSource: key not found in ${OVERLAY}"
+    FAILED=1
   fi
 
-  # Render template with airgap overlay
-  local TMPDIR=$(mktemp -d)
-  trap "rm -rf ${TMPDIR}" EXIT
-
-  # Create a minimal Chart.yaml for helm template to work
-  cat > "${TMPDIR}/Chart.yaml" <<EOF
-apiVersion: v2
-name: verify-test
-version: 0.0.1
-EOF
-
-  # Template with overlay applied
-  # Check that subscriptions have both original fields AND repointed source
-  local SUBS_WITH_SOURCE=0
-  local SUBS_WITHOUT_SOURCE=0
-
-  # Parse the overlay to see what subscriptions should be repointed
-  if grep -q "subscriptions:" "${OVERLAY}"; then
-    # Count subscriptions that should have source set
-    SUBS_WITH_SOURCE=$(yq eval '.subscriptions | keys | length' "${OVERLAY}" 2>/dev/null || echo "0")
+  # Assert catalogSourceNamespace: key is present under global
+  if ! grep -q "catalogSourceNamespace:" "${OVERLAY}"; then
+    fail "check_del1_overlay_merge" "catalogSourceNamespace: key not found in ${OVERLAY}"
+    FAILED=1
   fi
 
-  if [ "${SUBS_WITH_SOURCE}" -eq 0 ]; then
-    skip "check_del1_overlay_merge" "no subscriptions in overlay yet"
-    return 0
+  # Assert the overlay does NOT contain clusterGroup: (old per-subscription shape guard)
+  if grep -q "^clusterGroup:" "${OVERLAY}"; then
+    fail "check_del1_overlay_merge" "clusterGroup: key found in ${OVERLAY} — overlay appears to still be using old per-subscription shape"
+    FAILED=1
   fi
 
-  pass "check_del1_overlay_merge (overlay present, ${SUBS_WITH_SOURCE} subscriptions to verify)"
+  # Assert line count is 3 or fewer (global: + 2 keys; no trailing blank lines counted)
+  local LINE_COUNT
+  LINE_COUNT=$(grep -c "." "${OVERLAY}" || echo "0")
+  if [ "${LINE_COUNT}" -gt 3 ]; then
+    fail "check_del1_overlay_merge" "overlay has ${LINE_COUNT} non-blank lines (expected 3 for 2-line global shape)"
+    FAILED=1
+  fi
+
+  if [ "${FAILED}" -eq 0 ]; then
+    local CATALOG_NAME
+    CATALOG_NAME=$(grep "catalogSource:" "${OVERLAY}" | head -1 | awk '{print $2}')
+    pass "check_del1_overlay_merge (2-line global overlay present, catalogSource=${CATALOG_NAME})"
+  fi
+  return ${FAILED}
 }
 
-# DEL-1: Overlay regeneration — make target idempotent
+# DEL-1: Generator cleanup — gen-airgap-overlay removed from Makefile (D-04/D-05)
+# After D-05, the per-subscription overlay generator is removed.
+# This check asserts the target is absent, confirming cleanup was applied.
 check_del1_overlay_regen() {
-  if ! command -v make >/dev/null 2>&1; then
-    skip "check_del1_overlay_regen" "make not available"
+  if [ ! -f "Makefile" ]; then
+    skip "check_del1_overlay_regen" "Makefile not present"
     return 0
   fi
 
-  if ! make -n gen-airgap-overlay >/dev/null 2>&1; then
-    skip "check_del1_overlay_regen" "gen-airgap-overlay target not present yet"
-    return 0
-  fi
-
-  # Run generator and check for dirty diff
-  make gen-airgap-overlay >/dev/null 2>&1 || {
-    fail "check_del1_overlay_regen" "gen-airgap-overlay target failed"
-    return 1
-  }
-
-  if ! git diff --exit-code values-baremetal-airgap.yaml >/dev/null 2>&1; then
-    fail "check_del1_overlay_regen" "gen-airgap-overlay produced uncommitted changes"
+  # Assert gen-airgap-overlay target does NOT exist in the Makefile
+  if grep -q "gen-airgap-overlay" Makefile 2>/dev/null; then
+    fail "check_del1_overlay_regen" "gen-airgap-overlay still in Makefile — D-05 cleanup not applied"
     return 1
   fi
 
-  pass "check_del1_overlay_regen"
+  pass "check_del1_overlay_regen (gen-airgap-overlay absent from Makefile — D-05 cleanup confirmed)"
 }
 
 # DEL-2: Bootstrap playbook — utility container ships load_bootstrap_secrets
