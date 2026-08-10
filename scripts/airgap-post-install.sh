@@ -6,7 +6,7 @@
 #
 # Required env:
 #   KUBECONFIG          — path to cluster kubeconfig
-#   MIRROR_REGISTRY     — registry host:port/path (e.g. quay.apac-tech-lab.net:443/mirror)
+#   MIRROR_REGISTRY     — registry host:port (e.g. 172.25.36.135:8443)
 #
 # Optional env:
 #   EXTRA_CA_CERT           — path to CA cert file for the mirror registry
@@ -71,7 +71,7 @@ validate_prereqs() {
     fi
 
     if [[ -z "$MIRROR_REGISTRY" ]]; then
-        error "MIRROR_REGISTRY is not set (e.g. quay.example.com:443/mirror)"
+        error "MIRROR_REGISTRY is not set (e.g. 172.25.36.135:8443)"
         exit 1
     fi
 
@@ -320,118 +320,6 @@ fix_manifest_lists() {
                 warn "    Tag-based fallback also failed"
         fi
     done <<< "$failed_images"
-}
-
-# ─── Step 6b: Mirror fixup images and create IDMS ────────────────
-# Handles two categories of images that oc-mirror fails on:
-# 1. VP operator — hybrid OCI/Docker manifests → mirror-registry (preserves parent digest)
-# 2. Intel/NVIDIA/Hashicorp — cosign signature lookup fails → Quay (single-arch, no issue)
-# Also creates IDMS for both registries.
-fix_vp_operator_manifests() {
-    step "6b" "Mirror fixup images and create IDMS"
-
-    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
-    local MIRROR_REGISTRY_LOCAL="${MIRROR_REGISTRY_LOCAL:-172.25.36.135:8443}"
-
-    # --- VP hybrid manifest images → mirror-registry (preserves parent OCI index digest) ---
-    # Upstream bug: https://github.com/validatedpatterns/patterns-operator/issues/778
-    local VP_HYBRID_IMAGES=(
-        "quay.io/validatedpatterns/patterns-operator|sha256:eeb82d8c13fdb0c18603f11ee5cb16b8411806c1df3ebca75911fb2b87906306"
-        "quay.io/validatedpatterns/patterns-operator-console|sha256:ba657cf52ee099709d069db06359b588b7344f2472996ba8973f3d6a62cbb3e8"
-    )
-
-    info "Mirroring VP hybrid images to mirror-registry (${MIRROR_REGISTRY_LOCAL})..."
-    for entry in "${VP_HYBRID_IMAGES[@]}"; do
-        IFS='|' read -r src_image digest <<< "$entry"
-        local repo_name="${src_image##*/}"
-        local dest="${MIRROR_REGISTRY_LOCAL}/${src_image#*/}"
-
-        info "  ${repo_name} → mirror-registry (keep manifest list)"
-        oc image mirror --keep-manifest-list=true \
-            --src-tls-verify=true --dest-tls-verify=false \
-            "${src_image}@${digest}" "${dest}" 2>/dev/null || {
-            warn "  Failed — operator may not install"
-            continue
-        }
-        info "    OK (parent digest preserved)"
-    done
-
-    # --- Certified operator images → Quay (signature lookup failures, single-arch) ---
-    local QUAY_FIXUP_IMAGES=(
-        "registry.connect.redhat.com/intel/intel-deviceplugin-operator|sha256:d195bcb3278601478a92f36e5efec94b716647c4db68fef87fcaeacb953c7ebb"
-        "registry.connect.redhat.com/intel/intel-tdx-dcap-operator|sha256:34c0bcd0e931e51b5bd93e607851d510e0a7aff6833c4b6a1d1daad8a1ab8471"
-        "registry.connect.redhat.com/intel/intel-sgx-plugin|sha256:dd74e1f7436ca29b88843ecdd385021a5977da22531a5403920a7cc0f09f6cf6"
-        "registry.connect.redhat.com/intel/intel-sgx-plugin|sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b"
-        "registry.connect.redhat.com/intel/intel-dsa-plugin|sha256:18b1cd603a57255ac387ea056ef5d96f325d59eb66ce78c3cc0fa4f5c0534b6c"
-        "registry.connect.redhat.com/intel/intel-gpu-plugin|sha256:2569cfa01f54d7f73acc889c380bc2f7f5a3098866b9b43b48ae2fa9fa34355c"
-        "registry.connect.redhat.com/intel/intel-idxd-config-initcontainer|sha256:d5dbc172c138e987e8e0f64a47776c2bce99b58e2c0f28cb91acdfe9afae659b"
-        "registry.connect.redhat.com/intel/intel-qat-initcontainer|sha256:36701916dfc68db303ba2e5897a59243dc9e9cce8b1eee859d0339ff24322ecd"
-        "registry.connect.redhat.com/intel/intel-qat-plugin|sha256:2d619eee302e10c6813f056f7320c6c5f0c1fc989b73e617892bc6311b5576af"
-        "registry.connect.redhat.com/intel/intel-tdx-qgs|sha256:5dae30c8008c5a3a39f0eeb0db081292126491faf177c611a4f18f23f5f9f59c"
-        "registry.connect.redhat.com/hashicorp/vault|sha256:e43f420cb0ab0a6a1fc7af826d778e103184fb2bc1daaebc51cebc1330e38f12"
-    )
-
-    info "Mirroring certified operator fixup images to Quay..."
-    for entry in "${QUAY_FIXUP_IMAGES[@]}"; do
-        IFS='|' read -r src_image digest <<< "$entry"
-        local repo_name="${src_image##*/}"
-        local dest="${MIRROR_REGISTRY}/${src_image#*/}"
-
-        info "  ${repo_name}@${digest:0:20}..."
-        oc image mirror --insecure=true \
-            "${src_image}@${digest}" "${dest}" 2>/dev/null || {
-            warn "  Failed to mirror ${repo_name}"
-            continue
-        }
-        info "    OK"
-    done
-
-    # --- IDMS: mirror-registry for VP hybrid images ---
-    if ! oc get idms idms-mirror-registry >/dev/null 2>&1; then
-        info "Creating IDMS idms-mirror-registry (VP hybrid → mirror-registry)"
-        cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: idms-mirror-registry
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${MIRROR_REGISTRY_LOCAL}/validatedpatterns/patterns-operator
-    source: quay.io/validatedpatterns/patterns-operator
-  - mirrors:
-    - ${MIRROR_REGISTRY_LOCAL}/validatedpatterns/patterns-operator-console
-    source: quay.io/validatedpatterns/patterns-operator-console
-EOF
-    else
-        info "IDMS idms-mirror-registry already exists — skipping"
-    fi
-
-    # --- IDMS: Quay for certified operator images ---
-    if ! oc get idms idms-certified-operators >/dev/null 2>&1; then
-        info "Creating IDMS idms-certified-operators (Intel/NVIDIA/Hashicorp → Quay)"
-        cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: idms-certified-operators
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${registry_base}/mirror/intel
-    source: registry.connect.redhat.com/intel
-  - mirrors:
-    - ${registry_base}/mirror/nvidia
-    source: registry.connect.redhat.com/nvidia
-  - mirrors:
-    - ${registry_base}/mirror/hashicorp
-    source: registry.connect.redhat.com/hashicorp
-EOF
-    else
-        info "IDMS idms-certified-operators already exists — skipping"
-    fi
-
-    info "VP operator hybrid manifest workaround applied"
 }
 
 # ─── Step 7: Add extra CA certificate to ArgoCD ──────────────────
@@ -809,7 +697,6 @@ case "$MODE" in
     fix-manifests)
         validate_prereqs
         fix_manifest_lists
-        fix_vp_operator_manifests
         exit 0
         ;;
 esac
@@ -826,7 +713,6 @@ apply_ocmirror_resources
 create_itms
 mirror_oci_charts
 fix_manifest_lists
-fix_vp_operator_manifests
 add_argocd_ca
 enable_routing_via_host
 setup_git_server

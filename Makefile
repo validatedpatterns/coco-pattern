@@ -29,6 +29,23 @@ cache-registry-ca: ## Copy registry CA certificate chain to ~/.coco-pattern/
 		exit 1; \
 	fi
 
+.PHONY: load-bootstrap
+load-bootstrap: ## Load ArgoCD bootstrap secrets (DEL-2) — run after cluster exists but before Vault is up
+	@echo "Loading ArgoCD OCI Helm registry bootstrap secret..."
+	@if ! ./pattern.sh ansible-playbook rhvp.cluster_utils.load_bootstrap_secrets --list-tasks >/dev/null 2>&1; then \
+		echo "ERROR: load_bootstrap_secrets playbook not found in utility container."; \
+		echo "  Bump utility-container tag in imageset-config and re-mirror."; \
+		exit 1; \
+	fi
+	./pattern.sh ansible-playbook rhvp.cluster_utils.load_bootstrap_secrets
+
+.PHONY: gen-mirror-helm-secret
+gen-mirror-helm-secret: ## Generate mirror-registry Helm OCI password file from mirror-registry init output
+	@mkdir -p ~/.coco-pattern
+	@echo "Enter the mirror-registry password (from ~/mirror-registry-init.txt or ~/mirror-registry-output/init.json):"
+	@read -r MRPASS; echo "$$MRPASS" > ~/.coco-pattern/mirror-registry-password; chmod 600 ~/.coco-pattern/mirror-registry-password
+	@echo "  Saved to ~/.coco-pattern/mirror-registry-password"
+
 .PHONY: pck-register
 pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_API_KEY)
 	@if [ -z "$(INTEL_PCS_API_KEY)" ]; then \
