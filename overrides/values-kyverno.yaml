@@ -28,3 +28,24 @@ webhooksCleanup:
   securityContext: null
 test:
   securityContext: null
+admissionController:
+  image:
+    tag: v1.13.4
+  initImage:
+    tag: v1.13.4
+backgroundController:
+  image:
+    tag: v1.13.4
+cleanupController:
+  image:
+    tag: v1.13.4
+reportsController:
+  image:
+    tag: v1.13.4
+crds:
+  migration:
+    image:
+      tag: v1.13.4
+webhooksCleanup:
+  image:
+    tag: v1.13.4
