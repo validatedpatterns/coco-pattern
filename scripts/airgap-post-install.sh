@@ -101,37 +101,44 @@ disable_default_catalogs() {
     oc get catalogsource -n openshift-marketplace --no-headers 2>/dev/null || true
 }
 
-# ─── Step 3: Create missing CatalogSources ───────────────────────
+# ─── Step 3: Apply CatalogSources from oc-mirror cluster-resources ──
+# oc-mirror v2 generates cs-*.yaml with correct registry path and tag.
+# Applying from oc-mirror output avoids hardcoding version numbers here.
+# Stale CatalogSources (e.g. from prior OCP version) are deleted to prevent
+# OLM ResolutionFailed from ImagePullBackOff on outdated catalog pods.
 create_catalog_sources() {
-    step 3 "Create mirrored CatalogSources"
+    step 3 "Apply CatalogSources from oc-mirror cluster-resources"
 
-    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
-    # If MIRROR_REGISTRY is host:port/mirror, registry_base is host:port
+    local workspace="${OC_MIRROR_WORKSPACE:-${HOME}/oc-mirror-workspace}"
+    local cs_dir="${workspace}/working-dir/cluster-resources"
 
-    for catalog in \
-        "cs-redhat-operator-index-v4-21|${registry_base}/mirror/redhat/redhat-operator-index:v4.21" \
-        "cs-certified-operator-index-v4-21|${registry_base}/mirror/redhat/certified-operator-index:v4.21" \
-        "cs-community-operator-index-v4-21|${registry_base}/mirror/redhat/community-operator-index:v4.21"; do
-        local name="${catalog%%|*}"
-        local image="${catalog#*|}"
+    if [[ ! -d "$cs_dir" ]]; then
+        warn "oc-mirror cluster-resources not found at $cs_dir — skipping CatalogSource creation"
+        return
+    fi
 
-        if oc get catalogsource "$name" -n openshift-marketplace >/dev/null 2>&1; then
-            info "$name already exists — skipping"
-            continue
-        fi
-
-        info "Creating CatalogSource $name"
-        cat <<EOF | oc apply -f -
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: ${name}
-  namespace: openshift-marketplace
-spec:
-  image: ${image}
-  sourceType: grpc
-EOF
+    local applied=0
+    for cs_file in "$cs_dir"/cs-*.yaml; do
+        [[ -f "$cs_file" ]] || continue
+        info "  Applying $(basename "$cs_file")"
+        oc apply -f "$cs_file"
+        (( applied++ ))
     done
+    [[ $applied -eq 0 ]] && warn "No cs-*.yaml files found in $cs_dir"
+
+    # Delete CatalogSources not present in current oc-mirror output
+    local current_names
+    current_names=$(ls "$cs_dir"/cs-*.yaml 2>/dev/null | xargs -I{} basename {} .yaml | paste -sd '|')
+    if [[ -n "$current_names" ]]; then
+        while IFS= read -r stale_ref; do
+            [[ -z "$stale_ref" ]] && continue
+            warn "  Deleting stale: $stale_ref"
+            oc delete "$stale_ref" -n openshift-marketplace 2>/dev/null || true
+        done < <(oc get catalogsource -n openshift-marketplace --no-headers -o name 2>/dev/null |                  grep -vE "$current_names" | grep -v 'marketplace-operator')
+    fi
+
+    info "CatalogSources applied: $applied"
+    oc get catalogsource -n openshift-marketplace --no-headers 2>/dev/null || true
 }
 
 # ─── Step 3b: Apply oc-mirror IDMS/ITMS ──────────────────────────
