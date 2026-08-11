@@ -99,6 +99,8 @@ mirror:
     # Workload images
     - name: registry.redhat.io/ubi9/httpd-24:latest
     - name: registry.redhat.io/ubi9/ubi:latest
+    # NFD operand — worker/master/gc DaemonSets use this tag, NOT the operator digest.
+    - name: registry.redhat.io/openshift4/ose-node-feature-discovery-rhel9:v4.22
     # Vault — Red Hat certified UBI image from registry.connect.redhat.com
     - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi
     # Kyverno (Helm chart, not OLM — images from ghcr.io)
