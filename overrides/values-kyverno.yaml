@@ -1,44 +1,29 @@
 # Shared Kyverno chart overrides loaded via extraValueFiles.
 # OpenShift security context compatibility: null all securityContext fields.
 # Disable wgpolicyk8s CRDs and reports controller (not needed for coco-pattern).
-# Profile-specific overrides (backgroundController.resources) stay inline in values-<profile>.yaml.
 global:
   image:
     registry: 172.25.36.135:8443
 admissionController:
   container:
     securityContext: null
-    image:
-      tag: v1.13.4
   initContainer:
     securityContext: null
-    image:
-      tag: v1.13.4
 backgroundController:
   securityContext: null
-  image:
-    tag: v1.13.4
 cleanupController:
   securityContext: null
-  image:
-    tag: v1.13.4
 reportsController:
   securityContext: null
   enabled: false
-  image:
-    tag: v1.13.4
 crds:
   migration:
     securityContext: null
-    image:
-      tag: v1.13.4
   groups:
     wgpolicyk8s:
       policyreports: false
       clusterpolicyreports: false
 webhooksCleanup:
   securityContext: null
-  image:
-    tag: v1.13.4
 test:
   securityContext: null
