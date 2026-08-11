@@ -1,0 +1,15 @@
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: itms-manual-mirrors
+spec:
+  imageTagMirrors:
+    - source: quay.io/community-operator-pipeline-prod
+      mirrors:
+        - 172.25.36.135:8443/community-operator-pipeline-prod
+    - source: registry.connect.redhat.com/intel
+      mirrors:
+        - 172.25.36.135:8443/intel
+    - source: registry.connect.redhat.com/hashicorp
+      mirrors:
+        - 172.25.36.135:8443/hashicorp

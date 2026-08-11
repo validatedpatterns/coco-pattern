@@ -98,14 +98,15 @@ mirror:
   additionalImages:
     # Workload images
     - name: registry.redhat.io/ubi9/httpd-24:latest
+    - name: registry.redhat.io/ubi9/ubi:latest
     # Vault — Red Hat certified UBI image from registry.connect.redhat.com
     - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi
     # Kyverno (Helm chart, not OLM — images from ghcr.io)
-    - name: ghcr.io/kyverno/kyverno:v1.13.4
-    - name: ghcr.io/kyverno/kyvernopre:v1.13.4
-    - name: ghcr.io/kyverno/background-controller:v1.13.4
-    - name: ghcr.io/kyverno/cleanup-controller:v1.13.4
-    - name: ghcr.io/kyverno/reports-controller:v1.13.4
+    - name: ghcr.io/kyverno/kyverno:v1.17.2
+    - name: ghcr.io/kyverno/kyvernopre:v1.17.2
+    - name: ghcr.io/kyverno/background-controller:v1.17.2
+    - name: ghcr.io/kyverno/cleanup-controller:v1.17.2
+    - name: ghcr.io/kyverno/reports-controller:v1.17.2
 
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
