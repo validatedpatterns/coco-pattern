@@ -45,11 +45,11 @@ main:
   patternsOperator:
     # Mirrored CatalogSource name. patterns-operator is in community-operator-index,
     # NOT redhat-operator-index. Must match CatalogSource from oc-mirror workspace.
-    source: cs-community-operator-index-v4-21
+    source: cs-community-operator-index-v4-22
     channel: fast
   gitops:
     # Mirrored CatalogSource name for the GitOps operator.
-    operatorSource: cs-redhat-operator-index-v4-21
+    operatorSource: cs-redhat-operator-index-v4-22
     # Channel must match what's available in the mirrored catalog.
     # The mirrored catalog may only have 'latest', not version-specific channels.
     channel: latest

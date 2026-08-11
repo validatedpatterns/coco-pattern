@@ -35,21 +35,21 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     eso:
       name: openshift-external-secrets-operator
       namespace: external-secrets-operator
       channel: stable-v1
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       channel: stable
       installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.13.0
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     trustee:
@@ -58,43 +58,43 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.2.0
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     lvm-operator:
       name: lvms-operator
       namespace: openshift-storage
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
     cnv:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
       channel: stable
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
     nfd:
       name: nfd
       namespace: openshift-nfd
       channel: stable
-      source: cs-redhat-operator-index-v4-21
+      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     intel-device-plugins:
       name: intel-device-plugins-operator
       namespace: openshift-operators
-      source: cs-certified-operator-index-v4-21
+      source: cs-certified-operator-index-v4-22
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     intel-tdx-dcap:
       name: intel-tdx-dcap-operator
       namespace: intel-dcap-operator-system
-      source: cs-certified-operator-index-v4-21
+      source: cs-certified-operator-index-v4-22
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -103,7 +103,7 @@ clusterGroup:
     # gpu-operator:
     #   name: gpu-operator-certified
     #   namespace: nvidia-gpu-operator
-    #   source: cs-certified-operator-index-v4-21
+    #   source: cs-certified-operator-index-v4-22
     #   channel: v26.3
     #   installPlanApproval: Manual
     #   csv: gpu-operator-certified.v26.3.0
@@ -171,7 +171,7 @@ clusterGroup:
       chartVersion: 0.1.*
       overrides:
         - name: acm.mce_operator.source
-          value: "cs-redhat-operator-index-v4-21"
+          value: "cs-redhat-operator-index-v4-22"
 
     vault:
       name: vault
