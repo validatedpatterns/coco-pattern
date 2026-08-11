@@ -156,11 +156,23 @@ apply_ocmirror_resources() {
         return
     fi
 
-    # Apply IDMS (ImageDigestMirrorSet) — digest-based pull redirects
+    # Apply IDMS (ImageDigestMirrorSet) — digest-based pull redirects.
+    # Patch mirrorSourcePolicy: NeverContactSource on each entry so the cluster
+    # never falls back to internet registries if a mirror pull fails.
+    # Without this, a 404 from mirror-registry causes a fallback to quay.io
+    # which hangs on the fake-gateway TCP timeout in airgap environments.
     for f in "$resources"/idms-*.yaml; do
         [[ -f "$f" ]] || continue
-        info "  Applying $(basename "$f")"
-        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+        info "  Applying $(basename "$f") with NeverContactSource policy"
+        python3 -c "
+import sys, yaml
+docs = list(yaml.safe_load_all(open('$f')))
+for doc in docs:
+    if doc and doc.get('kind') == 'ImageDigestMirrorSet':
+        for entry in doc.get('spec', {}).get('imageDigestMirrors', []):
+            entry['mirrorSourcePolicy'] = 'NeverContactSource'
+print(yaml.dump_all(docs, default_flow_style=False))
+" | oc apply -f - || warn "  Failed to apply $(basename "$f")"
     done
 
     # Apply ITMS (ImageTagMirrorSet) — tag-based pull redirects
