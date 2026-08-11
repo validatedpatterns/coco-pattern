@@ -141,9 +141,12 @@ create_catalog_sources() {
     oc get catalogsource -n openshift-marketplace --no-headers 2>/dev/null || true
 }
 
-# ─── Step 3b: Apply oc-mirror IDMS/ITMS ──────────────────────────
+# ─── Step 3b: Apply ALL oc-mirror cluster-resources ─────────────
+# oc-mirror generates: IDMS, ITMS, CatalogSource, ClusterCatalog (OLM v1),
+# signature ConfigMap, and UpdateService (if applicable).
+# All must be applied per post-mirror procedure.
 apply_ocmirror_resources() {
-    step "3b" "Apply oc-mirror IDMS/ITMS"
+    step "3b" "Apply all oc-mirror cluster-resources (IDMS, ITMS, CatalogSource, signatures)"
 
     local workspace="${HOME}/oc-mirror-workspace"
     local resources="${workspace}/working-dir/cluster-resources"
@@ -153,58 +156,57 @@ apply_ocmirror_resources() {
         return
     fi
 
-    for f in "$resources"/idms-*.yaml "$resources"/itms-*.yaml; do
+    # Apply IDMS (ImageDigestMirrorSet) — digest-based pull redirects
+    for f in "$resources"/idms-*.yaml; do
         [[ -f "$f" ]] || continue
         info "  Applying $(basename "$f")"
-        oc apply -f "$f" 2>/dev/null || warn "  Failed to apply $(basename "$f")"
+        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
     done
 
-    info "oc-mirror IDMS/ITMS applied"
-}
+    # Apply ITMS (ImageTagMirrorSet) — tag-based pull redirects
+    for f in "$resources"/itms-*.yaml; do
+        [[ -f "$f" ]] || continue
+        info "  Applying $(basename "$f")"
+        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+    done
 
-# ─── Step 4: Create ITMS for tag-based image pulls ───────────────
-create_itms() {
-    step 4 "Create ImageTagMirrorSet for tag-based pulls"
-
-    if oc get itms itms-tag-mirrors >/dev/null 2>&1; then
-        info "ITMS itms-tag-mirrors already exists — skipping"
-        return
+    # Apply manually maintained ITMS (community-operator-pipeline-prod, intel, hashicorp)
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local manual_itms="${script_dir}/../airgap/itms-manual-mirrors.yaml"
+    if [[ -f "$manual_itms" ]]; then
+        info "  Applying manual ITMS: $(basename "$manual_itms")"
+        oc apply -f "$manual_itms" || warn "  Failed to apply manual ITMS"
     fi
 
-    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
+    # Apply signature ConfigMap — required for image signature verification
+    for f in "$resources"/signature-configmap.yaml "$resources"/signature-configmap.json; do
+        [[ -f "$f" ]] || continue
+        info "  Applying $(basename "$f")"
+        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+    done
 
-    info "Creating ITMS for tag-based image redirects"
-    cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: itms-tag-mirrors
-spec:
-  imageTagMirrors:
-  - mirrors:
-    - ${registry_base}/mirror/ubi9
-    source: registry.redhat.io/ubi9
-  - mirrors:
-    - ${registry_base}/mirror/ubi8
-    source: registry.redhat.io/ubi8
-  - mirrors:
-    - ${registry_base}/mirror/openshift-gitops-1
-    source: registry.redhat.io/openshift-gitops-1
-  - mirrors:
-    - ${registry_base}/mirror/rhel9
-    source: registry.redhat.io/rhel9
-  - mirrors:
-    - ${registry_base}/mirror/validatedpatterns
-    source: quay.io/validatedpatterns
-  - mirrors:
-    - ${registry_base}/mirror/hashicorp
-    source: registry.connect.redhat.com/hashicorp
-  - mirrors:
-    - ${registry_base}/mirror/community-operator-pipeline-prod
-    source: quay.io/community-operator-pipeline-prod
-EOF
-    info "ITMS created — MCO will roll out node config (may take a few minutes)"
+    # Apply ClusterCatalog (cc-*.yaml) — OLM v1 catalog API (OCP 4.22+)
+    for f in "$resources"/cc-*.yaml; do
+        [[ -f "$f" ]] || continue
+        info "  Applying $(basename "$f")"
+        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+    done
+
+    # Apply UpdateService if generated (for OCP update graph in disconnected environments)
+    for f in "$resources"/updateservice-*.yaml; do
+        [[ -f "$f" ]] || continue
+        info "  Applying $(basename "$f")"
+        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+    done
+
+    info "oc-mirror cluster-resources applied"
 }
+
+# Step 4 removed — ITMS is now applied from oc-mirror cluster-resources
+# in Step 3b (itms-*.yaml) and from airgap/itms-manual-mirrors.yaml.
+# The old inline ITMS used registry_base with /mirror/ prefix which was
+# incorrect for single-registry (mirror-registry) architecture.
 
 # ─── Step 5: Mirror OCI Helm charts and utility images ───────────
 mirror_oci_charts() {
@@ -717,7 +719,6 @@ validate_prereqs
 disable_default_catalogs
 create_catalog_sources
 apply_ocmirror_resources
-create_itms
 mirror_oci_charts
 fix_manifest_lists
 add_argocd_ca
