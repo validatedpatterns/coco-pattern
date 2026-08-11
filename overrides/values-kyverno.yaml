@@ -8,44 +8,37 @@ global:
 admissionController:
   container:
     securityContext: null
+    image:
+      tag: v1.13.4
   initContainer:
     securityContext: null
+    image:
+      tag: v1.13.4
 backgroundController:
   securityContext: null
+  image:
+    tag: v1.13.4
 cleanupController:
   securityContext: null
+  image:
+    tag: v1.13.4
 reportsController:
   securityContext: null
   enabled: false
+  image:
+    tag: v1.13.4
 crds:
   migration:
     securityContext: null
+    image:
+      tag: v1.13.4
   groups:
     wgpolicyk8s:
       policyreports: false
       clusterpolicyreports: false
 webhooksCleanup:
   securityContext: null
+  image:
+    tag: v1.13.4
 test:
   securityContext: null
-admissionController:
-  image:
-    tag: v1.13.4
-  initImage:
-    tag: v1.13.4
-backgroundController:
-  image:
-    tag: v1.13.4
-cleanupController:
-  image:
-    tag: v1.13.4
-reportsController:
-  image:
-    tag: v1.13.4
-crds:
-  migration:
-    image:
-      tag: v1.13.4
-webhooksCleanup:
-  image:
-    tag: v1.13.4
