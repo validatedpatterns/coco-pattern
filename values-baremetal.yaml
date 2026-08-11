@@ -302,7 +302,7 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
+          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
 
     kbs-access-curl:
       name: kbs-access-curl
@@ -316,9 +316,9 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
+          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
         - name: initImage
-          value: "quay.apac-tech-lab.net:443/mirror/ubi9/ubi:latest"
+          value: "172.25.36.135:8443/ubi9/ubi:latest"
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -332,7 +332,7 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "quay.apac-tech-lab.net:443/mirror/ubi9/httpd-24:airgap"
+          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
 
     kyverno:
       name: kyverno
