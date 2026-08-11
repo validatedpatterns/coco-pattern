@@ -35,21 +35,18 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     eso:
       name: openshift-external-secrets-operator
       namespace: external-secrets-operator
       channel: stable-v1
-      source: cs-redhat-operator-index-v4-22
     sandbox:
       name: sandboxed-containers-operator
       namespace: openshift-sandboxed-containers-operator
       channel: stable
       installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.13.0
-      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     trustee:
@@ -58,30 +55,25 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.2.0
-      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
-      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     lvm-operator:
       name: lvms-operator
       namespace: openshift-storage
-      source: cs-redhat-operator-index-v4-22
     cnv:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
       channel: stable
-      source: cs-redhat-operator-index-v4-22
     nfd:
       name: nfd
       namespace: openshift-nfd
       channel: stable
-      source: cs-redhat-operator-index-v4-22
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     intel-device-plugins:

@@ -5,7 +5,7 @@ global:
   singleArgoCD: true
   multiSourceRepoUrl: quay.apac-tech-lab.net:443/mirror/validatedpatterns
   storageProvider: hpp  # Options: hpp, lvm, external
-  clusterVersion: "4.21"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
+  clusterVersion: "4.22"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
   secretStore:
     # Warning: This must be present even if it is set to none.
     backend: vault # none, vault, kubernetes
@@ -55,7 +55,7 @@ main:
     channel: latest
   multiSourceConfig:
     enabled: true
-    clusterGroupChartVersion: 0.9.*
+    clusterGroupChartVersion: 0.9.58
     # Disconnected: OCI Helm charts on Quay mirror (repos must be public).
     # Connected: quay.io/validatedpatterns
     helmRepoUrl: quay.apac-tech-lab.net:443/mirror/validatedpatterns
