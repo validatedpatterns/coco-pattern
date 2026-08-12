@@ -122,7 +122,7 @@ create_catalog_sources() {
         [[ -f "$cs_file" ]] || continue
         info "  Applying $(basename "$cs_file")"
         oc apply -f "$cs_file"
-        (( applied++ ))
+        applied=$(( applied + 1 ))   # avoid (( applied++ )) which exits when applied=0 under set -e
     done
     [[ $applied -eq 0 ]] && warn "No cs-*.yaml files found in $cs_dir"
 
