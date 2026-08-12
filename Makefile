@@ -53,25 +53,6 @@ data = yaml.safe_load(f.read_text()) if f else {}; \
 " 2>/dev/null | \
 	  sort -u | xargs -I{} sh -c 'oc create namespace {} --dry-run=client -o yaml | oc apply -f - 2>/dev/null; true'
 	./pattern.sh ansible-playbook rhvp.cluster_utils.load_bootstrap_secrets
-	@echo "Patching labels onto bootstrap secrets (load_bootstrap_secrets does not apply labels)..."
-	@python3 -c "\
-import yaml, os, pathlib, subprocess; \
-pattern = yaml.safe_load(open('values-global.yaml'))['global']['pattern']; \
-search = [pathlib.Path(p) for p in [ \
-  os.environ.get('VALUES_SECRET', ''), \
-  os.path.expanduser(f'~/values-secret-{pattern}.yaml'), \
-  os.path.expanduser('~/values-secret.yaml'), \
-  'values-secret.yaml', \
-] if p]; \
-f = next((p for p in search if p.is_file()), None); \
-data = yaml.safe_load(f.read_text()) if f else {}; \
-[subprocess.run(['oc','label','secret',s['name'],'-n',ns,'--overwrite'] + \
-  [f'{k}={v}' for k,v in s.get('labels',{}).items()], \
-  capture_output=True) \
-  for s in data.get('bootstrap_secrets',[]) \
-  for ns in s.get('targetNamespaces',[]) \
-  if s.get('labels')] \
-" 2>/dev/null && echo "  Labels applied." || echo "  Label patch skipped (no labels defined or oc not available)."
 
 .PHONY: gen-mirror-helm-secret
 gen-mirror-helm-secret: ## Generate mirror-registry Helm OCI password file from mirror-registry init output
