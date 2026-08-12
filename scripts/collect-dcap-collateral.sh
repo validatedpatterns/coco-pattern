@@ -116,32 +116,52 @@ jq '
 .collaterals |= (
     del(.qeidentity | select(. == ""))
     | del(.tdqeidentity | select(. == ""))
+    | del(.qveidentity | select(. == ""))
     | del(.qeidentity_early | select(. == ""))
     | del(.tdqeidentity_early | select(. == ""))
+    | del(.qveidentity_early | select(. == ""))
     | if .qeidentity then .qeidentity |= fromjson else . end
     | if .tdqeidentity then .tdqeidentity |= fromjson else . end
+    | if .qveidentity then .qveidentity |= fromjson else . end
     | if .qeidentity_early then .qeidentity_early |= fromjson else . end
     | if .tdqeidentity_early then .tdqeidentity_early |= fromjson else . end
+    | if .qveidentity_early then .qveidentity_early |= fromjson else . end
 )
 ' "$RAW_FILE" > "$OUTPUT_FILE"
 
-# Step 3: Verify QeIdentity is a struct (not empty string)
+# Step 3: Verify identity fields are structs (not strings).
+# -t early produces *_early variants; standard variants will be absent/deleted.
 python3 - <<PYEOF
 import json, sys
 c = json.load(open("${OUTPUT_FILE}"))
 col = c.get("collaterals", {})
-qi = col.get("qeidentity", "MISSING")
-tdqi = col.get("tdqeidentity", "MISSING")
 ok = True
-if not isinstance(qi, dict):
-    print(f"WARN: qeidentity is {type(qi).__name__} (expected dict) — attestation may fail")
+# Check all identity variants — at least one qe* and one tdqe* must be a dict
+checks = [
+    ("qeidentity",         col.get("qeidentity")),
+    ("tdqeidentity",       col.get("tdqeidentity")),
+    ("qeidentity_early",   col.get("qeidentity_early")),
+    ("tdqeidentity_early", col.get("tdqeidentity_early")),
+    ("qveidentity_early",  col.get("qveidentity_early")),
+]
+for name, val in checks:
+    if val is None:
+        print("  " + name + ": absent (deleted or not fetched)")
+    elif isinstance(val, dict):
+        print("  PASS " + name + ": dict with " + str(len(val)) + " keys")
+    else:
+        print("  WARN " + name + ": " + type(val).__name__ + " — unexpected type")
+        ok = False
+
+# Must have at least one qe*identity as a dict
+has_qei = any(isinstance(col.get(k), dict) for k in ("qeidentity", "qeidentity_early"))
+has_tdqei = any(isinstance(col.get(k), dict) for k in ("tdqeidentity", "tdqeidentity_early"))
+if not has_qei:
+    print("FAIL: no qeidentity or qeidentity_early dict — KBS will reject attestation")
     ok = False
-else:
-    print(f"PASS: qeidentity is a JSON struct ({len(qi)} keys)")
-if not isinstance(tdqi, dict):
-    print(f"WARN: tdqeidentity is {type(tdqi).__name__} (expected dict)")
-else:
-    print(f"PASS: tdqeidentity is a JSON struct ({len(tdqi)} keys)")
+if not has_tdqei:
+    print("FAIL: no tdqeidentity or tdqeidentity_early dict — TDX attestation will fail")
+    ok = False
 sys.exit(0 if ok else 1)
 PYEOF
 
