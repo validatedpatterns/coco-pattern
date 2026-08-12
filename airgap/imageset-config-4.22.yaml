@@ -109,6 +109,7 @@ mirror:
     - name: ghcr.io/kyverno/background-controller:v1.17.2
     - name: ghcr.io/kyverno/cleanup-controller:v1.17.2
     - name: ghcr.io/kyverno/reports-controller:v1.17.2
+    - name: ghcr.io/kyverno/kyverno-cli:v1.17.2
 
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
