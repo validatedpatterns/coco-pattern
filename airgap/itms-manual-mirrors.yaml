@@ -4,12 +4,13 @@ metadata:
   name: itms-manual-mirrors
 spec:
   imageTagMirrors:
-    - source: quay.io/community-operator-pipeline-prod
-      mirrors:
-        - 172.25.36.135:8443/community-operator-pipeline-prod
+    # registry.connect.redhat.com is not covered by oc-mirror generated ITMS.
+    # Needed for tag-based pulls of certified operator operand images.
     - source: registry.connect.redhat.com/intel
       mirrors:
         - 172.25.36.135:8443/intel
     - source: registry.connect.redhat.com/hashicorp
       mirrors:
         - 172.25.36.135:8443/hashicorp
+    # NOTE: quay.io/community-operator-pipeline-prod removed — oc-mirror 4.22
+    # generates ITMS for it in itms-oc-mirror.yaml automatically.
