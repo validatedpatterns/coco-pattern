@@ -175,11 +175,23 @@ print(yaml.dump_all(docs, default_flow_style=False))
 " | oc apply -f - || warn "  Failed to apply $(basename "$f")"
     done
 
-    # Apply ITMS (ImageTagMirrorSet) — tag-based pull redirects
+    # Apply ITMS (ImageTagMirrorSet) — tag-based pull redirects.
+    # Patch mirrorSourcePolicy: NeverContactSource to match IDMS policy.
+    # Without this, MCO rejects re-renders when the same source appears in both
+    # an IDMS (NeverContactSource) and an ITMS ((none)), blocking ALL registry
+    # config updates until the conflict is resolved.
     for f in "$resources"/itms-*.yaml; do
         [[ -f "$f" ]] || continue
-        info "  Applying $(basename "$f")"
-        oc apply -f "$f" || warn "  Failed to apply $(basename "$f")"
+        info "  Applying $(basename "$f") with NeverContactSource policy"
+        python3 -c "
+import sys, yaml
+docs = list(yaml.safe_load_all(open('$f')))
+for doc in docs:
+    if doc and doc.get('kind') == 'ImageTagMirrorSet':
+        for entry in doc.get('spec', {}).get('imageTagMirrors', []):
+            entry['mirrorSourcePolicy'] = 'NeverContactSource'
+print(yaml.dump_all(docs, default_flow_style=False))
+" | oc apply -f - || warn "  Failed to apply $(basename "$f")"
     done
 
     # Apply manually maintained ITMS (community-operator-pipeline-prod, intel, hashicorp)
@@ -187,8 +199,16 @@ print(yaml.dump_all(docs, default_flow_style=False))
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local manual_itms="${script_dir}/../airgap/itms-manual-mirrors.yaml"
     if [[ -f "$manual_itms" ]]; then
-        info "  Applying manual ITMS: $(basename "$manual_itms")"
-        oc apply -f "$manual_itms" || warn "  Failed to apply manual ITMS"
+        info "  Applying manual ITMS: $(basename "$manual_itms") with NeverContactSource policy"
+        python3 -c "
+import sys, yaml
+docs = list(yaml.safe_load_all(open('$manual_itms')))
+for doc in docs:
+    if doc and doc.get('kind') == 'ImageTagMirrorSet':
+        for entry in doc.get('spec', {}).get('imageTagMirrors', []):
+            entry['mirrorSourcePolicy'] = 'NeverContactSource'
+print(yaml.dump_all(docs, default_flow_style=False))
+" | oc apply -f - || warn "  Failed to apply manual ITMS"
     fi
 
     # Apply signature ConfigMap — required for image signature verification
@@ -213,6 +233,106 @@ print(yaml.dump_all(docs, default_flow_style=False))
     done
 
     info "oc-mirror cluster-resources applied"
+}
+
+# ─── Step 3c: Normalise mirrorSourcePolicy on ALL cluster IDMS/ITMS ─
+# The cluster bootstrap IDMS (named "image-digest-mirror") is embedded in the
+# agent-config ignition by labctl at install time and applied before this script
+# runs. It has no mirrorSourcePolicy. When any source appears in both that IDMS
+# and a newer IDMS/ITMS with NeverContactSource, MCO reports a conflict and stops
+# re-rendering registries.conf — silently blocking all future mirror rule updates.
+# This step patches every IDMS and ITMS on the cluster, regardless of origin, so
+# all entries are consistent. Idempotent — re-running is safe.
+normalise_mirror_source_policy() {
+    step "3c" "Normalise mirrorSourcePolicy on all cluster IDMS/ITMS objects"
+
+    local changed=0 conflicts=0
+
+    # Patch all ImageDigestMirrorSet objects
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+        local patched
+        patched=$(oc get imagedigestmirrorset "$name" -o json 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+modified = False
+for m in d.get('spec', {}).get('imageDigestMirrors', []):
+    if m.get('mirrorSourcePolicy') != 'NeverContactSource':
+        m['mirrorSourcePolicy'] = 'NeverContactSource'
+        modified = True
+for k in ['managedFields', 'resourceVersion', 'uid', 'generation', 'creationTimestamp']:
+    d.get('metadata', {}).pop(k, None)
+d.pop('status', None)
+print(json.dumps(d))
+print('MODIFIED' if modified else 'NOOP', file=sys.stderr)
+" 2>/tmp/idms_status)
+        local status; status=$(cat /tmp/idms_status)
+        if [[ "$status" == "MODIFIED" ]]; then
+            echo "$patched" | oc apply -f - 2>/dev/null && \
+                info "  Patched IDMS: $name" && changed=$(( changed + 1 ))
+        else
+            info "  IDMS already consistent: $name"
+        fi
+    done < <(oc get imagedigestmirrorset -o name 2>/dev/null | sed 's|.*/||')
+
+    # Patch all ImageTagMirrorSet objects
+    while IFS= read -r name; do
+        [[ -z "$name" ]] && continue
+        local patched
+        patched=$(oc get imagetagmirrorset "$name" -o json 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+modified = False
+for m in d.get('spec', {}).get('imageTagMirrors', []):
+    if m.get('mirrorSourcePolicy') != 'NeverContactSource':
+        m['mirrorSourcePolicy'] = 'NeverContactSource'
+        modified = True
+for k in ['managedFields', 'resourceVersion', 'uid', 'generation', 'creationTimestamp']:
+    d.get('metadata', {}).pop(k, None)
+d.pop('status', None)
+print(json.dumps(d))
+print('MODIFIED' if modified else 'NOOP', file=sys.stderr)
+" 2>/tmp/itms_status)
+        local status; status=$(cat /tmp/itms_status)
+        if [[ "$status" == "MODIFIED" ]]; then
+            echo "$patched" | oc apply -f - 2>/dev/null && \
+                info "  Patched ITMS: $name" && changed=$(( changed + 1 ))
+        else
+            info "  ITMS already consistent: $name"
+        fi
+    done < <(oc get imagetagmirrorset -o name 2>/dev/null | sed 's|.*/||')
+
+    # Verify no conflicts remain
+    conflicts=$(python3 - <<'PYEOF'
+import subprocess, json
+from collections import defaultdict
+def get_items(kind):
+    r = subprocess.run(['oc','get',kind,'-o','json'], capture_output=True, text=True)
+    return json.loads(r.stdout).get('items', []) if r.returncode == 0 else []
+source_policies = defaultdict(set)
+for item in get_items('imagedigestmirrorset'):
+    for m in item.get('spec', {}).get('imageDigestMirrors', []):
+        source_policies[m.get('source','')].add(m.get('mirrorSourcePolicy','(none)'))
+for item in get_items('imagetagmirrorset'):
+    for m in item.get('spec', {}).get('imageTagMirrors', []):
+        source_policies[m.get('source','')].add(m.get('mirrorSourcePolicy','(none)'))
+conflicts = [s for s, p in source_policies.items() if len(p) > 1]
+print(len(conflicts))
+for s in conflicts:
+    print(f"  CONFLICT: {s} -> {source_policies[s]}", file=__import__('sys').stderr)
+PYEOF
+)
+    if [[ "$conflicts" -gt 0 ]]; then
+        warn "  $conflicts mirrorSourcePolicy conflicts remain — MCO may still be blocked"
+    else
+        info "  PASS: No mirrorSourcePolicy conflicts"
+    fi
+
+    if [[ "$changed" -gt 0 ]]; then
+        warn "  $changed objects patched — MCO will re-render registries.conf"
+        warn "  On SNO this triggers a node reboot. Wait for 'oc get nodes' to show Ready"
+        warn "  before proceeding with D-2."
+    fi
 }
 
 # Step 4 removed — ITMS is now applied from oc-mirror cluster-resources
@@ -731,6 +851,7 @@ validate_prereqs
 disable_default_catalogs
 create_catalog_sources
 apply_ocmirror_resources
+normalise_mirror_source_policy
 mirror_oci_charts
 fix_manifest_lists
 add_argocd_ca
