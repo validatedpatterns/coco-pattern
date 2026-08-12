@@ -38,7 +38,19 @@ load-bootstrap: ## Load ArgoCD bootstrap secrets (DEL-2) — run after cluster e
 		exit 1; \
 	fi
 	@echo "Pre-creating bootstrap secret target namespaces (avoids race with patterns-operator)..."
-	@python3 -c "import yaml; [print(ns) for s in yaml.safe_load(open('values-secret.yaml').read()).get('bootstrap_secrets',[]) for ns in s.get('targetNamespaces',[])]" 2>/dev/null | \
+	@python3 -c "\
+import yaml, os, pathlib; \
+pattern = yaml.safe_load(open('values-global.yaml'))['global']['pattern']; \
+search = [pathlib.Path(p) for p in [ \
+  os.environ.get('VALUES_SECRET', ''), \
+  os.path.expanduser(f'~/values-secret-{pattern}.yaml'), \
+  os.path.expanduser('~/values-secret.yaml'), \
+  'values-secret.yaml', \
+] if p]; \
+f = next((p for p in search if p.is_file()), None); \
+data = yaml.safe_load(f.read_text()) if f else {}; \
+[print(ns) for s in data.get('bootstrap_secrets',[]) for ns in s.get('targetNamespaces',[])] \
+" 2>/dev/null | \
 	  sort -u | xargs -I{} sh -c 'oc create namespace {} --dry-run=client -o yaml | oc apply -f - 2>/dev/null; true'
 	./pattern.sh ansible-playbook rhvp.cluster_utils.load_bootstrap_secrets
 
