@@ -1,4 +1,5 @@
 {{- range list "master" "worker" }}
+{{- if $.Values.tdx.enabled }}
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -9,16 +10,16 @@ metadata:
 spec:
   kernelArguments:
   - nohibernate
-{{- if $.Values.tdx.enabled }}
   - kvm_intel.tdx=1
-{{- end }}
+
   config:
     ignition:
       version: 3.2.0
     storage:
       files:
-        - path: /etc/modules-load.d/vsock.conf
+        - path: /etc/kata-containers/kata-tdx/config.d/96-kata-kernel-config
           mode: 0644
           contents:
-            source: data:text/plain;charset=utf-8;base64,dnNvY2stbG9vcGJhY2sK
+            source: data:text/plain;charset=utf-8;base64,W2h5cGVydmlzb3IucWVtdV0KdGR4X3F1b3RlX2dlbmVyYXRpb25fc2VydmljZV9zb2NrZXRfcG9ydD0wCg==
+{{- end }}
 {{- end }}
