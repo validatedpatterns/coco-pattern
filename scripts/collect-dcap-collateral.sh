@@ -2,13 +2,17 @@
 # Collect TDX DCAP verification collateral from Intel PCS using pcsclient.py fetch
 #
 # This script:
-#   1. Validates required parameters (FMSPC, Intel PCS API key)
-#   2. Runs pcsclient.py fetch to download TDX verification collateral
+#   1. Runs pcsclient.py fetch -p E5 to download TDX collateral (no API key needed)
+#   2. Applies a jq fixup to convert string-encoded QE identity fields to JSON structs
 #   3. Produces platform_collaterals.json for loading into Vault via 'make load-secrets'
 #
 # The output JSON contains TCB info, QE identity, and PCK CRL data needed by
 # the Trustee dcap_verifier in file:// mode. This is platform-level data that
 # does NOT change per-cluster — only per CPU family (identified by FMSPC).
+#
+# IMPORTANT: Run AFTER pcsclient.py cache (E-3). The cache step provisions PCK
+# certs for the specific platform. This fetch step gets the verification collateral
+# (QeIdentity, TcbInfo, CRLs) needed by KBS to verify attestation reports.
 #
 # Usage:
 #   ./scripts/collect-dcap-collateral.sh [OPTIONS]
@@ -23,9 +27,9 @@
 #   git clone https://github.com/intel/confidential-computing.tee.dcap.git \
 #       ~/confidential-computing.tee.dcap
 #   pip install -r ~/confidential-computing.tee.dcap/tools/PcsClientTool/requirements.txt
+#   jq installed (used for QE identity fixup)
 #
-# The Intel PCS API key must be configured in the OS keyring. On first run,
-# pcsclient.py will prompt for the key and optionally save it.
+# No Intel PCS API key is required — fetch without -i uses public endpoints.
 
 set -euo pipefail
 
@@ -56,59 +60,95 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check that pcsclient.py exists
+# Check prerequisites
 PCSCLIENT_PY="${PCSCLIENT_DIR}/pcsclient.py"
 if [ ! -f "$PCSCLIENT_PY" ]; then
     echo "Error: pcsclient.py not found at $PCSCLIENT_PY" >&2
-    echo "" >&2
-    echo "To install the Intel PCS Client Tool:" >&2
     echo "  git clone https://github.com/intel/confidential-computing.tee.dcap.git \\" >&2
     echo "      ~/confidential-computing.tee.dcap" >&2
     echo "  pip install -r ~/confidential-computing.tee.dcap/tools/PcsClientTool/requirements.txt" >&2
     exit 1
 fi
 
-# Create output directory
+if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: jq is required for QE identity fixup but was not found" >&2
+    echo "  Install: sudo dnf install jq" >&2
+    exit 1
+fi
+
 mkdir -p "$OUTPUT_DIR"
 
+RAW_FILE="${OUTPUT_DIR}/platform_collateral_fix.json"
 OUTPUT_FILE="${OUTPUT_DIR}/platform_collaterals.json"
 
 echo "Collecting TDX DCAP verification collateral..."
 echo "  Tool:       $PCSCLIENT_PY"
-echo "  Output:     $OUTPUT_FILE"
+echo "  Raw output: $RAW_FILE"
+echo "  Final:      $OUTPUT_FILE"
 echo ""
 
-# Run pcsclient.py fetch to collect collateral
-# IMPORTANT: Use 'fetch' subcommand (produces JSON for Trustee dcap_verifier file:// mode)
-# Do NOT use 'cache' (produces binary QPL cache files for QCNL library)
-#
-# pcsclient.py fetch retrieves all FMSPCs from Intel PCS and downloads
-# TCB info, QE identity, and CRL data. The API key must be pre-configured
-# in the OS keyring (pcsclient.py prompts interactively on first run).
-# Use -t early for early TCB update type (matches kbs-config.toml).
+# Step 1: Fetch collateral from Intel PCS.
+# -p E5  — TDX E5 platform type (required for TDX QeIdentity; 'all' omits it)
+# -t early — early TCB update type (matches kbs-config.toml)
+# No -i platform_list.json and no API key needed — public endpoints only.
 python3 "$PCSCLIENT_PY" fetch \
-    -o "$OUTPUT_FILE" \
+    -p E5 \
     -t early \
-    -p all
+    -o "$RAW_FILE"
 
-# Verify output file exists and is valid JSON
-if [ ! -f "$OUTPUT_FILE" ]; then
-    echo "Error: pcsclient.py fetch did not produce output file: $OUTPUT_FILE" >&2
+if [ ! -f "$RAW_FILE" ]; then
+    echo "Error: pcsclient.py fetch did not produce $RAW_FILE" >&2
     exit 1
 fi
 
-if ! python3 -m json.tool < "$OUTPUT_FILE" > /dev/null 2>&1; then
-    echo "Error: Output file is not valid JSON: $OUTPUT_FILE" >&2
-    echo "This may indicate a pcsclient.py version mismatch or network error." >&2
+if ! python3 -m json.tool < "$RAW_FILE" > /dev/null 2>&1; then
+    echo "Error: $RAW_FILE is not valid JSON" >&2
     exit 1
 fi
 
-# Report success
+# Step 2: Apply jq fixup.
+# pcsclient.py fetch returns qeidentity and tdqeidentity as JSON-encoded strings.
+# KBS expects them as parsed JSON structs. Empty strings are deleted; non-empty
+# strings are parsed with fromjson. Without this fixup KBS fails with:
+#   "collateral JSON error: invalid type: string "", expected struct QeIdentity"
+# Per Red Hat OSC 1.13 disconnected TDX collateral procedure.
+jq '
+.collaterals |= (
+    del(.qeidentity | select(. == ""))
+    | del(.tdqeidentity | select(. == ""))
+    | del(.qeidentity_early | select(. == ""))
+    | del(.tdqeidentity_early | select(. == ""))
+    | if .qeidentity then .qeidentity |= fromjson else . end
+    | if .tdqeidentity then .tdqeidentity |= fromjson else . end
+    | if .qeidentity_early then .qeidentity_early |= fromjson else . end
+    | if .tdqeidentity_early then .tdqeidentity_early |= fromjson else . end
+)
+' "$RAW_FILE" > "$OUTPUT_FILE"
+
+# Step 3: Verify QeIdentity is a struct (not empty string)
+python3 - <<PYEOF
+import json, sys
+c = json.load(open("${OUTPUT_FILE}"))
+col = c.get("collaterals", {})
+qi = col.get("qeidentity", "MISSING")
+tdqi = col.get("tdqeidentity", "MISSING")
+ok = True
+if not isinstance(qi, dict):
+    print(f"WARN: qeidentity is {type(qi).__name__} (expected dict) — attestation may fail")
+    ok = False
+else:
+    print(f"PASS: qeidentity is a JSON struct ({len(qi)} keys)")
+if not isinstance(tdqi, dict):
+    print(f"WARN: tdqeidentity is {type(tdqi).__name__} (expected dict)")
+else:
+    print(f"PASS: tdqeidentity is a JSON struct ({len(tdqi)} keys)")
+sys.exit(0 if ok else 1)
+PYEOF
+
 FILE_SIZE=$(wc -c < "$OUTPUT_FILE" | tr -d ' ')
 echo ""
-echo "Success! Collateral collected."
-echo "  File: $OUTPUT_FILE"
-echo "  Size: $FILE_SIZE bytes"
+echo "Success! Collateral collected and fixup applied."
+echo "  File: $OUTPUT_FILE ($FILE_SIZE bytes)"
 echo ""
 echo "Next step: Load into Vault via:"
 echo "  make load-secrets"
