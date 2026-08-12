@@ -37,6 +37,9 @@ load-bootstrap: ## Load ArgoCD bootstrap secrets (DEL-2) — run after cluster e
 		echo "  Bump utility-container tag in imageset-config and re-mirror."; \
 		exit 1; \
 	fi
+	@echo "Pre-creating bootstrap secret target namespaces (avoids race with patterns-operator)..."
+	@python3 -c "import yaml; [print(ns) for s in yaml.safe_load(open('values-secret.yaml').read()).get('bootstrap_secrets',[]) for ns in s.get('targetNamespaces',[])]" 2>/dev/null | \
+	  sort -u | xargs -I{} sh -c 'oc create namespace {} --dry-run=client -o yaml | oc apply -f - 2>/dev/null; true'
 	./pattern.sh ansible-playbook rhvp.cluster_utils.load_bootstrap_secrets
 
 .PHONY: gen-mirror-helm-secret
