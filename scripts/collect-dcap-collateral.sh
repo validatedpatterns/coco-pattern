@@ -91,6 +91,8 @@ echo ""
 # -p E5  — TDX E5 platform type (required for TDX QeIdentity; 'all' omits it)
 # -t early — early TCB update type (matches kbs-config.toml)
 # No -i platform_list.json and no API key needed — public endpoints only.
+# Remove raw file first so pcsclient.py does not prompt "Overwrite? (y/n)" interactively.
+rm -f "$RAW_FILE"
 python3 "$PCSCLIENT_PY" fetch \
     -p E5 \
     -t early \
