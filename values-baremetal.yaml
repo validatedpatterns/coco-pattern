@@ -302,7 +302,7 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
+          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
 
     kbs-access-curl:
       name: kbs-access-curl
@@ -316,9 +316,9 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
+          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
         - name: initImage
-          value: "172.25.36.135:8443/ubi9/ubi:latest"
+          value: "172.25.36.135:8443/ubi9/ubi@sha256:d5ee75b5c6a6c933e55ed6927fff82a5dce69b988cd9f39a11b38e616d4bb61a"
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -332,7 +332,7 @@ clusterGroup:
           prune: true
       overrides:
         - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24:latest"
+          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
 
     kyverno:
       name: kyverno
