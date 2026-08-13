@@ -1,0 +1,83 @@
+{{- if .Values.global.kubevirt.confidential.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rhel9-imagestream-importer
+  namespace: openshift-virtualization-os-images
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rhel9-imagestream-importer
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+rules:
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams", "imagestreamtags", "imagestreammappings"]
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams/layers"]
+    verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhel9-imagestream-importer
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+subjects:
+  - kind: ServiceAccount
+    name: rhel9-imagestream-importer
+    namespace: openshift-virtualization-os-images
+roleRef:
+  kind: ClusterRole
+  name: rhel9-imagestream-importer
+  apiGroup: rbac.authorization.k8s.io
+---
+# PostSync Job — creates/updates the rhel9-guest ImageStream in
+# openshift-virtualization-os-images so that the DataImportCron
+# (rhel9-image-cron) can find the image digest and trigger a DataVolume
+# import, ultimately making DataSource rhel9 Ready for VM templates.
+#
+# The IDMS rules redirect registry.redhat.io/rhel9/rhel-guest-image to
+# the mirror registry (172.25.36.135:8443) so oc import-image resolves
+# against the local mirror even in airgap.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rhel9-imagestream-import
+  namespace: openshift-virtualization-os-images
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "32"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      serviceAccountName: rhel9-imagestream-importer
+      restartPolicy: OnFailure
+      containers:
+        - name: import-image
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Importing rhel9-guest ImageStream..."
+              oc import-image rhel9-guest \
+                -n openshift-virtualization-os-images \
+                --from=registry.redhat.io/rhel9/rhel-guest-image:latest \
+                --confirm \
+                --reference-policy=source \
+                --insecure=true
+              echo "Done. ImageStream rhel9-guest:"
+              oc get imagestream rhel9-guest \
+                -n openshift-virtualization-os-images \
+                -o jsonpath='{.status.tags[0].items[0].image}' 2>/dev/null && echo ""
+{{- end }}
