@@ -58,7 +58,7 @@ data = yaml.safe_load(f.read_text()) if f else {}; \
 gen-mirror-helm-secret: ## Generate mirror-registry Helm OCI password file from mirror-registry init output
 	@mkdir -p ~/.coco-pattern
 	@echo "Enter the mirror-registry password (from ~/mirror-registry-init.txt or ~/mirror-registry-output/init.json):"
-	@read -r MRPASS; echo "$$MRPASS" > ~/.coco-pattern/mirror-registry-password; chmod 600 ~/.coco-pattern/mirror-registry-password
+	@read -r MRPASS; printf '%s' "$$MRPASS" > ~/.coco-pattern/mirror-registry-password; chmod 600 ~/.coco-pattern/mirror-registry-password
 	@echo "  Saved to ~/.coco-pattern/mirror-registry-password"
 
 .PHONY: pck-register
