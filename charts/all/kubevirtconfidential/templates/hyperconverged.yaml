@@ -1,0 +1,23 @@
+{{- if .Values.global.kubevirt.confidential.enabled }}
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    # WorkloadEncryptionTDX feature gate — enables TDX workload encryption in KubeVirt.
+    # The jsonpatch path targets KubeVirt CR developerConfiguration via HCO pass-through.
+    # This is MINIMAL for Phase 26 — path verified against KubeVirt CR API in Phase 28.
+    # If this path does not exist in the KubeVirt CRD (check: kubectl explain kv.spec.configuration),
+    # the annotation will fail silently or the HCO webhook will reject it.
+    # See Task 8 for API verification and iteration.
+    kubevirt.kubevirt.io/jsonpatch: |
+      [{"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "WorkloadEncryptionTDX"}]
+spec:
+  featureGates:
+    # Disable DataImportCron in airgap to prevent CDIDataImportCronOutdated alerts.
+    # Re-enable after rhel-guest-image and virtio-win are confirmed present in mirror registry.
+    # Controlled by values in Phase 27 once guest images are mirrored.
+    enableCommonBootImageImport: false
+{{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kubevirtconfidential
+description: HyperConverged Operator configuration and SELinux policy for KubeVirt TDX support
+type: application
+version: 0.1.0
+appVersion: "4.22"
+keywords:
+  - kubevirt
+  - confidential-containers
+  - tdx
+  - selinux
+home: https://github.com/butler54/coco-pattern
+maintainers:
+  - name: CoCo Pattern Team

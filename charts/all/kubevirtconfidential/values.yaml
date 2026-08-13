@@ -1,0 +1,8 @@
+# Default values for kubevirtconfidential chart.
+# Override global.kubevirt.confidential.enabled: true in values-baremetal.yaml
+# to enable this chart via ArgoCD.
+global:
+  kubevirt:
+    confidential:
+      # enabled: false by default. Set to true in values-baremetal.yaml to deploy HCO + SELinux MCO.
+      enabled: false

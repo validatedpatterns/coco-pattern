@@ -1,0 +1,42 @@
+{{- if .Values.global.kubevirt.confidential.enabled }}
+{{- range list "master" "worker" }}
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: {{ . }}
+  name: 99-kubevirt-qgs-selinux-{{ . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+        - path: /etc/selinux/kubevirt-qgs.pp
+          mode: 0644
+          contents:
+            # PLACEHOLDER: Replace this base64 value with the compiled kubevirt-qgs.pp binary.
+            # Compile on RHEL 9: cd charts/all/kubevirtconfidential/selinux && make -f /usr/share/selinux/devel/Makefile kubevirt-qgs.pp
+            # Then: base64 -w0 kubevirt-qgs.pp
+            # See Makefile target: make compile-selinux-policy
+            source: data:application/octet-stream;base64,PLACEHOLDER_COMPILE_AND_REPLACE
+    systemd:
+      units:
+        - name: kubevirt-qgs-selinux.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Load kubevirt-qgs SELinux policy module
+            After=local-fs.target
+            ConditionPathExists=/etc/selinux/kubevirt-qgs.pp
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/sbin/semodule -i /etc/selinux/kubevirt-qgs.pp
+            [Install]
+            WantedBy=multi-user.target
+{{- end }}
+{{- end }}

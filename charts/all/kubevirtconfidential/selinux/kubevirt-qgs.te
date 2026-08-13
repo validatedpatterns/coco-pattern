@@ -1,0 +1,13 @@
+module kubevirt-qgs 1.0;
+
+require {
+    type container_t;
+    type qgs_var_run_t;
+    class unix_stream_socket connectto;
+    class sock_file write;
+}
+
+# Allow virt-launcher (container_t) to connect to QGS socket
+# Scoped to qgs_var_run_t — does not affect kata-cc (spc_t bypasses SELinux)
+allow container_t qgs_var_run_t:unix_stream_socket connectto;
+allow container_t qgs_var_run_t:sock_file write;
