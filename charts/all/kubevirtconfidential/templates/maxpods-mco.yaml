@@ -1,0 +1,15 @@
+{{- if .Values.global.kubevirt.confidential.enabled }}
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: kubevirt-maxpods
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/master: ""
+  kubeletConfig:
+    maxPods: 500
+{{- end }}
