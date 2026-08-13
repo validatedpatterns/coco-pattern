@@ -273,7 +273,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "30"
       overrides:
         - name: global.kubevirt.confidential.enabled
-          value: "false"
+          value: "true"
 
     # GPU apps disabled — depends on gpu-operator subscription (disabled above).
     # nvidia-gpu:
