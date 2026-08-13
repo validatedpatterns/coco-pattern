@@ -153,9 +153,10 @@ mirror:
     # environments. In airgap, they must be mirrored or enableCommonBootImageImport must be
     # set to false in the HyperConverged CR (Phase 26 sets it to false by default).
     # Re-enable after verifying guest images are present in the mirror registry.
-    - name: registry.redhat.io/rhel9/rhel-guest-image
-    - name: registry.redhat.io/rhel8/rhel-guest-image
-    - name: registry.redhat.io/container-native-virtualization/virtio-win
+    # oc-mirror v2 requires tag or digest — :latest is used here; pin to a specific version if reproducibility matters.
+    - name: registry.redhat.io/rhel9/rhel-guest-image:latest
+    - name: registry.redhat.io/rhel8/rhel-guest-image:latest
+    - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
     # it is not applicable to this topology and would pull unneeded RHCOS artifacts.
