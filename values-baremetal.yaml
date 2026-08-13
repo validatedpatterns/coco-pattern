@@ -261,6 +261,20 @@ clusterGroup:
             - /spec
             - /status
 
+    # KubeVirt confidential containers support (Phase 26)
+    # Deploys HyperConverged CR with TDX feature gate and SELinux MCO for QGS socket access.
+    # Gated: set global.kubevirt.confidential.enabled to true to enable chart templates.
+    kubevirtconfidential:
+      name: kubevirtconfidential
+      namespace: openshift-cnv
+      project: hub
+      path: charts/all/kubevirtconfidential
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      overrides:
+        - name: global.kubevirt.confidential.enabled
+          value: "false"
+
     # GPU apps disabled — depends on gpu-operator subscription (disabled above).
     # nvidia-gpu:
     #   name: nvidia-gpu
