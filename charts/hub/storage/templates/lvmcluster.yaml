@@ -8,9 +8,10 @@ spec:
   storage:
     deviceClasses:
     - name: {{ .Values.lvmCluster.deviceClass | default "vg1" }}
-      # Immediate binding so CDI importer pods can create PVCs without the
-      # WaitForFirstConsumer deadlock. Safe on SNO — only one node exists.
-      volumeBindingMode: Immediate
+      storageClassOptions:
+        # Immediate binding so CDI importer pods can create PVCs without the
+        # WaitForFirstConsumer deadlock. Safe on SNO — only one node exists.
+        volumeBindingMode: Immediate
       thinPoolConfig:
         name: thin-pool-1
         sizePercent: 90
