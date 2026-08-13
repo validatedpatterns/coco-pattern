@@ -1,0 +1,8 @@
+apiVersion: v2
+name: kubevirtvm
+description: Deploys a baseline RHEL 9 VirtualMachine (non-TDX) for KubeVirt validation
+keywords:
+  - pattern
+  - kubevirt
+  - vm
+version: 0.1.0

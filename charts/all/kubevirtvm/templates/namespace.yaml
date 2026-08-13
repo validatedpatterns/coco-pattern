@@ -1,0 +1,8 @@
+{{- if .Values.global.kubevirt.vm.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubevirt-vms
+  annotations:
+    argocd.argoproj.io/sync-wave: "34"
+{{- end }}

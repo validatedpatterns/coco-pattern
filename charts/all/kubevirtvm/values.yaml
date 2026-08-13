@@ -1,0 +1,4 @@
+global:
+  kubevirt:
+    vm:
+      enabled: false
