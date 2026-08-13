@@ -292,6 +292,8 @@ clusterGroup:
       overrides:
         - name: global.kubevirt.vm.enabled
           value: "true"
+        - name: global.kubevirt.vm.tdx.enabled
+          value: "true"
 
     # GPU apps disabled — depends on gpu-operator subscription (disabled above).
     # nvidia-gpu:
