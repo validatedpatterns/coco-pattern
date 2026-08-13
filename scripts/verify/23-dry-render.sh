@@ -127,8 +127,9 @@ check_del3_kyverno_prefix() {
     return 1
   fi
 
-  if [[ ! "${REGISTRY_PREFIX}" =~ ^quay\.apac-tech-lab\.net:443/mirror ]]; then
-    fail "check_del3_kyverno_prefix" "registry prefix '${REGISTRY_PREFIX}' does not begin with quay.apac-tech-lab.net:443/mirror"
+  local EXPECTED_REGISTRY="${MIRROR_REGISTRY:-172.25.36.135:8443}"
+  if [[ ! "${REGISTRY_PREFIX}" =~ ^${EXPECTED_REGISTRY} ]]; then
+    fail "check_del3_kyverno_prefix" "registry prefix '${REGISTRY_PREFIX}' does not begin with ${EXPECTED_REGISTRY}"
     return 1
   fi
 

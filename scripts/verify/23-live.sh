@@ -134,18 +134,19 @@ check_del2_bootstrap_secret() {
   pass "check_del2_bootstrap_secret"
 }
 
-# DEL-2: Chart pull — ArgoCD pulls from authenticated Quay OCI
+# DEL-2: Chart pull — ArgoCD pulls from authenticated mirror-registry OCI
 check_del2_chart_pull() {
+  local MIRROR="${MIRROR_REGISTRY:-172.25.36.135:8443}"
   if ${DRY_RUN}; then
     info "check_del2_chart_pull [DRY]"
-    echo "  Command: argocd repo get quay.apac-tech-lab.net:443/mirror/validatedpatterns"
+    echo "  Command: argocd repo get ${MIRROR}/validatedpatterns"
     echo "  Or: create throwaway Application targeting mirrored chart, check Synced/Healthy"
     return 0
   fi
 
   # Prefer argocd CLI if available
   if command -v argocd >/dev/null 2>&1; then
-    local REPO_URL="quay.apac-tech-lab.net:443/mirror/validatedpatterns"
+    local REPO_URL="${MIRROR}/validatedpatterns"
     if argocd repo get "${REPO_URL}" --core 2>&1 | grep -q "TYPE.*helm"; then
       pass "check_del2_chart_pull (argocd repo confirms OCI-helm connection)"
       return 0
@@ -155,7 +156,7 @@ check_del2_chart_pull() {
   # Fallback: check for existing ArgoCD Applications pulling from mirror
   local MIRROR_APPS
   MIRROR_APPS=$(oc get applications.argoproj.io -A -o json 2>/dev/null | \
-    jq -r '.items[] | select(.spec.source.repoURL | contains("quay.apac-tech-lab.net:443/mirror")) | "\(.metadata.namespace)/\(.metadata.name)"' 2>/dev/null || echo "")
+    jq -r --arg reg "${MIRROR}" '.items[] | select(.spec.source.repoURL | contains($reg)) | "\(.metadata.namespace)/\(.metadata.name)"' 2>/dev/null || echo "")
 
   if [ -z "${MIRROR_APPS}" ]; then
     skip "check_del2_chart_pull" "no Applications targeting mirrored charts found (needs in-phase validation)"
