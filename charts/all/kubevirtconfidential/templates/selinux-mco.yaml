@@ -15,26 +15,31 @@ spec:
       version: 3.2.0
     storage:
       files:
-        - path: /etc/selinux/kubevirt-qgs.pp
+        - path: /etc/selinux/kubevirt-qgs.cil
           mode: 0644
           contents:
-            # Compiled on node-02 (RHCOS/RHEL9) via oc debug node + checkmodule/semodule_package.
+            # CIL (Common Intermediate Language) policy — RHCOS native format.
+            # pp format not used: RHCOS lacks /usr/libexec/selinux/hll/pp converter.
             # Source: charts/all/kubevirtconfidential/selinux/kubevirt-qgs.te
-            # To regenerate: oc debug node/<node> -- chroot /host checkmodule -M -m -o /tmp/kubevirt-qgs.mod <te> && semodule_package -o /tmp/kubevirt-qgs.pp -m /tmp/kubevirt-qgs.mod && base64 -w0 /tmp/kubevirt-qgs.pp
-            source: data:application/octet-stream;base64,j/98+QEAAAABAAAAEAAAAI3/fPkPAAAAU0UgTGludXggTW9kdWxlAgAAABUAAAABAAAACAAAAAAAAAAMAAAAa3ViZXZpcnQtcWdzAwAAADEuMEAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAIAAAAJAAAAAAAAAAIAAAABAAAAAQAAAAAAAABzb2NrX2ZpbGUFAAAAAQAAAHdyaXRlEgAAAAAAAAABAAAAAQAAAAEAAAAAAAAAdW5peF9zdHJlYW1fc29ja2V0CQAAAAEAAABjb25uZWN0dG8BAAAAAQAAAAgAAAABAAAAAAAAAG9iamVjdF9yQAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAACAAAAAgAAAA0AAAACAAAAAQAAAAEAAAAAAAAAQAAAAAAAAAAAAAAAcWdzX3Zhcl9ydW5fdAsAAAABAAAAAQAAAAEAAAAAAAAAQAAAAAAAAAAAAAAAY29udGFpbmVyX3QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAABAAAAAQAAAAAAAAAAAAAAAgAAAAEAAAAAAAAAQAAAAEAAAAABAAAAAAAAAAEAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAABAAAAAAQAAAAAAAAACAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAABAAAAAQAAAAEAAAABAAAAAAAAAEAAAABAAAAAAQAAAAAAAAABAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAQAAAAAEAAAAAAAAAAgAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAQAAAAIAAAABAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAABAAAAAAQAAAAAAAAADAAAAAAAAAEAAAAAAAAAAAAAAAEAAAABAAAAAAQAAAAAAAAADAAAAAAAAAEAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAIAAABAAAAAQAAAAAEAAAAAAAAAAQAAAAAAAABAAAAAQAAAAAEAAAAAAAAAAQAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAACQAAAHNvY2tfZmlsZQEAAAABAAAAAQAAABIAAAB1bml4X3N0cmVhbV9zb2NrZXQBAAAAAQAAAAEAAAABAAAACAAAAG9iamVjdF9yAgAAAAEAAAABAAAAAgAAAA0AAABxZ3NfdmFyX3J1bl90AQAAAAEAAAABAAAACwAAAGNvbnRhaW5lcl90AQAAAAEAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            # Decoded content:
+            #   (typeattributeset cil_gen_require container_t)
+            #   (typeattributeset cil_gen_require qgs_var_run_t)
+            #   (allow container_t qgs_var_run_t (unix_stream_socket (connectto)))
+            #   (allow container_t qgs_var_run_t (sock_file (write)))
+            source: data:text/plain;charset=utf-8;base64,KHR5cGVhdHRyaWJ1dGVzZXQgY2lsX2dlbl9yZXF1aXJlIGNvbnRhaW5lcl90KQoodHlwZWF0dHJpYnV0ZXNldCBjaWxfZ2VuX3JlcXVpcmUgcWdzX3Zhcl9ydW5fdCkKKGFsbG93IGNvbnRhaW5lcl90IHFnc192YXJfcnVuX3QgKHVuaXhfc3RyZWFtX3NvY2tldCAoY29ubmVjdHRvKSkpCihhbGxvdyBjb250YWluZXJfdCBxZ3NfdmFyX3J1bl90IChzb2NrX2ZpbGUgKHdyaXRlKSkpCg==
     systemd:
       units:
         - name: kubevirt-qgs-selinux.service
           enabled: true
           contents: |
             [Unit]
-            Description=Load kubevirt-qgs SELinux policy module
+            Description=Load kubevirt-qgs SELinux policy module (CIL)
             After=local-fs.target
-            ConditionPathExists=/etc/selinux/kubevirt-qgs.pp
+            ConditionPathExists=/etc/selinux/kubevirt-qgs.cil
             [Service]
             Type=oneshot
             RemainAfterExit=yes
-            ExecStart=/usr/sbin/semodule -i /etc/selinux/kubevirt-qgs.pp
+            ExecStart=/usr/sbin/semodule -i /etc/selinux/kubevirt-qgs.cil
             [Install]
             WantedBy=multi-user.target
 {{- end }}
