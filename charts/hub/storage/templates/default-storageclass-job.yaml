@@ -1,0 +1,77 @@
+{{- if eq .Values.global.storageProvider "lvm" }}
+---
+# ServiceAccount and RBAC for the default StorageClass patch job.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storageclass-default-patcher
+  namespace: openshift-storage
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storageclass-default-patcher
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: storageclass-default-patcher
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+subjects:
+  - kind: ServiceAccount
+    name: storageclass-default-patcher
+    namespace: openshift-storage
+roleRef:
+  kind: ClusterRole
+  name: storageclass-default-patcher
+  apiGroup: rbac.authorization.k8s.io
+---
+# PostSync Job — sets lvms-vg1 as the default StorageClass after every ArgoCD sync.
+# Required because the LVMS operator explicitly sets
+# storageclass.kubernetes.io/is-default-class=false on reconcile, which prevents
+# CDI from finding a default StorageClass when DataVolumes omit storageClassName.
+# The beta annotation (storageclass.beta.kubernetes.io/is-default-class) is also
+# set as a fallback for older controllers.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: set-default-storageclass
+  namespace: openshift-storage
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      serviceAccountName: storageclass-default-patcher
+      restartPolicy: OnFailure
+      containers:
+        - name: patch
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              SC="{{ .Values.lvmCluster.deviceClass | default "vg1" }}"
+              SC_NAME="lvms-${SC}"
+              echo "Setting ${SC_NAME} as default StorageClass..."
+              oc annotate storageclass "${SC_NAME}" \
+                storageclass.kubernetes.io/is-default-class=true \
+                storageclass.beta.kubernetes.io/is-default-class=true \
+                --overwrite
+              echo "Done. Current StorageClasses:"
+              oc get storageclass
+{{- end }}
