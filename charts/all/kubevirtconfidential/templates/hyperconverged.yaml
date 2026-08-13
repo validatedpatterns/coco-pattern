@@ -16,8 +16,6 @@ metadata:
       [{"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "WorkloadEncryptionTDX"}]
 spec:
   featureGates:
-    # Disable DataImportCron in airgap to prevent CDIDataImportCronOutdated alerts.
-    # Re-enable after rhel-guest-image and virtio-win are confirmed present in mirror registry.
-    # Controlled by values in Phase 27 once guest images are mirrored.
-    enableCommonBootImageImport: false
+    # Guest images mirrored (Phase 26 oc-mirror run) — DataImportCron enabled.
+    enableCommonBootImageImport: true
 {{- end }}
