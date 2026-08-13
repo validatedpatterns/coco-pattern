@@ -65,3 +65,89 @@ spec:
                 expire: false
               ssh_pwauth: true
 {{- end }}
+{{- if .Values.global.kubevirt.vm.tdx.enabled }}
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: rhel9-tdx
+  namespace: kubevirt-vms
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  runStrategy: Always
+  dataVolumeTemplates:
+    - metadata:
+        name: rhel9-tdx-disk
+        annotations:
+          cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+      spec:
+        storage:
+          storageClassName: lvms-vg1
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 30Gi
+          volumeMode: Filesystem
+        sourceRef:
+          kind: DataSource
+          name: rhel9
+          namespace: openshift-virtualization-os-images
+  template:
+    spec:
+      terminationGracePeriodSeconds: 180
+      domain:
+        cpu:
+          model: host-passthrough
+          cores: 2
+          sockets: 1
+          threads: 1
+        memory:
+          guest: 4Gi
+        features:
+          acpi: {}
+          smm:
+            enabled: false
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+        machine:
+          type: q35
+        launchSecurity:
+          tdx:
+            attestation:
+              qgsSocketPath: /var/run/tdx-qgs/qgs.socket
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+              model: virtio
+          autoattachGraphicsDevice: false
+          autoattachSerialConsole: true
+          rng: {}
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: rhel9-tdx-disk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              user: cloud-user
+              password: redhat
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+{{- end }}

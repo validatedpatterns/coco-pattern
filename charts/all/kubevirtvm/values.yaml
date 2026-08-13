@@ -2,3 +2,5 @@ global:
   kubevirt:
     vm:
       enabled: false
+      tdx:
+        enabled: false
