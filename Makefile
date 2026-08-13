@@ -18,14 +18,14 @@ cache-keys: ## Download Red Hat signing keys from official sources to ~/.coco-pa
 
 
 .PHONY: cache-registry-ca
-cache-registry-ca: ## Copy registry CA certificate chain to ~/.coco-pattern/
+cache-registry-ca: ## Copy mirror-registry CA cert to ~/.coco-pattern/ for use by load-secrets
 	@mkdir -p ~/.coco-pattern
-	@if [ -f ~/quay-ca-chain.pem ]; then \
-		cp ~/quay-ca-chain.pem ~/.coco-pattern/quay-ca-cert.pem; \
-		echo "  Cached at ~/.coco-pattern/quay-ca-cert.pem"; \
+	@if [ -f ~/mirror-registry-certs/ca.crt ]; then \
+		cp ~/mirror-registry-certs/ca.crt ~/.coco-pattern/quay-ca-cert.pem; \
+		echo "  Cached mirror-registry CA at ~/.coco-pattern/quay-ca-cert.pem"; \
 	else \
-		echo "ERROR: ~/quay-ca-chain.pem not found."; \
-		echo "  Copy your registry CA certificate chain to ~/quay-ca-chain.pem first."; \
+		echo "ERROR: ~/mirror-registry-certs/ca.crt not found."; \
+		echo "  Ensure the mirror registry was initialised and its certs are at ~/mirror-registry-certs/"; \
 		exit 1; \
 	fi
 
