@@ -3,7 +3,7 @@ global:
   # singleArgoCD must be under global: (not main:) for the clustergroup chart to read it.
   # When true, child apps are managed by the vp-gitops ArgoCD instance — no second ArgoCD.
   singleArgoCD: true
-  multiSourceRepoUrl: 172.25.36.135:8443/validatedpatterns
+  multiSourceRepoUrl: quay.io/validatedpatterns
   storageProvider: lvm  # Options: hpp, lvm, external
   clusterVersion: "4.22"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
   secretStore:
@@ -39,17 +39,16 @@ main:
   clusterGroupName: baremetal
   git:
     # Disconnected: HTTP URL served by git-http-server.py on jump host port 8080.
-    # Connected: https://github.com/butler54/coco-pattern.git
-    repoURL: http://172.25.36.135:8080/coco-pattern.git
-    revision: dev/airgap-testing
+    # Connected: https://github.com/validatedpatterns/coco-pattern.git
+    repoURL: https://github.com/validatedpatterns/coco-pattern.git
+    revision: main
   patternsOperator:
-    # Mirrored CatalogSource name. patterns-operator is in community-operator-index,
-    # NOT redhat-operator-index. Must match CatalogSource from oc-mirror workspace.
-    source: cs-community-operator-index-v4-22
+    # Required for airgap -- set to your mirrored catalog source name
+    # source: cs-community-operator-index-v4-22
     channel: fast
   gitops:
-    # Mirrored CatalogSource name for the GitOps operator.
-    operatorSource: cs-redhat-operator-index-v4-22
+    # Required for airgap -- set to your mirrored catalog source name
+    # operatorSource: cs-redhat-operator-index-v4-22
     # Channel must match what's available in the mirrored catalog.
     # The mirrored catalog may only have 'latest', not version-specific channels.
     channel: latest
@@ -58,7 +57,7 @@ main:
     clusterGroupChartVersion: 0.9.58
     # VP OCI Helm charts are mirrored to mirror-registry by oc-mirror additionalImages.
     # Use mirror-registry directly — no Quay dependency for airgap deploys.
-    helmRepoUrl: 172.25.36.135:8443/validatedpatterns
+    helmRepoUrl: quay.io/validatedpatterns
 
 # Common secret store configuration used across multiple charts.
 # NOTE: Charts reference secretStore.* (top-level, not global.secretStore.*).
