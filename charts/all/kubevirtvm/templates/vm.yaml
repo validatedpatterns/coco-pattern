@@ -107,12 +107,10 @@ spec:
           guest: 4Gi
         features:
           acpi: {}
-          smm:
-            enabled: false
         firmware:
           bootloader:
             efi:
-              secureBoot: false
+              secureBoot: true
         machine:
           type: q35
         launchSecurity:
