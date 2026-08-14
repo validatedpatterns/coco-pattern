@@ -100,23 +100,23 @@ check_del1_naming_contract() {
   pass "check_del1_naming_contract (all subscription sources have matching CatalogSources)"
 }
 
-# DEL-2: Bootstrap secret — quay-helm-oci exists with correct fields
+# DEL-2: Bootstrap secret — mirror-registry-helm-oci exists with correct fields
 check_del2_bootstrap_secret() {
   if ${DRY_RUN}; then
     info "check_del2_bootstrap_secret [DRY]"
-    echo "  Command: oc -n vp-gitops get secret quay-helm-oci"
+    echo "  Command: oc -n vp-gitops get secret mirror-registry-helm-oci"
     echo "  Decode .data.type → 'helm'"
     echo "  Decode .data.enableOCI → 'true'"
     return 0
   fi
 
-  if ! oc -n vp-gitops get secret quay-helm-oci >/dev/null 2>&1; then
-    fail "check_del2_bootstrap_secret" "secret quay-helm-oci not found in namespace vp-gitops"
+  if ! oc -n vp-gitops get secret mirror-registry-helm-oci >/dev/null 2>&1; then
+    fail "check_del2_bootstrap_secret" "secret mirror-registry-helm-oci not found in namespace vp-gitops"
     return 1
   fi
 
   local TYPE_FIELD
-  TYPE_FIELD=$(oc -n vp-gitops get secret quay-helm-oci -o jsonpath='{.data.type}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  TYPE_FIELD=$(oc -n vp-gitops get secret mirror-registry-helm-oci -o jsonpath='{.data.type}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
 
   if [ "${TYPE_FIELD}" != "helm" ]; then
     fail "check_del2_bootstrap_secret" ".data.type is '${TYPE_FIELD}', expected 'helm'"
@@ -124,7 +124,7 @@ check_del2_bootstrap_secret() {
   fi
 
   local ENABLE_OCI
-  ENABLE_OCI=$(oc -n vp-gitops get secret quay-helm-oci -o jsonpath='{.data.enableOCI}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  ENABLE_OCI=$(oc -n vp-gitops get secret mirror-registry-helm-oci -o jsonpath='{.data.enableOCI}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
 
   if [ "${ENABLE_OCI}" != "true" ]; then
     fail "check_del2_bootstrap_secret" ".data.enableOCI is '${ENABLE_OCI}', expected 'true'"
