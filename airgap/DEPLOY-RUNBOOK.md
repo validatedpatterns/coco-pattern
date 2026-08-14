@@ -1050,16 +1050,16 @@ echo "Loading bootstrap secrets (ArgoCD OCI Helm repo auth)..." 2>&1 | tee -a "$
 make load-bootstrap 2>&1 | tee -a "$LOG"
 
 # Verify the secret was created and password has correct length (no trailing newline)
-oc get secret quay-helm-oci -n vp-gitops 2>&1 | tee -a "$LOG"
-# EXPECTED: quay-helm-oci   Opaque   ...
-PASS_LEN=$(oc get secret quay-helm-oci -n vp-gitops \
+oc get secret mirror-registry-helm-oci -n vp-gitops 2>&1 | tee -a "$LOG"
+# EXPECTED: mirror-registry-helm-oci   Opaque   ...
+PASS_LEN=$(oc get secret mirror-registry-helm-oci -n vp-gitops \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 -d | wc -c)
-echo "quay-helm-oci password length: ${PASS_LEN} bytes (expected: same as mirror-registry-password file)" \
+echo "mirror-registry-helm-oci password length: ${PASS_LEN} bytes (expected: same as mirror-registry-password file)" \
   2>&1 | tee -a "$LOG"
 if [ "${PASS_LEN}" -gt 24 ]; then
   echo "WARN: password may have trailing newline — patch the secret:" 2>&1 | tee -a "$LOG"
   echo "  MREG_PASS=\$(cat ~/.coco-pattern/mirror-registry-password | tr -d '\\n')" 2>&1 | tee -a "$LOG"
-  echo "  oc create secret generic quay-helm-oci -n vp-gitops \\" 2>&1 | tee -a "$LOG"
+  echo "  oc create secret generic mirror-registry-helm-oci -n vp-gitops \\" 2>&1 | tee -a "$LOG"
   echo "    --from-literal=type=helm --from-literal=enableOCI=true \\" 2>&1 | tee -a "$LOG"
   echo "    --from-literal=url=${MIRROR_REGISTRY}/validatedpatterns \\" 2>&1 | tee -a "$LOG"
   echo "    --from-literal=name=mirror-registry-charts \\" 2>&1 | tee -a "$LOG"

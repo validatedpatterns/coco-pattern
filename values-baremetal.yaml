@@ -194,8 +194,8 @@ clusterGroup:
       annotations:
         argocd.argoproj.io/sync-wave: "20"
       # Replaced with OCI chart in Phase 29 Plan 02
-      # repoURL: http://172.25.36.135:8080/trustee-chart.git
-      # targetRevision: dev/airgap-testing
+      # repoURL: https://github.com/validatedpatterns/trustee-chart.git
+      # targetRevision: main
       # path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'

@@ -1,21 +1,21 @@
 ---
 # ImageSetConfiguration for CoCo Validated Pattern airgap deployment
-# Target: quay.apac-tech-lab.net
+# Target: 10.0.0.1:8443
 # OCP: 4.21.24
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
 # Usage:
 #   # Mirror to mirror (jump host has both internet and quay access):
 #   oc-mirror -c airgap/imageset-config.yaml \
-#     --workspace file:///home/chbutler/oc-mirror-workspace \
-#     docker://quay.apac-tech-lab.net/ocp-mirror --v2
+#     --workspace file://$HOME/oc-mirror-workspace \
+#     docker://10.0.0.1:8443/ocp-mirror --v2
 #
 #   # Or mirror to disk first, then disk to mirror:
 #   oc-mirror -c airgap/imageset-config.yaml \
-#     file:///home/chbutler/oc-mirror-archive --v2
+#     file://$HOME/oc-mirror-archive --v2
 #   oc-mirror -c airgap/imageset-config.yaml \
-#     --from file:///home/chbutler/oc-mirror-archive \
-#     docker://quay.apac-tech-lab.net/ocp-mirror --v2
+#     --from file://$HOME/oc-mirror-archive \
+#     docker://10.0.0.1:8443/ocp-mirror --v2
 
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
