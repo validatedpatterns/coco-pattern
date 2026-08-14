@@ -80,14 +80,16 @@ clusterGroup:
     intel-device-plugins:
       name: intel-device-plugins-operator
       namespace: openshift-operators
-      source: cs-certified-operator-index-v4-22
+      # Required for airgap -- set to your mirrored catalog source name
+      # source: cs-certified-operator-index-v4-22
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     intel-tdx-dcap:
       name: intel-tdx-dcap-operator
       namespace: intel-dcap-operator-system
-      source: cs-certified-operator-index-v4-22
+      # Required for airgap -- set to your mirrored catalog source name
+      # source: cs-certified-operator-index-v4-22
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -162,9 +164,10 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      overrides:
-        - name: acm.mce_operator.source
-          value: "cs-redhat-operator-index-v4-22"
+      # Required for airgap -- set to your mirrored catalog source name
+      # overrides:
+      #   - name: acm.mce_operator.source
+      #     value: "cs-redhat-operator-index-v4-22"
 
     vault:
       name: vault
@@ -190,9 +193,10 @@ clusterGroup:
       project: trustee
       annotations:
         argocd.argoproj.io/sync-wave: "20"
-      repoURL: http://172.25.36.135:8080/trustee-chart.git
-      targetRevision: dev/airgap-testing
-      path: .
+      # Replaced with OCI chart in Phase 29 Plan 02
+      # repoURL: http://172.25.36.135:8080/trustee-chart.git
+      # targetRevision: dev/airgap-testing
+      # path: .
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -272,9 +276,6 @@ clusterGroup:
       path: charts/all/kubevirtconfidential
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      overrides:
-        - name: global.kubevirt.confidential.enabled
-          value: "true"
 
     # Baseline non-confidential RHEL9 VM (Phase 27).
     # Validates KubeVirt works before adding TDX launch security in Phase 28.
@@ -289,11 +290,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      overrides:
-        - name: global.kubevirt.vm.enabled
-          value: "true"
-        - name: global.kubevirt.vm.tdx.enabled
-          value: "true"
 
     # GPU apps disabled — depends on gpu-operator subscription (disabled above).
     # nvidia-gpu:
@@ -334,9 +330,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      overrides:
-        - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
 
     kbs-access-curl:
       name: kbs-access-curl
@@ -348,11 +341,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      overrides:
-        - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
-        - name: initImage
-          value: "172.25.36.135:8443/ubi9/ubi@sha256:d5ee75b5c6a6c933e55ed6927fff82a5dce69b988cd9f39a11b38e616d4bb61a"
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -364,9 +352,6 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
-      overrides:
-        - name: image
-          value: "172.25.36.135:8443/ubi9/httpd-24@sha256:836477de72bcc5d7ae4408f59944b701e108e116bac99060b15f235ef5d9fef6"
 
     kyverno:
       name: kyverno
