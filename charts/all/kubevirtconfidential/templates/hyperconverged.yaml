@@ -13,11 +13,7 @@ metadata:
     # the annotation will fail silently or the HCO webhook will reject it.
     # See Task 8 for API verification and iteration.
     kubevirt.kubevirt.io/jsonpatch: |
-      [
-        {"op": "add", "path": "/spec/configuration/developerConfiguration", "value": {}},
-        {"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates", "value": []},
-        {"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "WorkloadEncryptionTDX"}
-      ]
+      [{"op": "add", "path": "/spec/configuration/developerConfiguration/featureGates/-", "value": "WorkloadEncryptionTDX"}]
 spec:
   featureGates:
     # Guest images mirrored (Phase 26 oc-mirror run) — DataImportCron enabled.
