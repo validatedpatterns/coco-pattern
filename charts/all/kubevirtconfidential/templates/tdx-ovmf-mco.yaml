@@ -15,7 +15,7 @@ spec:
       version: 3.2.0
     storage:
       files:
-        - path: /etc/qemu/firmware/61-edk2-ovmf-x64-inteltdx-nosb.json
+        - path: /usr/share/qemu/firmware/61-edk2-ovmf-x64-inteltdx-nosb.json
           mode: 0644
           contents:
             # TDX OVMF firmware descriptor WITHOUT SecureBoot.
