@@ -107,6 +107,8 @@ spec:
           guest: 4Gi
         features:
           acpi: {}
+          smm:
+            enabled: true
         firmware:
           bootloader:
             efi:
