@@ -38,6 +38,8 @@ jobs:
           VALIDATE_SHELL_SHFMT: false
           VALIDATE_YAML: false
           VALIDATE_YAML_PRETTIER: false
+          # Exclude vendored charts from linting
+          FILTER_REGEX_EXCLUDE: "charts/all/kyverno/.*"
           # VALIDATE_DOCKERFILE_HADOLINT: false
           # VALIDATE_MARKDOWN: false
           # VALIDATE_NATURAL_LANGUAGE: false
