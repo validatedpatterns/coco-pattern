@@ -224,33 +224,6 @@ detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECON
 	echo "" && \
 	echo "To apply: edit values-global.yaml and set global.hardware.profile to the recommended value."
 
-##@ Confidential KubeVirt
-.PHONY: compile-selinux-policy
-compile-selinux-policy: ## Compile SELinux policy for kubevirt-qgs and embed base64 in selinux-mco.yaml
-	@echo "=== Compiling kubevirt-qgs SELinux policy module ==="
-	@echo "This step must run on a RHEL 9 machine with selinux-policy-devel installed."
-	@echo "Install: dnf install selinux-policy-devel policycoreutils"
-	@if ! command -v checkmodule >/dev/null 2>&1; then \
-		echo "ERROR: checkmodule not found. Run on RHEL 9 with selinux-policy-devel installed."; \
-		exit 1; \
-	fi
-	cd charts/all/kubevirtconfidential/selinux && \
-		make -f /usr/share/selinux/devel/Makefile kubevirt-qgs.pp
-	@echo ""
-	@echo "=== Generating base64 for MachineConfig embedding ==="
-	base64 -w0 charts/all/kubevirtconfidential/selinux/kubevirt-qgs.pp > /tmp/kubevirt-qgs-pp.b64
-	@echo ""
-	@echo "=== Replacing PLACEHOLDER in selinux-mco.yaml ==="
-	@B64=$$(cat /tmp/kubevirt-qgs-pp.b64); \
-		sed -i "s|PLACEHOLDER_COMPILE_AND_REPLACE|$${B64}|g" \
-		charts/all/kubevirtconfidential/templates/selinux-mco.yaml
-	@echo "Done. Verify with: grep -c PLACEHOLDER charts/all/kubevirtconfidential/templates/selinux-mco.yaml"
-	@echo "Expected: 0 (no remaining placeholders)"
-	@echo ""
-	@echo "Commit the updated selinux-mco.yaml:"
-	@echo "  git add charts/all/kubevirtconfidential/templates/selinux-mco.yaml"
-	@echo "  git commit -m 'feat(26): embed compiled kubevirt-qgs SELinux policy in selinux-mco.yaml'"
-
 ##@ Chart Management
 KYVERNO_VERSION ?= 3.7.2
 KYVERNO_REPO ?= https://kyverno.github.io/kyverno/
@@ -258,8 +231,8 @@ KYVERNO_REPO ?= https://kyverno.github.io/kyverno/
 .PHONY: update-kyverno-chart
 update-kyverno-chart: ## Pull and embed upstream Kyverno Helm chart (requires internet)
 	@echo "Pulling kyverno chart v$(KYVERNO_VERSION)..."
-	@rm -rf charts/all/kyverno
-	@helm pull kyverno --repo $(KYVERNO_REPO) --version $(KYVERNO_VERSION) --untar -d charts/all/
-	@find charts/all/kyverno -name "README.md" -o -name "README.md.gotmpl" | xargs rm -f
-	@echo "Embedded charts/all/kyverno (v$(KYVERNO_VERSION))"
+	@rm -rf charts/vendor/kyverno
+	@helm pull kyverno --repo $(KYVERNO_REPO) --version $(KYVERNO_VERSION) --untar -d charts/vendor/
+	@find charts/vendor/kyverno -name "README.md" -o -name "README.md.gotmpl" | xargs rm -f
+	@echo "Embedded charts/vendor/kyverno (v$(KYVERNO_VERSION))"
 	@echo "Next: commit, push, and sync ArgoCD"

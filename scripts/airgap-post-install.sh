@@ -6,7 +6,7 @@
 #
 # Required env:
 #   KUBECONFIG          — path to cluster kubeconfig
-#   MIRROR_REGISTRY     — registry host:port (e.g. 10.0.0.1:8443)
+#   MIRROR_REGISTRY     — registry host:port (e.g. MIRROR_REGISTRY_HOST:8443)
 #
 # Optional env:
 #   EXTRA_CA_CERT           — path to CA cert file for the mirror registry
@@ -71,7 +71,7 @@ validate_prereqs() {
     fi
 
     if [[ -z "$MIRROR_REGISTRY" ]]; then
-        error "MIRROR_REGISTRY is not set (e.g. 10.0.0.1:8443)"
+        error "MIRROR_REGISTRY is not set (e.g. MIRROR_REGISTRY_HOST:8443)"
         exit 1
     fi
 

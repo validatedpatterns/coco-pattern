@@ -127,7 +127,7 @@ check_del3_kyverno_prefix() {
     return 1
   fi
 
-  local EXPECTED_REGISTRY="${MIRROR_REGISTRY:-10.0.0.1:8443}"
+  local EXPECTED_REGISTRY="${MIRROR_REGISTRY:-MIRROR_REGISTRY_HOST:8443}"
   if [[ ! "${REGISTRY_PREFIX}" =~ ^${EXPECTED_REGISTRY} ]]; then
     fail "check_del3_kyverno_prefix" "registry prefix '${REGISTRY_PREFIX}' does not begin with ${EXPECTED_REGISTRY}"
     return 1

@@ -120,7 +120,7 @@ clusterGroup:
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
-  - '/values-baremetal-airgap.yaml'
+  - '/overrides/values-baremetal-airgap.yaml'
 
   extraObjects:
     wait-for-vault-unsealed:
@@ -198,16 +198,24 @@ clusterGroup:
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
+        # Enable attestation-gated secret delivery via KBS
         - name: global.coco.secured
           value: "true"
+        # TDX attestation — enables Intel TDX reference value verification in AS
         - name: kbs.tdx.enabled
           value: "true"
+        # GPU attestation — enables NVIDIA CC GPU reference value verification
         - name: kbs.gpu.enabled
           value: "true"
+        # Bare metal mode — uses firmware reference values (not peer-pod PCR measurements)
         - name: kbs.baremetal.enabled
           value: "true"
+        # Inject mirror-registry CA into KBS trust store (required for airgap image pulls)
         - name: kbs.registryCa.enabled
           value: "true"
+        # TDX DCAP collateral — offline attestation without Intel PCS network access.
+        # Collateral is collected via `make collect-dcap-collateral` and loaded into Vault.
+        # The file path below is where the AS container mounts the collateral from its ESO secret.
         - name: kbs.tdx.collateralService
           value: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
         - name: kbs.tdx.collateralMountPath
@@ -264,30 +272,32 @@ clusterGroup:
             - /spec
             - /status
 
-    # KubeVirt confidential containers support (Phase 26)
+    # KubeVirt confidential containers support (experimental)
     # Deploys HyperConverged CR with TDX feature gate and SELinux MCO for QGS socket access.
-    # Gated: set global.kubevirt.confidential.enabled to true to enable chart templates.
-    kubevirtconfidential:
-      name: kubevirtconfidential
-      namespace: openshift-cnv
-      project: hub
-      path: charts/all/kubevirtconfidential
-      annotations:
-        argocd.argoproj.io/sync-wave: "30"
+    # Requires Intel TDX hardware and CNV operator. Gated by chart-level values.
+    # Uncomment to enable:
+    # kubevirtconfidential:
+    #   name: kubevirtconfidential
+    #   namespace: openshift-cnv
+    #   project: hub
+    #   path: charts/all/kubevirtconfidential
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "30"
 
-    # Baseline non-confidential RHEL9 VM (Phase 27).
-    # Validates KubeVirt works before adding TDX launch security in Phase 28.
-    # Gated: set global.kubevirt.vm.enabled to true to enable chart templates.
-    kubevirtvm:
-      name: kubevirtvm
-      namespace: kubevirt-vms
-      project: hub
-      path: charts/all/kubevirtvm
-      annotations:
-        argocd.argoproj.io/sync-wave: "35"
-      syncPolicy:
-        automated:
-          prune: true
+    # KubeVirt test VMs (experimental)
+    # Baseline and TDX-enabled RHEL9 VMs for validating confidential VM workloads.
+    # Requires kubevirtconfidential above and LVM storage. Gated by chart-level values.
+    # Uncomment to enable:
+    # kubevirtvm:
+    #   name: kubevirtvm
+    #   namespace: kubevirt-vms
+    #   project: hub
+    #   path: charts/all/kubevirtvm
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "35"
+    #   syncPolicy:
+    #     automated:
+    #       prune: true
 
     # GPU apps disabled — depends on gpu-operator subscription (disabled above).
     # nvidia-gpu:

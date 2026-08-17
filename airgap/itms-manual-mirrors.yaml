@@ -8,9 +8,9 @@ spec:
     # Needed for tag-based pulls of certified operator operand images.
     - source: registry.connect.redhat.com/intel
       mirrors:
-        - 10.0.0.1:8443/intel
+        - MIRROR_REGISTRY_HOST:8443/intel
     - source: registry.connect.redhat.com/hashicorp
       mirrors:
-        - 10.0.0.1:8443/hashicorp
+        - MIRROR_REGISTRY_HOST:8443/hashicorp
     # NOTE: quay.io/community-operator-pipeline-prod removed — oc-mirror 4.22
     # generates ITMS for it in itms-oc-mirror.yaml automatically.

@@ -1,6 +1,6 @@
 ---
 # ImageSetConfiguration for CoCo Validated Pattern airgap deployment
-# Target: 10.0.0.1:8443 (mirror-registry — sole airgap target, Phase 25.2)
+# Target: MIRROR_REGISTRY_HOST:8443 (mirror-registry — sole airgap target, Phase 25.2)
 # OCP: 4.22.8
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
@@ -10,7 +10,7 @@
 # Usage:
 #   oc-mirror -c airgap/imageset-config-4.22.yaml \
 #     --workspace file://$HOME/oc-mirror-workspace \
-#     docker://10.0.0.1:8443 --v2
+#     docker://MIRROR_REGISTRY_HOST:8443 --v2
 
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration

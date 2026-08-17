@@ -39,7 +39,7 @@ jobs:
       - name: Verify ClusterGroup values.schema.json against values-*yaml files
         run: |
           set -e
-          find . -maxdepth 1 -type f -name "values-*.yaml" ! -name "values-global.yaml" ! -name "values-*-airgap.yaml" -print0 | while IFS= read -r -d '' i;
+          find . -maxdepth 1 -type f -name "values-*.yaml" ! -name "values-global.yaml" -print0 | while IFS= read -r -d '' i;
           do
             echo "$i"
             # disable shellcheck of single quotes in yq

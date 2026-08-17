@@ -38,9 +38,9 @@ main:
   #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
   clusterGroupName: azure
   git:
-    # Disconnected: HTTP URL served by git-http-server.py on jump host port 8080.
-    # Connected: https://github.com/validatedpatterns/coco-pattern.git
-    repoURL: https://github.com/validatedpatterns/coco-pattern.git
+    # Connected mode: repoURL is inferred from your local git remote.
+    # Disconnected: uncomment and set to the HTTP URL served by git-http-server.py
+    # repoURL: http://JUMP_HOST_IP:8080/coco-pattern.git
     revision: main
   patternsOperator:
     # Required for airgap -- set to your mirrored catalog source name
