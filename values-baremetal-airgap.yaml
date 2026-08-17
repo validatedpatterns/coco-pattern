@@ -1,6 +1,3 @@
-clusterGroup:
-  name: baremetal
-
 global:
   catalogSource: cs-redhat-operator-index-v4-22
   catalogSourceNamespace: openshift-marketplace
