@@ -141,7 +141,7 @@ clusterGroup:
       name: kyverno
       namespace: kyverno
       project: hub
-      path: charts/all/kyverno
+      path: charts/vendor/kyverno
       syncPolicy:
         automated: {}
         retry:

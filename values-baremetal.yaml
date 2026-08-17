@@ -355,7 +355,7 @@ clusterGroup:
       name: kyverno
       namespace: kyverno
       project: hub
-      path: charts/all/kyverno
+      path: charts/vendor/kyverno
       annotations:
         argocd.argoproj.io/sync-wave: "0"
       syncPolicy:
