@@ -26,26 +26,45 @@ The topology is controlled by the `main.clusterGroupName` field in `values-globa
 
 Azure deployments use peer-pods, which provision confidential VMs (`Standard_DCas_v5` family) directly on the Azure hypervisor. Bare metal deployments use layered images and hardware TEE features directly.
 
-## Current version (5.*)
+## Current version (8.*)
 
-Breaking change from v4. Uses GA releases of the CoCo stack with Kyverno-based initdata injection.
+Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (disconnected) deployment support, and introduces experimental KubeVirt TDX VM workloads.
 
-- **5.0** — Kyverno-based `cc_init_data` injection (replaces MutatingAdmissionPolicy), OSC 1.12 / Trustee 1.1 GA, external chart repositories, self-signed certificates via cert-manager, multi-cluster support via ACM. Requires OCP 4.19.28+.
-- **5.1** — Bare metal support for Intel TDX and AMD SEV-SNP via NFD auto-detection. Currently tested on SNO (Single Node OpenShift) configurations only.
-- **5.2** — NVIDIA H100 confidential GPU support for bare metal (`baremetal-gpu` clusterGroup). Adds GPU Operator, IOMMU configuration, CC Manager, and sample CUDA workload.
-- **5.3** — DRY refactor of trustee and kyverno overrides, Kyverno CRD label fix, pattern infrastructure update.
-- **5.4** — Firmware reference values workflow for bare metal attestation via veritas. Adds `collect-firmware-refvals.sh`, RVPS integration, and hardened attestation policy (trustee-chart v0.5.0).
-- **5.5** — Trustee-chart v0.7.0 (td_attributes.debug path fix). Unified reference value collection for Azure and bare metal via veritas container.
-- **5.6** — Documentation update, sandboxed-policies v0.2.0 (Azure-conditional peer-pods).
+- **8.0** — OSC 1.13 / Trustee 1.2 upgrade. KBS TOML rewrite, RVPS format alignment, operator CSV pins, trustee-chart v0.10.0. Airgap deployment support: single mirror-registry architecture, `oc-mirror` v2, `airgap-post-install.sh` bootstrap, `DEPLOY-RUNBOOK.md` operational guide. Requires OCP 4.22+.
+
+**Key changes from v5:**
+- **Operator upgrade:** OSC 1.12 → 1.13, Trustee 1.1 → 1.2. Breaking API changes in KBS configuration and RVPS reference value format.
+- **Airgap support:** Full disconnected deployment on bare metal via a single mirror-registry. Includes `oc-mirror` imageset configs, `airgap-post-install.sh` for bootstrap (CatalogSources, IDMS/ITMS, NeverContactSource policy normalisation, ArgoCD CA injection, git HTTP server), and a step-by-step operational runbook at `airgap/DEPLOY-RUNBOOK.md`.
+- **Chart architecture:** trustee-chart moved to OCI Helm artifact (`quay.io/validatedpatterns/trustee:0.10.0`). Kyverno chart vendored under `charts/vendor/`. External charts (sandboxed-containers, sandboxed-policies) remain OCI.
+- **TDX MachineConfig:** QGS socket port `socket_port=0` now deployed via MachineConfig drop-in (replaces manual `sed` workaround).
+- **DCAP collateral:** `collect-dcap-collateral.sh` uses `pcsclient.py fetch -p E5` with `jq` fixup for QeIdentity (Red Hat OSC 1.13 disconnected TDX procedure).
+- **Experimental:** KubeVirt TDX confidential VMs (`charts/all/kubevirtconfidential/`, `charts/all/kubevirtvm/`). Disabled by default. Requires Intel TDX hardware and KubeVirt post-v1.8.4 for full QGS attestation. See chart READMEs for details.
 
 ### Previous versions
 
 | Version | Trustee | OSC | Min OCP | Notes |
 |---------|---------|-----|---------|-------|
+| **5.*** | 1.1 (GA) | 1.12 | 4.19.28+ | Kyverno initdata injection, multi-cluster, bare metal, GPU |
 | **4.*** | 1.1 (GA) | 1.12 | 4.19.28+ | First GA release; MutatingAdmissionPolicy-based initdata |
 | **3.*** | 0.4.* (Tech Preview) | 1.10.* | 4.16+ | |
 | **2.*** | 0.3.* (Tech Preview) | 1.9.* | 4.16+ | |
 | **1.0.0** | 0.2.0 (Tech Preview) | 1.8.1 | 4.16+ | |
+
+### Airgap (disconnected) deployment
+
+For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/DEPLOY-RUNBOOK.md) for the full operational procedure. The runbook covers:
+- Phase 0: One-time jump host setup (mirror registry, git HTTP server, CA certificates)
+- Phase A–B: Mirror wipe and `oc-mirror` v2 re-mirror
+- Phase C: Agent-based OCP install
+- Phase D: Pattern bootstrap (`airgap-post-install.sh`)
+- Phase E: Intel DCAP collateral and TDX attestation
+- Phase F: Verification and pass/fail checklist
+
+**Prerequisites for airgap:**
+- A jump host with internet access (for `oc-mirror`) and network access to the target cluster
+- `docker.io/library/registry:2` container running as the mirror registry (setup documented in Phase 0)
+- `scripts/git-http-server.py` serving pattern repos over smart HTTP (required by the patterns-operator's go-git client)
+- All operator images, OCI Helm charts, and workload images mirrored via `airgap/imageset-config-4.22.yaml`
 
 ## Setup
 
@@ -53,13 +72,13 @@ Breaking change from v4. Uses GA releases of the CoCo stack with Kyverno-based i
 
 **Azure deployments:**
 
-- OpenShift 4.19.28+ cluster on Azure (self-managed via `openshift-install` or ARO)
+- OpenShift 4.22+ cluster on Azure (self-managed via `openshift-install` or ARO)
 - Azure `Standard_DCas_v5` VM quota in your target region (these are confidential computing VMs and are not available in all regions). See the note below for more details.
 - Azure DNS hosting the cluster's DNS zone
 
 **Bare metal deployments:**
 
-- OpenShift 4.19.28+ cluster on bare metal with Intel TDX or AMD SEV-SNP hardware
+- OpenShift 4.22+ cluster on bare metal with Intel TDX or AMD SEV-SNP hardware
 - BIOS/firmware configured to enable TDX or SEV-SNP
 - Available block devices for LVMS storage (auto-discovered)
 - For Intel TDX: an Intel PCS API key from [api.portal.trustedservices.intel.com](https://api.portal.trustedservices.intel.com/)
@@ -74,12 +93,12 @@ Breaking change from v4. Uses GA releases of the CoCo stack with Kyverno-based i
 
 These scripts generate the cryptographic material and attestation reference values needed by Trustee. Run them once before your first deployment.
 
-1. `bash scripts/gen-secrets.sh` — generates KBS key pairs, PCCS certificates/tokens (for bare metal), and copies `values-secret.yaml.template` to `~/values-secret-coco-pattern.yaml`
+1. `bash scripts/gen-secrets.sh` — generates KBS key pairs, sealed-secrets signing keys, and copies `values-secret.yaml.template` to `~/values-secret-coco-pattern.yaml`
 2. Collect attestation reference values (requires `podman`, `yq`, `jq`, and `~/pull-secret.json`):
    - **Azure:** `make collect-azure-refvals` — pulls PCR measurements from the dm-verity image via veritas. Saves to `~/.coco-pattern/measurements.json`.
    - **Bare metal:** `make collect-firmware-refvals` — computes firmware measurements from OCP release artifacts via veritas. Saves to `~/.coco-pattern/firmware-reference-values.json`. For bare metal, also uncomment the `firmwareReferenceValues` section in `~/values-secret-coco-pattern.yaml`.
    - See [docs/firmware-reference-values.md](docs/firmware-reference-values.md) for detailed workflow and options.
-3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern. For bare metal, uncomment the PCCS secrets section and provide your Intel PCS API key.
+3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern.
 
 > **Note:** `gen-secrets.sh` will not overwrite existing secrets. Delete `~/.coco-pattern/` if you need to regenerate.
 
@@ -95,7 +114,7 @@ These scripts generate the cryptographic material and attestation reference valu
 1. Set `main.clusterGroupName: trusted-hub` in `values-global.yaml`
 2. Deploy the hub cluster: `./pattern.sh make install`
 3. Wait for ACM (`MultiClusterHub`) to reach `Running` state on the hub
-4. Provision a second OpenShift 4.19.28+ cluster on Azure for the spoke
+4. Provision a second OpenShift 4.22+ cluster on Azure for the spoke
 5. Import the spoke into ACM with label `clusterGroup=azure-spoke`
    (see [importing a cluster](https://validatedpatterns.io/learn/importing-a-cluster/))
 6. ACM will automatically deploy the `azure-spoke` clusterGroup applications (sandboxed containers, workloads) to the imported cluster
@@ -107,8 +126,7 @@ These scripts generate the cryptographic material and attestation reference valu
    - Run `make detect-hardware` after NFD is deployed to detect your hardware profile automatically
    - Options: `intel-tdx`, `amd-snp`, `intel-tdx-gpu`, `amd-snp-gpu`
 3. Run `bash scripts/gen-secrets.sh` to generate KBS keys and PCCS secrets
-4. For Intel TDX: uncomment the PCCS secrets in `~/values-secret-coco-pattern.yaml` and provide your Intel PCS API key
-5. `./pattern.sh make install`
+4. `./pattern.sh make install`
 6. Wait for the cluster to reboot nodes (MachineConfig updates for TDX/SEV-SNP kernel parameters and vsock)
 
 > **Note:** Bare metal support is currently tested on SNO (Single Node OpenShift) configurations. Multi-node bare metal clusters are expected to work but have not been validated yet.
@@ -120,9 +138,7 @@ The system auto-detects your hardware:
 - **RuntimeClass** `kata-cc` is created automatically pointing to the correct handler (`kata-tdx` or `kata-snp`)
 - Both `kata-tdx` and `kata-snp` RuntimeClasses are deployed; only the one matching your hardware has schedulable nodes
 - MachineConfigs are deployed for both `master` and `worker` roles (safe on SNO where only master exists)
-- PCCS and QGS services deploy unconditionally; DaemonSets only schedule on Intel nodes via NFD labels
-
-Optional: pin PCCS to a specific node with `bash scripts/get-pccs-node.sh` and set `baremetal.pccs.nodeSelector` in the baremetal chart values.
+- DCAP QGS (Quote Generation Service) deploys on Intel nodes via NFD labels; offline collateral mode (no PCCS server required)
 
 For GPU-enabled deployments (`intel-tdx-gpu` or `amd-snp-gpu` profiles):
 
