@@ -77,8 +77,7 @@ mirror:
               minVersion: "26.3.0"
               maxVersion: "26.3.0"
         # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
-        # NOTE: oc-mirror fails these due to missing cosign signatures on registry.connect.redhat.com
-        # They are pushed to Quay separately via airgap-post-install.sh (Phase 25.1 finding)
+        # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
         - name: intel-device-plugins-operator
           channels:
             - name: stable
@@ -96,8 +95,9 @@ mirror:
 
   # Additional container images (application workloads)
   additionalImages:
-    # Workload images
-    - name: registry.redhat.io/ubi9/httpd-24:latest
+    # Workload images — use the exact digest from charts/coco-supported/*/values.yaml
+    # oc-mirror with :latest mirrors the current tag which may differ from the chart digest
+    - name: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
     - name: registry.redhat.io/ubi9/ubi:latest
     # NFD operand — worker/master/gc DaemonSets use this tag, NOT the operator digest.
     - name: registry.redhat.io/openshift4/ose-node-feature-discovery-rhel9:v4.22
@@ -139,7 +139,7 @@ mirror:
     - name: registry.redhat.io/openshift4/ose-cli:latest
 
     # --- Intel DCAP chart images ---
-    # NOTE: intel-sgx-plugin is pushed to Quay via airgap-post-install.sh (Phase 25.1 finding)
+    # Requires registries.d/no-sigstore-certified.yaml for intel-sgx-plugin
     - name: registry.redhat.io/openshift-sandboxed-containers/osc-tdx-qgs@sha256:308d66da94d3116cc16530a4a2cd60a995458f331e1cb3487c6ea3fdae60545b
     - name: registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b
 
