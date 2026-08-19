@@ -48,15 +48,19 @@ if [ ! -f "${VALUES_FILE}" ]; then
 	echo
 	echo "  For Azure deployments:"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
-	echo "    - PCCS secrets can remain commented out"
+	echo "    - DCAP collateral section can remain commented out"
 	echo
 	echo "  For Bare Metal deployments:"
-	echo "    - Uncomment the PCCS secrets section"
-	echo "    - Add your Intel PCS API key (get from https://api.portal.trustedservices.intel.com/)"
 	echo "    - Run 'make collect-firmware-refvals' to collect firmware measurements"
 	echo "    - Uncomment firmwareReferenceValues in values-secret file"
+	echo "    - For Intel TDX: run 'make collect-dcap-collateral' for offline attestation"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
-	echo "    - See docs/pcr-reference-values-bare-metal.md for PCR collection"
+	echo "    - See docs/firmware-reference-values.md for reference value collection"
+	echo
+	echo "  For airgap (disconnected) deployments:"
+	echo "    - Bootstrap secrets (mirror-registry-helm-oci) are pre-configured"
+	echo "    - Run 'make cache-registry-ca' to cache the mirror registry CA cert"
+	echo "    - See airgap/DEPLOY-RUNBOOK.md for the full deployment procedure"
 	echo
 	echo "  Security policies:"
 	echo "    - Default is 'insecure' (accepts all images)"
