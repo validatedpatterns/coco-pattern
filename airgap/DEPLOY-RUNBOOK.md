@@ -27,7 +27,7 @@
 > **Skip this phase on repeat runs.** These steps configure the jump host infrastructure
 > (mirror registry, git server) that persists across deployments. Run once per jump host.
 >
-> **Prerequisites:** Internet access on the jump host, sudo rights, `podman` and `openssl`
+> **Prerequisites:** Internet access on the jump host, `podman` and `openssl`
 > installed, and `python3-passlib` or `httpd-tools` for `htpasswd`.
 
 ### 0-0: Set Site Variables
@@ -110,12 +110,16 @@ auth:
     path: /auth/htpasswd
 EOF
 
-# f) Create podman container (does not start yet)
+# f) Create and start podman container
+# config.yml → /etc/docker/registry/config.yml (where registry:2 reads it)
+# htpasswd → /auth/htpasswd (where config.yml references it)
+# certs → /certs/ (where config.yml references server.crt/server.key)
 podman create \
   --name local-registry \
   -p "${MREG_PORT}:8443" \
   -v ~/local-registry:/var/lib/registry:z \
-  -v ~/mirror-registry-config:/auth:z \
+  -v ~/mirror-registry-config/config.yml:/etc/docker/registry/config.yml:z \
+  -v ~/mirror-registry-config/htpasswd:/auth/htpasswd:z \
   -v ~/mirror-registry-certs:/certs:z \
   docker.io/library/registry:2
 podman start local-registry
@@ -130,11 +134,27 @@ systemctl --user enable local-registry.service
 loginctl enable-linger "$USER"
 echo "local-registry systemd user service enabled"
 
-# h) Trust the CA for container tools and system
+# h) Trust the CA for container tools (per-user, no sudo required)
+# podman/skopeo/oc-mirror read from this directory automatically.
+# curl: pass --cacert ~/mirror-registry-certs/ca.crt
+# oc image mirror: pass --insecure=true
 cp ~/mirror-registry-certs/ca.crt ~/.config/containers/certs.d/${MIRROR_REGISTRY}/ca.crt
-sudo cp ~/mirror-registry-certs/ca.crt /etc/pki/ca-trust/source/anchors/mirror-registry-ca.crt
-sudo update-ca-trust
-echo "CA trusted for container tools and system"
+echo "CA trusted for container tools"
+
+# h2) Skip sigstore attachment lookups for certified vendors
+# Intel, HashiCorp, and NVIDIA images on registry.connect.redhat.com lack cosign
+# .sig manifests. Without this, oc-mirror fails with "name unknown: Image not found".
+mkdir -p ~/.config/containers/registries.d
+cat > ~/.config/containers/registries.d/no-sigstore-certified.yaml << 'REGCFG'
+docker:
+  registry.connect.redhat.com/intel:
+    use-sigstore-attachments: false
+  registry.connect.redhat.com/hashicorp:
+    use-sigstore-attachments: false
+  registry.connect.redhat.com/nvidia:
+    use-sigstore-attachments: false
+REGCFG
+echo "Sigstore attachment lookups disabled for certified vendors"
 
 # i) Build combined-ca-bundle.pem (used by labctl --additional-trust-bundle)
 # The mirror-registry CA is the only CA required — Quay is not used in this deployment.
@@ -278,11 +298,14 @@ mkdir -p ~/.config/containers/certs.d/${MIRROR_REGISTRY}
 cp ~/mirror-registry-certs/ca.crt ~/.config/containers/certs.d/${MIRROR_REGISTRY}/ca.crt
 echo "local-registry CA trusted for container tools" | tee -a "$LOG"
 
-# Also add to system trust so openssl/oc image extract trusts mirror-registry TLS
-# (container tools use ~/.config/containers/certs.d; oc uses system trust for TLS verification)
-sudo cp ~/mirror-registry-certs/ca.crt /etc/pki/ca-trust/source/anchors/mirror-registry-ca.crt
-sudo update-ca-trust
-echo "local-registry CA added to system trust" | tee -a "$LOG"
+# Per-user cert dir handles podman/skopeo/oc-mirror TLS.
+# curl: pass --cacert ~/mirror-registry-certs/ca.crt
+# oc image mirror: pass --insecure=true
+
+# Verify sigstore skip config is in place (created in Phase 0-1 step h2)
+ls ~/.config/containers/registries.d/no-sigstore-certified.yaml && \
+  echo "Sigstore skip config present" | tee -a "$LOG" || \
+  echo "WARN: no-sigstore-certified.yaml missing — Intel/HashiCorp/NVIDIA mirrors may fail" | tee -a "$LOG"
 ```
 
 > At run end, Claude will SSH in and read this log file for findings analysis.
@@ -582,11 +605,10 @@ echo "B-2: oc-mirror complete at $(date)" 2>&1 | tee -a "$LOG"
 > Expected completion: 3-4 hours.
 > oc-mirror v2 is resumable — re-running the same command skips already-mirrored content.
 >
-> **Known failures (permanent — not fixed by re-running):**
-> Intel certified operator images and `hashicorp/vault` will always fail with
-> `reading signatures: ... name unknown: Image not found`
-> oc-mirror v2 tries to copy cosign `.sig` artifacts; these images have none.
-> See B-3a below to fix manually after oc-mirror completes.
+> **Cosign signature failures:** Intel, HashiCorp, and NVIDIA images on
+> `registry.connect.redhat.com` lack cosign `.sig` manifests. The
+> `no-sigstore-certified.yaml` config (created in Phase 0-1 step h2) disables
+> sigstore attachment lookups for these vendors, so oc-mirror handles them normally.
 >
 > **Transient failures (fixed by re-running):**
 > `multicluster-engine/hive-rhel9` is 600MB+ and reliably times out on the first oc-mirror run
@@ -602,7 +624,7 @@ echo "B-2: oc-mirror complete at $(date)" 2>&1 | tee -a "$LOG"
 ```bash
 echo "=== B-3: Post-Mirror Verification ===" 2>&1 | tee -a "$LOG"
 
-# Count cluster-resources YAML files (expect ~10 including idms-manual-mirrors.yaml)
+# Count cluster-resources YAML files (expect ~9: IDMS, ITMS, CatalogSources, signatures)
 ls ~/oc-mirror-workspace/working-dir/cluster-resources/*.yaml 2>&1 | tee -a "$LOG"
 COUNT=$(ls ~/oc-mirror-workspace/working-dir/cluster-resources/*.yaml | wc -l)
 echo "cluster-resources count: $COUNT (expected ~10)" 2>&1 | tee -a "$LOG"
@@ -654,96 +676,29 @@ PYEOF
 # Verify IDMS files cover expected namespaces
 echo "IDMS namespace coverage:" 2>&1 | tee -a "$LOG"
 grep "${MIRROR_REGISTRY}" ~/oc-mirror-workspace/working-dir/cluster-resources/idms-oc-mirror.yaml | wc -l | xargs -I{} echo "  idms-oc-mirror.yaml: {} mirror entries" | tee -a "$LOG"
-grep "${MIRROR_REGISTRY}" ~/oc-mirror-workspace/working-dir/cluster-resources/idms-manual-mirrors.yaml | wc -l | xargs -I{} echo "  idms-manual-mirrors.yaml: {} mirror entries" | tee -a "$LOG"
+# idms-manual-mirrors.yaml no longer needed — oc-mirror generates IDMS for Intel/Hashicorp
+# when registries.d/no-sigstore-certified.yaml is in place
 
 echo "B-3: Post-mirror verification complete at $(date)" 2>&1 | tee -a "$LOG"
 ```
 
-### B-3a: Manual Mirror — Intel + Hashicorp (cosign signature failures)
+### B-3a: Manual Mirror — ELIMINATED
 
-oc-mirror cannot mirror these images because it looks for cosign `.sig` artifacts that don't exist at `registry.connect.redhat.com`. Use `oc image mirror` with a combined CA bundle instead.
-
-> **Must run after every B-2**, regardless of whether oc-mirror exits 0 or non-zero.
-
-```bash
-echo "=== B-3a: Manual mirror — Intel + Hashicorp ===" 2>&1 | tee -a "$LOG"
-echo "Started: $(date)" | tee -a "$LOG"
-
-# Build combined CA bundle (mirror-registry CA + system public CAs)
-cat ~/mirror-registry-certs/ca.crt /etc/pki/tls/certs/ca-bundle.crt > /tmp/combined-ca.pem
-
-DEST=${MIRROR_REGISTRY}
-mirror() {
-  local src=$1 dest_repo=$2
-  echo "  $dest_repo" | tee -a "$LOG"
-  oc image mirror \
-    --registry-config ~/pull-secret.json \
-    --certificate-authority=/tmp/combined-ca.pem \
-    --skip-missing \
-    "$src" "${DEST}/${dest_repo}" 2>&1 | grep -E "error|stats:|mirrored" | tee -a "$LOG"
-}
-
-# Intel TDX DCAP operator — operator image AND OLM bundle image
-# The bundle image is what OLM unpacks to install the CSV/CRDs. Without it,
-# OLM fails with BundleUnpackFailed/DeadlineExceeded even if the operator image is present.
-mirror "registry.connect.redhat.com/intel/intel-tdx-qgs@sha256:5dae30c8008c5a3a39f0eeb0db081292126491faf177c611a4f18f23f5f9f59c" "intel/intel-tdx-qgs"
-mirror "registry.connect.redhat.com/intel/intel-tdx-dcap-operator@sha256:34c0bcd0e931e51b5bd93e607851d510e0a7aff6833c4b6a1d1daad8a1ab8471" "intel/intel-tdx-dcap-operator"
-mirror "registry.connect.redhat.com/intel/intel-tdx-dcap-operator-bundle@sha256:4cffb6b6c0559ce816e3e8f8527b3eff360f0b330bed67428d3e11f78118017a" "intel/intel-tdx-dcap-operator-bundle"
-
-# Intel device plugins — operator image AND OLM bundle image
-mirror "registry.connect.redhat.com/intel/intel-device-plugins-operator-bundle@sha256:4d1ffc351b87cd3dd12954f9784516195de9e35566fee8c2e4d2f9e514b0c5b3" "intel/intel-device-plugins-operator-bundle"
-mirror "registry.connect.redhat.com/intel/intel-deviceplugin-operator@sha256:d195bcb3278601478a92f36e5efec94b716647c4db68fef87fcaeacb953c7ebb" "intel/intel-deviceplugin-operator"
-mirror "registry.connect.redhat.com/intel/intel-dsa-plugin@sha256:18b1cd603a57255ac387ea056ef5d96f325d59eb66ce78c3cc0fa4f5c0534b6c" "intel/intel-dsa-plugin"
-mirror "registry.connect.redhat.com/intel/intel-gpu-plugin@sha256:2569cfa01f54d7f73acc889c380bc2f7f5a3098866b9b43b48ae2fa9fa34355c" "intel/intel-gpu-plugin"
-mirror "registry.connect.redhat.com/intel/intel-idxd-config-initcontainer@sha256:d5dbc172c138e987e8e0f64a47776c2bce99b58e2c0f28cb91acdfe9afae659b" "intel/intel-idxd-config-initcontainer"
-mirror "registry.connect.redhat.com/intel/intel-qat-initcontainer@sha256:36701916dfc68db303ba2e5897a59243dc9e9cce8b1eee859d0339ff24322ecd" "intel/intel-qat-initcontainer"
-mirror "registry.connect.redhat.com/intel/intel-qat-plugin@sha256:2d619eee302e10c6813f056f7320c6c5f0c1fc989b73e617892bc6311b5576af" "intel/intel-qat-plugin"
-mirror "registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:dd74e1f7436ca29b88843ecdd385021a5977da22531a5403920a7cc0f09f6cf6" "intel/intel-sgx-plugin"
-mirror "registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:4ac8769c4f0a82b3ea04cf1532f15e9935c71fe390ff5a9dc3ee57f970a65f0b" "intel/intel-sgx-plugin"
-
-# Hashicorp Vault — mirror by TAG so ITMS redirect works (tag-based pull from Helm chart)
-# Mirroring by digest only stores sha256 ref; the tag 1.21.4-ubi must exist for ITMS to redirect
-mirror "registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi" "hashicorp/vault"
-
-echo "B-3a: Manual mirror complete at $(date)" 2>&1 | tee -a "$LOG"
-```
-
-**Then create the supplementary IDMS** — oc-mirror omits Intel/Hashicorp from its generated IDMS because those bundles fail cosign verification. Without this file the cluster cannot resolve digest-based pulls from `registry.connect.redhat.com/intel` or `registry.connect.redhat.com/hashicorp`:
+> **No longer needed.** The `no-sigstore-certified.yaml` registries.d config
+> (Phase 0-1 step h2) disables sigstore attachment lookups for Intel, HashiCorp,
+> and NVIDIA on `registry.connect.redhat.com`. oc-mirror now mirrors all images
+> successfully and generates IDMS entries for them automatically.
+>
+> **ITMS (tag-based mirrors)** for `registry.connect.redhat.com/intel` and
+> `/hashicorp` are still needed — oc-mirror only generates IDMS (digest-based).
+> The supplementary ITMS lives at `airgap/itms-manual-mirrors.yaml` and is applied
+> automatically by `airgap-post-install.sh` in D-1.
 
 ```bash
-cat > ~/oc-mirror-workspace/working-dir/cluster-resources/idms-manual-mirrors.yaml << 'EOF'
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: idms-manual-mirrors
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${MIRROR_REGISTRY}/intel
-    source: registry.connect.redhat.com/intel
-  - mirrors:
-    - ${MIRROR_REGISTRY}/hashicorp
-    source: registry.connect.redhat.com/hashicorp
-EOF
-echo "idms-manual-mirrors.yaml created" | tee -a "$LOG"
-```
-
-**Supplementary ITMS** — oc-mirror also does not generate ITMS for `registry.connect.redhat.com`. The
-supplementary ITMS for tag-based pulls of Intel and Hashicorp images lives in the repo at
-`~/coco-pattern/airgap/itms-manual-mirrors.yaml` and is applied automatically by `airgap-post-install.sh`
-in D-1. No manual step required here — verify it exists:
-
-```bash
-echo "--- supplementary ITMS in repo ---" | tee -a "$LOG"
+echo "=== B-3a: Verify supplementary ITMS in repo ===" | tee -a "$LOG"
 cat ~/coco-pattern/airgap/itms-manual-mirrors.yaml 2>&1 | tee -a "$LOG"
 # EXPECTED: ImageTagMirrorSet covering registry.connect.redhat.com/intel and /hashicorp
 ```
-
-> **Both supplementary files are safe across oc-mirror re-runs.**
-> - IDMS (`idms-manual-mirrors.yaml`): recreated here after every B-2
-> - ITMS (`airgap/itms-manual-mirrors.yaml`): in the repo, applied by D-1 automatically
-> Run both the `oc image mirror` block and the IDMS creation after every B-2 invocation.
-
 
 ---
 
