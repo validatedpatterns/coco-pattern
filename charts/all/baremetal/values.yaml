@@ -1,2 +1,6 @@
+global:
+  cluster:
+    hcp: false
+
 tdx:
   enabled: true

@@ -1,4 +1,4 @@
-{{- if .Values.global.kubevirt.confidential.enabled }}
+{{- if and .Values.global.kubevirt.confidential.enabled (not .Values.global.cluster.hcp) }}
 {{- range list "master" "worker" }}
 ---
 apiVersion: machineconfiguration.openshift.io/v1

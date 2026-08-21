@@ -1,3 +1,4 @@
+{{- if not .Values.global.cluster.hcp }}
 {{- range list "master" "worker" }}
 {{- if $.Values.tdx.enabled }}
 ---
@@ -21,5 +22,6 @@ spec:
           mode: 0644
           contents:
             source: data:text/plain;charset=utf-8;base64,W2h5cGVydmlzb3IucWVtdV0KdGR4X3F1b3RlX2dlbmVyYXRpb25fc2VydmljZV9zb2NrZXRfcG9ydD0wCg==
+{{- end }}
 {{- end }}
 {{- end }}

@@ -29,13 +29,21 @@ global:
       defaultVMFlavour: "Standard_DC2as_v5"
       VMFlavours: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
   hardware:
-    profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu
+    profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu, hub-mixed
+  cluster:
+    # Hosted Control Planes (HCP) mode. When true, MachineConfig resources are skipped
+    # (no Machine Config Daemon on HCP workers). The sandboxed-containers operator
+    # auto-detects HCP and uses DaemonSet deployment mode (Tech Preview in OSC 1.13).
+    # For multi-cluster: set false on hub, override to true for HCP spokes via helmOverrides.
+    hcp: false
 main:
   # Set clusterGroupName to match your deployment topology:
-  #   azure         — Azure single-cluster (all components in one cluster)
-  #   azure-spoke   — Azure spoke (multi-cluster, imported into ACM from trusted-hub)
-  #   baremetal     — Bare metal (Intel TDX / AMD SEV-SNP, hardware profile gated)
-  #   trusted-hub   — Hub for multi-cluster (Trustee + ACM, manages spoke clusters)
+  #   azure          — Azure single-cluster (all components in one cluster)
+  #   azure-spoke    — Azure spoke (multi-cluster, imported into ACM from trusted-hub)
+  #   baremetal      — Bare metal single-cluster (Intel TDX / AMD SEV-SNP, hardware profile gated)
+  #   baremetal-hub  — Bare metal hub (Trustee + ACM, mixed TDX/SNP, manages baremetal spokes)
+  #   baremetal-spoke — Bare metal spoke (imported into ACM from baremetal-hub)
+  #   trusted-hub    — Hub for multi-cluster Azure (Trustee + ACM, manages azure-spoke clusters)
   clusterGroupName: azure
   git:
     # Connected mode: repoURL is inferred from your local git remote.
