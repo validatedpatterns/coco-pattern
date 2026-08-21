@@ -1,0 +1,203 @@
+# Bare metal spoke topology for confidential containers (multi-cluster).
+# Runs sandboxed containers operator and confidential workloads.
+# Paired with baremetal-hub topology — spoke is imported into ACM from the hub.
+# Set main.clusterGroupName: baremetal-spoke in values-global.yaml on the spoke cluster.
+#
+# HCP support: If the spoke is a Hosted Control Plane cluster, set global.cluster.hcp: true
+# in values-global.yaml (or via helmOverrides from the hub). OSC 1.13 auto-detects HCP and
+# uses DaemonSet deployment mode. MachineConfig templates are skipped.
+
+clusterGroup:
+  name: baremetal-spoke
+  isHubCluster: false
+  namespaces:
+  - external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
+  - external-secrets
+  - openshift-sandboxed-containers-operator
+  - hello-openshift
+  - kbs-access
+  - cert-manager-operator
+  - openshift-nfd
+  - baremetal
+  - kyverno
+
+  subscriptions:
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
+    sandbox:
+      name: sandboxed-containers-operator
+      namespace: openshift-sandboxed-containers-operator
+      channel: stable
+      installPlanApproval: Manual
+      csv: sandboxed-containers-operator.v1.13.0
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+    nfd:
+      name: nfd
+      namespace: openshift-nfd
+      channel: stable
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+
+  projects:
+  - hub
+  - external-secrets
+  - sandbox
+  - workloads
+  - default
+
+  sharedValueFiles:
+  - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+  - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
+  - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
+  - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
+  - '/overrides/values-baremetal-airgap.yaml'
+
+  applications:
+    secrets-operator:
+      name: openshift-external-secrets
+      namespace: external-secrets
+      project: external-secrets
+      chart: openshift-external-secrets
+      chartVersion: 0.0.*
+
+    sandbox:
+      name: sandbox
+      namespace: openshift-sandboxed-containers-operator
+      project: sandbox
+      chart: sandboxed-containers
+      chartVersion: 0.2.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+      overrides:
+        - name: enablePeerPods
+          value: "false"
+        - name: global.secretStore.backend
+          value: vault
+        - name: secretStore.name
+          value: vault-backend
+        - name: secretStore.kind
+          value: ClusterSecretStore
+
+    baremetal:
+      name: baremetal
+      namespace: baremetal
+      project: hub
+      path: charts/all/baremetal
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
+
+    sandbox-policies:
+      name: sandbox-policies
+      namespace: openshift-sandboxed-containers-operator
+      project: sandbox
+      chart: sandboxed-policies
+      chartVersion: 0.2.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+
+    hello-openshift:
+      name: hello-openshift
+      namespace: hello-openshift
+      project: workloads
+      path: charts/coco-supported/hello-openshift
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
+      # overrides:
+      #   - name: image
+      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      syncPolicy:
+        automated:
+          prune: true
+
+    kbs-access-curl:
+      name: kbs-access-curl
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-curl
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
+      # overrides:
+      #   - name: image
+      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      #   - name: initImage
+      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/ubi:latest"
+      syncPolicy:
+        automated:
+          prune: true
+
+    kbs-access-sealed:
+      name: kbs-access-sealed
+      namespace: kbs-access
+      project: workloads
+      path: charts/coco-supported/kbs-access-sealed
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
+      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
+      # overrides:
+      #   - name: image
+      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      syncPolicy:
+        automated:
+          prune: true
+
+    kyverno:
+      name: kyverno
+      namespace: kyverno
+      project: hub
+      path: charts/vendor/kyverno
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 20
+        syncOptions:
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          jqPathExpressions:
+            - .metadata.labels
+            - .metadata.annotations
+      extraValueFiles:
+        - '/overrides/values-kyverno.yaml'
+      overrides:
+        - name: backgroundController.resources.limits.memory
+          value: "512Mi"
+        - name: backgroundController.resources.requests.memory
+          value: "256Mi"
+
+    coco-kyverno-policies:
+      name: coco-kyverno-policies
+      namespace: openshift-sandboxed-containers-operator
+      project: sandbox
+      path: charts/all/coco-kyverno-policies
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
+
+  imperative:
+    serviceAccountCreate: true
+    clusterRoleYaml:
+      - apiGroups:
+        - '*'
+        resources:
+        - '*'
+        verbs:
+        - '*'
+    jobs:
+    - name: init-data-gzipper
+      playbook: ansible/init-data-gzipper.yaml
+      verbosity: -vvv
+      timeout: 3600
