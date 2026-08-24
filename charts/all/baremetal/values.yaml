@@ -2,5 +2,10 @@ global:
   cluster:
     hcp: false
 
+# Node-level (OSC/kata) TDX enablement — controls the TDX MachineConfig
+# (kvm_intel.tdx=1 kernel arg + kata-tdx socket config). This is SEPARATE from
+# trustee's kbs.tdx.enabled, which controls attestation (quote verification).
+# A cluster may verify TDX evidence (trustee) without running TDX workloads,
+# and vice versa. The amd-snp hardware profile sets this false.
 tdx:
   enabled: true

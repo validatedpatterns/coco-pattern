@@ -22,6 +22,12 @@ clusterGroup:
     gpu-workload:
       disabled: true
 
+    # Node has no Intel TDX — skip the TDX MachineConfig (kvm_intel.tdx=1 kernel arg).
+    baremetal:
+      overrides:
+        - name: tdx.enabled
+          value: "false"
+
     trustee:
       overrides:
         - name: kbs.snp.enabled

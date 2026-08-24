@@ -1,4 +1,5 @@
-{{- if and .Values.global.kubevirt.confidential.enabled (not .Values.global.cluster.hcp) }}
+{{- /* QGS-socket SELinux policy is Intel TDX-specific. Skip on non-TDX and on HCP (no MCD). */}}
+{{- if and .Values.global.kubevirt.confidential.enabled .Values.tdx.enabled (not .Values.global.cluster.hcp) }}
 {{- range list "master" "worker" }}
 ---
 apiVersion: machineconfiguration.openshift.io/v1

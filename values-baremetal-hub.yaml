@@ -78,6 +78,8 @@ clusterGroup:
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
+    # Intel DCAP / device plugins provide TDX quote GENERATION — only needed when
+    # the hub itself has Intel TDX hardware. Disabled by the amd-snp hardware profile.
     intel-device-plugins:
       name: intel-device-plugins-operator
       namespace: openshift-operators
@@ -187,13 +189,21 @@ clusterGroup:
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
+        # NOTE: Trustee attestation (quote *verification*) is independent of the hub's
+        # own TEE hardware. The hub verifies both TDX and SNP evidence regardless of
+        # its own CPU. Node-level quote *generation* infra (Intel DCAP/QGS/SGX,
+        # TDX MachineConfig) is controlled by the hardware profile — set
+        # global.hardware.profile: intel-tdx for a TDX hub (DCAP deploys) or
+        # amd-snp for an AMD hub (DCAP disabled). See values-hw-*.yaml.
         # Enable attestation-gated secret delivery via KBS
         - name: global.coco.secured
           value: "true"
-        # TDX attestation — hub's own Intel TDX platform
+        # TDX attestation — verify TDX evidence from the hub and/or TDX spokes.
+        # Verification only; needs collateral (below), not local TDX hardware.
         - name: kbs.tdx.enabled
           value: "true"
-        # SNP attestation — for AMD SEV-SNP spoke clusters
+        # SNP attestation — verify SNP evidence from AMD SEV-SNP spoke clusters.
+        # VCEK certs are loaded via overrides/values-snp-vcek.yaml.
         - name: kbs.snp.enabled
           value: "true"
         # GPU attestation — enables NVIDIA CC GPU reference value verification
@@ -241,6 +251,9 @@ clusterGroup:
         - name: enablePeerPods
           value: "false"
 
+    # TDX quote generation (QGS/SGX). Only needed on a TDX hub — disabled by the
+    # amd-snp hardware profile. Trustee still verifies TDX evidence from spokes
+    # without this (verification uses collateral, not local quote generation).
     intel-dcap:
       name: intel-dcap
       namespace: intel-dcap

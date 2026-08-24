@@ -6,3 +6,11 @@ global:
     confidential:
       # enabled: false by default. Set to true in values-baremetal.yaml to deploy HCO + SELinux MCO.
       enabled: false
+  cluster:
+    # HCP clusters have no Machine Config Daemon — SELinux MachineConfig is skipped.
+    hcp: false
+
+# The QGS-socket SELinux policy (selinux-mco.yaml) is Intel TDX-specific.
+# Set false on non-TDX clusters so the MachineConfig is not deployed.
+tdx:
+  enabled: true

@@ -29,7 +29,7 @@ global:
       defaultVMFlavour: "Standard_DC2as_v5"
       VMFlavours: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
   hardware:
-    profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu, hub-mixed
+    profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu
   cluster:
     # Hosted Control Planes (HCP) mode. When true, MachineConfig resources are skipped
     # (no Machine Config Daemon on HCP workers). The sandboxed-containers operator
