@@ -53,3 +53,34 @@ The wrapper handles: cluster provisioning, secret generation, PCR reference valu
 
    1. `bash ./rhdp/wrapper-cluster-only.sh eastasia`
    2. Provisions the cluster without installing secrets or the pattern
+
+## Re-running against an existing install directory
+
+All three wrapper scripts (and `rhdp/rhdp-cluster-define.py` directly) refuse
+to touch an install directory (e.g. `openshift-install`,
+`openshift-install-hub`) that already has cluster state (`metadata.json`)
+from a previous run. This prevents accidentally wiping the local record of a
+still-live cluster and silently replacing it with a new one.
+
+If you see an error about existing cluster install state, you have two
+options:
+
+1. **Destroy the existing cluster's cloud resources yourself first**, then
+   re-run the wrapper normally:
+
+   ```shell
+   openshift-install destroy cluster --dir=./openshift-install
+   ```
+
+2. **Pass `--recreate`** if you've already confirmed the cloud resources are
+   gone (or were never fully created):
+
+   ```shell
+   bash ./rhdp/wrapper.sh --recreate eastasia
+   ```
+
+   **`--recreate` does NOT call `openshift-install destroy cluster` for
+   you.** It only wipes the local install directory so a fresh install can
+   proceed. If the previous cluster's cloud resources are still live, they
+   will be orphaned (left running in Azure, unmanaged) — verify and clean
+   those up manually via the Azure portal/CLI if needed.

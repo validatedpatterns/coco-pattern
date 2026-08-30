@@ -60,10 +60,70 @@ def get_multicluster_configs() -> List[Dict]:
     ]
 
 
-def cleanup(pattern_dir: pathlib.Path, cluster_configs: List[Dict]) -> None:
-    """Cleanup directories for all clusters"""
+# Files openshift-install writes early in "create cluster" that indicate an
+# install directory already holds state for a (possibly still-live) cluster.
+STATE_MARKER_FILES = ("metadata.json",)
 
+
+def _existing_state_dirs(
+    pattern_dir: pathlib.Path, cluster_configs: List[Dict]
+) -> List[Dict]:
+    """Return the cluster configs whose install directory already holds
+    cluster state (i.e. a previous `create cluster` was run there)."""
+    existing = []
+    for config in cluster_configs:
+        install_dir = pattern_dir / config["directory"]
+        if install_dir.exists() and any(
+            (install_dir / marker).exists() for marker in STATE_MARKER_FILES
+        ):
+            existing.append(config)
+    return existing
+
+
+def cleanup(
+    pattern_dir: pathlib.Path,
+    cluster_configs: List[Dict],
+    recreate: bool = False,
+) -> None:
+    """Cleanup directories for all clusters.
+
+    Refuses to touch an install directory that already holds cluster state
+    unless `recreate` is explicitly set. Wiping that directory destroys the
+    only local record `openshift-install` has of any cloud resources it
+    previously provisioned there, which is what silently turns a re-run into
+    an unintentional "recreate" of the cluster (and can orphan the old cloud
+    resources). This function does NOT run `openshift-install destroy
+    cluster` on your behalf — see the warning printed below.
+    """
     azure_dir = pathlib.Path.home() / ".azure"
+
+    existing = _existing_state_dirs(pattern_dir, cluster_configs)
+
+    if existing and not recreate:
+        rprint("[red]ERROR: Existing cluster install state detected:[/red]")
+        for config in existing:
+            rprint(f"  - {config['name']}: {pattern_dir / config['directory']}")
+        rprint(
+            "\n[yellow]Refusing to overwrite without --recreate.[/yellow]\n"
+            "This tool does NOT run 'openshift-install destroy cluster' for you.\n"
+            "Before re-running with --recreate, either:\n"
+            "  1. Destroy the existing cluster's cloud resources yourself:\n"
+            "     openshift-install destroy cluster --dir=<install_dir>\n"
+            "  2. Or confirm the cloud resources are already gone / were never created.\n"
+            "Re-running with --recreate will DELETE the local install state above\n"
+            "WITHOUT destroying any associated cloud resources, which can orphan them."
+        )
+        raise typer.Exit(code=1)
+
+    if existing:
+        rprint("[yellow]--recreate specified: wiping local install state for:[/yellow]")
+        for config in existing:
+            rprint(f"  - {config['name']}: {pattern_dir / config['directory']}")
+        rprint(
+            "[yellow]NOTE: this does NOT call 'openshift-install destroy cluster'. "
+            "If cloud resources still exist from the previous install, they will "
+            "be orphaned. Destroy them manually first if needed.[/yellow]"
+        )
 
     for config in cluster_configs:
         install_dir = pattern_dir / config["directory"]
@@ -152,6 +212,18 @@ def run(
     prefix: Annotated[
         str, typer.Option("--prefix", help="Prefix for cluster name and directory")
     ] = "",
+    recreate: Annotated[
+        bool,
+        typer.Option(
+            "--recreate",
+            help=(
+                "Required if the install directory already has cluster state. "
+                "Wipes the local install state so a new cluster can be created. "
+                "Does NOT destroy cloud resources from a previous install -- "
+                "destroy those yourself first if they still exist."
+            ),
+        ),
+    ] = False,
 ):
     """
     Region flag requires an azure region key which can be (authoritatively)
@@ -163,6 +235,11 @@ def run(
     Use --prefix to add a prefix to cluster name and install directory, enabling
     multiple cluster deployments (e.g., --prefix cluster1 creates coco-cluster1
     in openshift-install-cluster1).
+
+    Use --recreate to allow wiping an install directory that already has
+    cluster state. Without it, the command refuses to touch a directory that
+    looks like it belongs to a previous (possibly still-live) cluster. This
+    does NOT run "openshift-install destroy cluster" for you.
     """
     validate_dir()
 
@@ -179,7 +256,7 @@ def run(
         else:
             rprint("Setting up single cluster deployment")
 
-    cleanup(pathlib.Path.cwd(), cluster_configs)
+    cleanup(pathlib.Path.cwd(), cluster_configs, recreate=recreate)
     setup_install(
         pathlib.Path.cwd(),
         region,
