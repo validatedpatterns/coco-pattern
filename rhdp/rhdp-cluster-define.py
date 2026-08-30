@@ -5,7 +5,7 @@ import json
 import os
 import pathlib
 import shutil
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -109,7 +109,8 @@ def cleanup(
             "Before re-running with --recreate, either:\n"
             "  1. Destroy the existing cluster's cloud resources yourself:\n"
             "     openshift-install destroy cluster --dir=<install_dir>\n"
-            "  2. Or confirm the cloud resources are already gone / were never created.\n"
+            "  2. Or confirm the cloud resources are already gone / were never "
+            "created.\n"
             "Re-running with --recreate will DELETE the local install state above\n"
             "WITHOUT destroying any associated cloud resources, which can orphan them."
         )
@@ -139,6 +140,66 @@ def validate_dir():
     """Simple validation for directory"""
     assert pathlib.Path("values-global.yaml").exists()
     assert pathlib.Path("values-azure.yaml").exists()
+
+
+# Default SSH public key candidates to auto-detect, in preference order.
+# Ed25519 first (current best practice), falling back through ECDSA to RSA
+# for backwards compatibility with existing keys.
+DEFAULT_SSH_KEY_CANDIDATES = ("id_ed25519", "id_ecdsa", "id_rsa")
+
+
+def resolve_pull_secret(override: Optional[str]) -> pathlib.Path:
+    """Resolve the OpenShift pull secret path.
+
+    Honors an explicit override (--pull-secret / PULL_SECRET env var), else
+    falls back to the historical default of ~/pull-secret.json.
+    """
+    path = (
+        pathlib.Path(override).expanduser()
+        if override
+        else pathlib.Path("~/pull-secret.json").expanduser()
+    )
+    if not path.exists():
+        rprint(f"[red]ERROR: OpenShift pull secret not found at {path}[/red]")
+        rprint(
+            "Download it from https://console.redhat.com/openshift/downloads "
+            "and save it there, or point to it with --pull-secret / the "
+            "PULL_SECRET environment variable."
+        )
+        raise typer.Exit(code=1)
+    return path
+
+
+def resolve_ssh_public_key(override: Optional[str]) -> pathlib.Path:
+    """Resolve the SSH public key to embed in install-config.yaml.
+
+    Honors an explicit override (--ssh-public-key / SSH_PUBLIC_KEY env var).
+    Otherwise auto-detects the user's default key, preferring Ed25519, then
+    ECDSA, then RSA (first match wins) -- current best practice while
+    remaining backwards compatible with existing RSA-only setups.
+    """
+    if override:
+        path = pathlib.Path(override).expanduser()
+        if not path.exists():
+            rprint(f"[red]ERROR: SSH public key not found at {path}[/red]")
+            raise typer.Exit(code=1)
+        return path
+
+    ssh_dir = pathlib.Path.home() / ".ssh"
+    for candidate in DEFAULT_SSH_KEY_CANDIDATES:
+        candidate_path = ssh_dir / f"{candidate}.pub"
+        if candidate_path.exists():
+            return candidate_path
+
+    checked = ", ".join(str(ssh_dir / f"{c}.pub") for c in DEFAULT_SSH_KEY_CANDIDATES)
+    rprint("[red]ERROR: No SSH public key found.[/red]")
+    rprint(
+        f"Checked (in order): {checked}\n"
+        "Generate a modern key with: ssh-keygen -t ed25519\n"
+        "Or point to an existing one with --ssh-public-key / the "
+        "SSH_PUBLIC_KEY environment variable."
+    )
+    raise typer.Exit(code=1)
 
 
 def setup_install(
@@ -224,6 +285,26 @@ def run(
             ),
         ),
     ] = False,
+    pull_secret: Annotated[
+        Optional[str],
+        typer.Option(
+            "--pull-secret",
+            envvar="PULL_SECRET",
+            help="Path to the OpenShift pull secret (default: ~/pull-secret.json).",
+        ),
+    ] = None,
+    ssh_public_key: Annotated[
+        Optional[str],
+        typer.Option(
+            "--ssh-public-key",
+            envvar="SSH_PUBLIC_KEY",
+            help=(
+                "Path to an SSH public key to embed in install-config.yaml. "
+                "Defaults to auto-detecting ~/.ssh/id_ed25519.pub, then "
+                "id_ecdsa.pub, then id_rsa.pub (first match wins)."
+            ),
+        ),
+    ] = None,
 ):
     """
     Region flag requires an azure region key which can be (authoritatively)
@@ -240,8 +321,22 @@ def run(
     cluster state. Without it, the command refuses to touch a directory that
     looks like it belongs to a previous (possibly still-live) cluster. This
     does NOT run "openshift-install destroy cluster" for you.
+
+    Use --pull-secret (or the PULL_SECRET environment variable) to override
+    the OpenShift pull secret location (default: ~/pull-secret.json).
+
+    Use --ssh-public-key (or the SSH_PUBLIC_KEY environment variable) to
+    override the SSH public key embedded in install-config.yaml. Without an
+    override, the key is auto-detected, preferring ~/.ssh/id_ed25519.pub,
+    then id_ecdsa.pub, then id_rsa.pub.
     """
     validate_dir()
+
+    # Resolve and validate secrets/keys before touching any install
+    # directory, so a missing pull secret or SSH key can't trigger a
+    # destructive cleanup() only to fail afterwards.
+    pull_secret_path = resolve_pull_secret(pull_secret)
+    ssh_public_key_path = resolve_ssh_public_key(ssh_public_key)
 
     # Choose cluster configurations based on multicluster flag
     if multicluster:
@@ -260,8 +355,8 @@ def run(
     setup_install(
         pathlib.Path.cwd(),
         region,
-        pathlib.Path("~/pull-secret.json"),
-        pathlib.Path("~/.ssh/id_rsa.pub"),
+        pull_secret_path,
+        ssh_public_key_path,
         cluster_configs,
     )
     write_azure_creds()

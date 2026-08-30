@@ -140,17 +140,10 @@ echo "requirements installed"
 echo "---------------------"
 sleep 5
 
-if [ ! -f "${HOME}/pull-secret.json" ]; then
-   echo "A OpenShift pull secret is required at ~/pull-secret.json"
-   exit 1
-fi
-
-if [ ! -f "${HOME}/.ssh/id_rsa" ]; then
-   echo "An rsa ssh key is required at ~/.ssh/id_rsa"
-   echo "e.g. ssh-keygen -t rsa -b 4096"
-   echo "TBC: Update to support other key types"
-   exit 1
-fi
+# The OpenShift pull secret and SSH public key locations are resolved by
+# rhdp-cluster-define.py below (with clear error messages if not found).
+# Override via the PULL_SECRET / SSH_PUBLIC_KEY environment variables if
+# your pull secret or SSH key isn't at the default location.
 
 echo "---------------------"
 echo "defining both clusters (hub and spoke)"
