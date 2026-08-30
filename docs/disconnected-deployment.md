@@ -12,7 +12,7 @@ Deploy the CoCo validated pattern on a disconnected OpenShift cluster using mirr
 
 ## Architecture
 
-```
+```text
 Internet ──► Jump Host ──► Disconnected Network
                 │                    │
           quay.io (source)    quay-mirror (dest)
@@ -21,10 +21,11 @@ Internet ──► Jump Host ──► Disconnected Network
 ```
 
 **Content flows:**
+
 1. `oc-mirror` mirrors OCP release + operator catalogs + container images to Quay
 2. `airgap-post-install.sh` mirrors OCI Helm charts (oc-mirror can't handle these)
-3. `git-http-server.py` serves pattern git repos over smart HTTP (go-git requires this)
-4. Pattern operator clones from git server, ArgoCD pulls Helm charts from Quay
+3. `git-http-server.py` serves pattern Git repos over smart HTTP (go-git requires this)
+4. Pattern operator clones from Git server, ArgoCD pulls Helm charts from Quay
 
 ## Step-by-Step Deployment
 
@@ -41,6 +42,7 @@ make airgap-mirror \
 ```
 
 **What gets mirrored:**
+
 - OCP 4.21.24 release images
 - Red Hat operators: gitops, sandboxed-containers, trustee, cert-manager, ACM, LVM, CNV, NFD, intel-device-plugins
 - Certified operators: gpu-operator
@@ -49,7 +51,7 @@ make airgap-mirror \
 
 **Known limitation:** `oc-mirror --v2` cannot mirror OCI Helm chart artifacts via `additionalImages`. The post-install script handles these separately.
 
-**Known limitation:** `oc-mirror --v2` fails on images published as OCI image indexes (`application/vnd.oci.image.index.v1+json`) with "Manifest list must be converted" error. Currently only affects `patterns-operator`. See [patterns-operator#774](https://github.com/validatedpatterns/patterns-operator/issues/774). Workaround: deploy operator manually (automated in bootstrap script).
+**Known limitation:** `oc-mirror --v2` fails on images published as OCI image indices (`application/vnd.oci.image.index.v1+json`) with "Manifest list must be converted" error. Currently only affects `patterns-operator`. See [patterns-operator#774](https://github.com/validatedpatterns/patterns-operator/issues/774). Workaround: deploy operator manually (automated in bootstrap script).
 
 ### 2. Install OpenShift
 
@@ -100,7 +102,7 @@ make airgap-post-install
 
 | Step | Action |
 |------|--------|
-| 1 | Validate prerequisites (oc, git, KUBECONFIG, MIRROR_REGISTRY) |
+| 1 | Validate prerequisites (oc, Git, KUBECONFIG, MIRROR_REGISTRY) |
 | 2 | Disable default CatalogSources (prevent OLM reaching internet) |
 | 3 | Create mirrored CatalogSources (redhat, certified, community) |
 | 4 | Create ITMS for tag-based image pulls (ubi-minimal, VP images) |
@@ -108,7 +110,7 @@ make airgap-post-install
 | 6 | Fix oc-mirror manifest list failures (skopeo fallback) |
 | 7 | Add mirror CA cert to ArgoCD TLS config |
 | 8 | Enable OVN routingViaHost (opt-in, lab networks only) |
-| 9 | Set up smart HTTP git server for pattern repos |
+| 9 | Set up smart HTTP Git server for pattern repos |
 | 10 | Create patterns-operator-config ConfigMap (GitOps channel override) |
 
 ### 5. Install patterns-operator
@@ -195,28 +197,35 @@ The following Quay repos **must be public** for ArgoCD to pull OCI Helm charts (
 | `make airgap-mirror` | Mirror content to disconnected registry |
 | `make airgap-post-install` | Run full post-install bootstrap |
 | `make airgap-deploy-pattern` | Deploy Pattern CR directly |
-| `make airgap-sync-repos` | Sync git working copies to bare HTTP repos |
+| `make airgap-sync-repos` | Sync Git working copies to bare HTTP repos |
 
 ## Troubleshooting
 
 ### "manifest unknown" during OCP install
+
 The `openshift-install` binary version must match the mirrored release. Rebuild the ISO if certificates expired (>24 hours old).
 
 ### ArgoCD apps stuck at "Unknown" sync
+
 Check if Helm chart repos are public on Quay. Verify with:
+
 ```bash
 curl -sk https://quay.example.com:443/v2/mirror/validatedpatterns/clustergroup/tags/list
 # Should return 200 with JSON, not 401
 ```
 
-### "unexpected EOF" from patterns-operator git clone
+### "unexpected EOF" from patterns-operator Git clone
+
 The patterns-operator uses go-git which doesn't support Apache dumb HTTP. Use `git-http-server.py` (smart HTTP via `git-http-backend` CGI) on port 8080.
 
 ### GitOps operator subscription wrong channel
+
 The patterns-operator hardcodes the GitOps channel. The bootstrap script creates a `patterns-operator-config` ConfigMap to override it to `latest` (the only channel available in the mirrored catalog).
 
 ### Vault ImagePullBackOff
+
 The VP Helm chart references `registry.connect.redhat.com/hashicorp/vault:VERSION-ubi`. Add an ITMS entry for `registry.connect.redhat.com/hashicorp` and mirror the image:
+
 ```bash
 oc image mirror --insecure=true \
   registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi \
@@ -224,6 +233,7 @@ oc image mirror --insecure=true \
 ```
 
 ### OVN routingViaHost
+
 Only needed when the OVN default gateway can't route to the jump host subnet. This is lab-specific — in a properly routed network, pods can reach the git/registry servers without it. Set `ENABLE_ROUTINGVIAHOST=true` before running the bootstrap.
 
 ## Known Issues

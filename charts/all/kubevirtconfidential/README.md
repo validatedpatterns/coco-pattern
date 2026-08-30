@@ -44,6 +44,6 @@ When enabled, the chart creates:
 1. **HyperConverged CR patch** -- enables the `WorkloadEncryptionSEV` feature gate
    (which also covers TDX on Intel platforms)
 2. **SELinux MachineConfig** -- installs a custom SELinux policy module
-   (`kubevirt-qgs`) allowing QEMU processes to connect to the QGS unix socket
+   (`kubevirt-qgs`) allowing QEMU processes to connect to the QGS Unix socket
 3. **RHEL 9 ImageStream import job** -- imports the RHEL 9 guest image into the
    internal registry for VM boot via DataImportCron

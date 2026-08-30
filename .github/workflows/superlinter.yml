@@ -35,6 +35,10 @@ jobs:
           VALIDATE_MARKDOWN_PRETTIER: false
           VALIDATE_KUBERNETES_KUBECONFORM: false
           VALIDATE_PYTHON_PYLINT: false
+          # Pyink and Black conflict (super-linter warns against enabling both).
+          # This repo formats Python with Black (.flake8 targets Black's line
+          # length), and no other validatedpatterns/* repo enables Pyink.
+          VALIDATE_PYTHON_PYINK: false
           VALIDATE_SHELL_SHFMT: false
           VALIDATE_YAML: false
           VALIDATE_YAML_PRETTIER: false

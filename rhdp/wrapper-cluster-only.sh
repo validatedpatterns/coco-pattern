@@ -14,13 +14,41 @@ get_python_cmd() {
     fi
 } 
 
-if [ "$#" -ne 1 ]; then
-    echo "Error: Exactly one argument is required."
-    echo "Usage: $0 {azure-region-code}"
+# Parse arguments
+AZUREREGION=""
+RECREATE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --recreate)
+            RECREATE=true
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option $1"
+            echo "Usage: $0 [--recreate] {azure-region-code}"
+            echo "Example: $0 eastasia"
+            exit 1
+            ;;
+        *)
+            if [ -z "$AZUREREGION" ]; then
+                AZUREREGION="$1"
+            else
+                echo "Error: Too many positional arguments."
+                echo "Usage: $0 [--recreate] {azure-region-code}"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$AZUREREGION" ]; then
+    echo "Error: Azure region is required."
+    echo "Usage: $0 [--recreate] {azure-region-code}"
     echo "Example: $0 eastasia"
     exit 1
 fi
-AZUREREGION=$1
 
 echo "---------------------"
 echo "Validating configuration"
@@ -97,7 +125,11 @@ echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
 PYTHON_CMD=$(get_python_cmd)
-$PYTHON_CMD rhdp/rhdp-cluster-define.py ${AZUREREGION}
+DEFINE_ARGS=()
+if [ "$RECREATE" = true ]; then
+    DEFINE_ARGS+=(--recreate)
+fi
+$PYTHON_CMD rhdp/rhdp-cluster-define.py "${DEFINE_ARGS[@]}" ${AZUREREGION}
 echo "---------------------"
 echo "cluster defined"
 echo "---------------------"
