@@ -15,10 +15,10 @@ Systemd user service (persistent):
     systemctl --user enable --now git-http.service
 """
 import os
+import socketserver
 import subprocess
 import sys
-import socketserver
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 GIT_PROJECT_ROOT = os.path.expanduser(

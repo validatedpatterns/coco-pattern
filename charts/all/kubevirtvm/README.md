@@ -44,5 +44,5 @@ When enabled with `global.kubevirt.vm.enabled: "true"`:
 
 When additionally enabled with `global.kubevirt.vm.tdx.enabled: "true"`:
 
-2. **TDX Confidential VM** -- a RHEL 9 VM with TDX launch security enabled,
+1. **TDX Confidential VM** -- a RHEL 9 VM with TDX launch security enabled,
    validating end-to-end confidential compute inside KubeVirt

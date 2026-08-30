@@ -210,7 +210,7 @@ EOF
 
 ### 0-3: Local Git Server Initialisation (ONE-TIME per jump host)
 
-The local git HTTP server makes pattern repos available to the cluster's patterns-operator
+The local Git HTTP server makes pattern repos available to the cluster's patterns-operator
 during the deploy. `scripts/airgap-post-install.sh --sync-repos-only` creates bare repos
 and starts the service; subsequent runs auto-sync via the D-1 step.
 
@@ -386,7 +386,6 @@ python3 -c "import json; [print(k) for k in json.load(open('pull-secret.json'))[
 
 echo "A-1: State verification complete at $(date)" 2>&1 | tee -a "$LOG"
 ```
-
 
 ### A-3: oc-mirror Workspace Wipe
 
@@ -743,7 +742,6 @@ ls -lh ~/public_html/node-02-42208.iso 2>&1 | tee -a "$LOG" && \
 echo "C-1: Config generation and ISO build complete at $(date)" 2>&1 | tee -a "$LOG"
 ```
 
-
 ### C-3: Mount ISO via iDRAC
 
 ```bash
@@ -835,6 +833,7 @@ echo "C-6: KUBECONFIG configured at $(date)" 2>&1 | tee -a "$LOG"
 ### D-1: Run airgap-post-install.sh
 
 > `airgap-post-install.sh` handles all of the following in one pass:
+>
 > - Disables OperatorHub default catalogs
 > - Applies CatalogSources from oc-mirror cluster-resources (deleting stale ones)
 > - Applies ALL oc-mirror cluster-resources: IDMS, ITMS, ClusterCatalog (OLM v1), signature ConfigMap
@@ -956,6 +955,7 @@ echo "D-4: pattern.sh complete at $(date)" 2>&1 | tee -a "$LOG"
 > If you delay, ArgoCD may come up and fail to pull VP OCI Helm charts before credentials are loaded.
 >
 > Steps D-5 performs once vp-gitops appears:
+>
 > 1. Inject mirror-registry private CA into ArgoCD's TLS trust store
 > 2. `make load-bootstrap` — pre-seeds ArgoCD with mirror-registry OCI Helm credentials
 >    (from the `bootstrap_secrets` block in values-secret.yaml; no vault required)
@@ -1391,7 +1391,7 @@ echo "=== Run Complete: $(date) ===" 2>&1 | tee -a "$LOG"
 | Criterion | Expected | Actual |
 |-----------|----------|--------|
 | patterns-operator CSV Succeeded | Via OLM from mirror-registry community catalog | |
-| Pattern CR reconciles | targetRepo = HTTP git URL (not GitHub) | |
+| Pattern CR reconciles | targetRepo = HTTP Git URL (not GitHub) | |
 | Vault init without manual SA creation | Sync-wave fix still working | |
 | 15/15 (or current count) ArgoCD apps Synced+Healthy | All green | |
 | KBS attestation affirming | POST /attest 200 | |
@@ -1402,7 +1402,7 @@ echo "=== Run Complete: $(date) ===" 2>&1 | tee -a "$LOG"
 | secret.txt contains KBS resource | Fetched via CDH from KBS | |
 | All images from mirror-registry | No upstream refs | |
 | MCH Running | ACM + MCE healthy | |
-| QGS socket_port=0 WITHOUT manual sed | D-06 — MCO fix working (new row) |
+| QGS socket_port=0 WITHOUT manual sed | D-06 — MCO fix working (new row) | |
 | No mirrorSourcePolicy conflicts after D-1.5 | PASS: all IDMS/ITMS have NeverContactSource (new row) | |
 | scripts/deprecated/ untouched — 3 files, none invoked | D-07 — no deprecated scripts called (new row) | |
 | 2-line global catalogSource overlay active in values-baremetal-airgap.yaml | D-07 — Phase 24 C-05 migration active (new row) | |
@@ -1492,10 +1492,12 @@ SELinux note: htpasswd file requires `container_file_t` label. If recreating, ru
 `chcon -t container_file_t ~/mirror-registry-config/htpasswd`
 
 CA trust for container tools (podman, oc-mirror, skopeo):
+
 ```bash
 mkdir -p ~/.config/containers/certs.d/${MIRROR_REGISTRY}
 cp ~/mirror-registry-certs/ca.crt ~/.config/containers/certs.d/${MIRROR_REGISTRY}/ca.crt
 ```
+
 This is idempotent and is run automatically in A-0. It enables `--dest-tls-verify=true` in oc-mirror
 and removes the need for `--tls-verify=false` in podman login.
 
@@ -1553,12 +1555,14 @@ export MREG_PASS=$(cat ~/.coco-pattern/mirror-registry-password)
 ```
 
 Auto-set during run:
+
 ```bash
 export KUBECONFIG=<set in C-6 from build dir>
 export MIRROR_REGISTRY=MIRROR_REGISTRY_HOST:8443
 ```
 
 Persistent in `~/.envrc`:
+
 ```bash
 export LABCTL_IDRAC_USER=chbutler
 export LABCTL_IDRAC_PASSWORD="..."

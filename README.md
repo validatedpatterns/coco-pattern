@@ -33,12 +33,13 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 - **8.0** — OSC 1.13 / Trustee 1.2 upgrade. KBS TOML rewrite, RVPS format alignment, operator CSV pins, trustee-chart v0.10.0. Airgap deployment support: single mirror-registry architecture, `oc-mirror` v2, `airgap-post-install.sh` bootstrap, `DEPLOY-RUNBOOK.md` operational guide. Requires OCP 4.22+.
 
 **Key changes from v5:**
+
 - **Operator upgrade:** OSC 1.12 → 1.13, Trustee 1.1 → 1.2. Breaking API changes in KBS configuration and RVPS reference value format.
-- **Airgap support:** Full disconnected deployment on bare metal via a single mirror-registry. Includes `oc-mirror` imageset configs, `airgap-post-install.sh` for bootstrap (CatalogSources, IDMS/ITMS, NeverContactSource policy normalisation, ArgoCD CA injection, git HTTP server), and a step-by-step operational runbook at `airgap/DEPLOY-RUNBOOK.md`.
+- **Airgap support:** Full disconnected deployment on bare metal via a single mirror-registry. Includes `oc-mirror` imageset configs, `airgap-post-install.sh` for bootstrap (CatalogSources, IDMS/ITMS, NeverContactSource policy normalisation, ArgoCD CA injection, Git HTTP server), and a step-by-step operational runbook at `airgap/DEPLOY-RUNBOOK.md`.
 - **Chart architecture:** trustee-chart moved to OCI Helm artifact (`quay.io/validatedpatterns/trustee:0.10.0`). Kyverno chart vendored under `charts/vendor/`. External charts (sandboxed-containers, sandboxed-policies) remain OCI.
 - **TDX MachineConfig:** QGS socket port `socket_port=0` now deployed via MachineConfig drop-in (replaces manual `sed` workaround).
 - **DCAP collateral:** `collect-dcap-collateral.sh` uses `pcsclient.py fetch -p E5` with `jq` fixup for QeIdentity (Red Hat OSC 1.13 disconnected TDX procedure).
-- **Experimental:** KubeVirt TDX confidential VMs (`charts/all/kubevirtconfidential/`, `charts/all/kubevirtvm/`). Disabled by default. Requires Intel TDX hardware and KubeVirt post-v1.8.4 for full QGS attestation. See chart READMEs for details.
+- **Experimental:** KubeVirt TDX confidential VMs (`charts/all/kubevirtconfidential/`, `charts/all/kubevirtvm/`). Disabled by default. Requires Intel TDX hardware and KubeVirt post-v1.8.4 for full QGS attestation. See chart readmes for details.
 
 ### Previous versions
 
@@ -53,7 +54,8 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 ### Airgap (disconnected) deployment
 
 For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/DEPLOY-RUNBOOK.md) for the full operational procedure. The runbook covers:
-- Phase 0: One-time jump host setup (mirror registry, git HTTP server, CA certificates)
+
+- Phase 0: One-time jump host setup (mirror registry, Git HTTP server, CA certificates)
 - Phase A–B: Mirror wipe and `oc-mirror` v2 re-mirror
 - Phase C: Agent-based OCP install
 - Phase D: Pattern bootstrap (`airgap-post-install.sh`)
@@ -61,6 +63,7 @@ For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/
 - Phase F: Verification and pass/fail checklist
 
 **Prerequisites for airgap:**
+
 - A jump host with internet access (for `oc-mirror`) and network access to the target cluster
 - `docker.io/library/registry:2` container running as the mirror registry (setup documented in Phase 0)
 - `scripts/git-http-server.py` serving pattern repos over smart HTTP (required by the patterns-operator's go-git client)
@@ -127,7 +130,7 @@ These scripts generate the cryptographic material and attestation reference valu
    - Options: `intel-tdx`, `amd-snp`, `intel-tdx-gpu`, `amd-snp-gpu`
 3. Run `bash scripts/gen-secrets.sh` to generate KBS keys and PCCS secrets
 4. `./pattern.sh make install`
-6. Wait for the cluster to reboot nodes (MachineConfig updates for TDX/SEV-SNP kernel parameters and vsock)
+5. Wait for the cluster to reboot nodes (MachineConfig updates for TDX/SEV-SNP kernel parameters and vsock)
 
 > **Note:** Bare metal support is currently tested on SNO (Single Node OpenShift) configurations. Multi-node bare metal clusters are expected to work but have not been validated yet.
 
