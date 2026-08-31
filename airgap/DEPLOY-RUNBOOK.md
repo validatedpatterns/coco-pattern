@@ -910,6 +910,12 @@ make cache-keys 2>&1 | tee -a "$LOG"
 make cache-registry-ca 2>&1 | tee -a "$LOG"
 ./scripts/gen-secrets.sh 2>&1 | tee -a "$LOG"
 
+# registryCaCert and bootstrap_secrets (mirror-registry-helm-oci) are
+# commented out by default in values-secret.yaml.template (they only apply
+# to airgap deployments). Uncomment both blocks in the generated
+# values-secret file now that cache-registry-ca has populated the CA cert.
+make enable-airgap-secrets 2>&1 | tee -a "$LOG"
+
 # Strip trailing newline from mirror-registry-password.
 # load-bootstrap reads this file verbatim via the values-secret.yaml path: field and
 # the Ansible role does not strip whitespace. A trailing \n causes Helm to send

@@ -314,9 +314,24 @@ echo "Saved to: $OUTPUT_FILE"
 echo ""
 if [ "$PLATFORM" = "azure" ]; then
     VAULT_KEY="pcrStash"
+    SIBLING_FILE="${HOME}/.coco-pattern/firmware-reference-values.json"
 else
     VAULT_KEY="firmwareReferenceValues"
+    SIBLING_FILE="${HOME}/.coco-pattern/measurements.json"
 fi
+
+# The values-secret template enables pcrStash (Azure) and
+# firmwareReferenceValues (bare metal) unconditionally so the same file works
+# on either topology. Ensure the *other* platform's file also exists (as an
+# empty '{}' placeholder) so 'make load-secrets' doesn't fail on a topology
+# that only ever collects reference values for one platform. This never
+# overwrites real, previously-collected data.
+if [ ! -f "$SIBLING_FILE" ]; then
+    echo '{}' > "$SIBLING_FILE"
+    echo "Created empty placeholder for the other platform: $SIBLING_FILE"
+    echo ""
+fi
+
 echo "Next steps:"
 echo "1. Review the collected values: cat $OUTPUT_FILE"
 echo "2. Ensure '$VAULT_KEY' is configured in ~/values-secret-coco-pattern.yaml"

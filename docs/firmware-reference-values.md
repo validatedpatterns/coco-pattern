@@ -90,18 +90,17 @@ Pass `--tee tdx` or `--tee snp` explicitly to collect a single architecture only
 
 ### Step 1: Configure values-secret.yaml
 
-Azure reference values use the `pcrStash` secret (already enabled by default in `~/values-secret-coco-pattern.yaml`).
+Azure reference values use the `pcrStash` secret and bare metal reference
+values use the `firmwareReferenceValues` secret. Both are enabled by default
+in `~/values-secret-coco-pattern.yaml`, so the same file works unmodified on
+either topology — nothing needs to be uncommented.
 
-Bare metal reference values use the `firmwareReferenceValues` secret. Uncomment this section in `~/values-secret-coco-pattern.yaml`:
-
-```yaml
-- name: firmwareReferenceValues
-  vaultPrefixes:
-  - hub
-  fields:
-  - name: json
-    path: ~/.coco-pattern/firmware-reference-values.json
-```
+`collect-firmware-refvals.sh` automatically creates an empty `{}` placeholder
+for whichever of `~/.coco-pattern/measurements.json` /
+`~/.coco-pattern/firmware-reference-values.json` you are *not* collecting, so
+`make load-secrets` never fails with a missing-file error regardless of
+platform. Real collected data always overwrites the placeholder for the
+platform you actually run.
 
 ### Step 2: Push to Vault
 
