@@ -43,3 +43,19 @@ kbs:
     abiMinor: "31"
     singleSocket: "false"
     smtAllowed: "true"
+
+  # trustee-chart's default kbs.extraSecrets (["credential"]) is unconditionally
+  # added to KbsConfig.spec.kbsSecretResources, but the ACM ConfigurationPolicy
+  # that creates that Secret (pull-secret-credential-policy.yaml) is skipped on
+  # Azure -- peer-pod CDH doesn't fetch registry credentials from KBS there
+  # (pull secrets are distributed to workload namespace SAs instead, see
+  # sandboxed-policies-chart/pull-secret-distribution.yaml). Without this
+  # override, KbsConfig lists a Secret ("credential") that never gets created,
+  # and the kbsconfig-controller fails to deploy KBS with:
+  #   Error in creating/updating KBS deployment: Secret "credential" not found
+  #
+  # Fixed upstream in trustee-chart (kbs.yaml now gates extraSecrets the same
+  # way as the policy) -- see validatedpatterns/trustee-chart#42. This
+  # override can be dropped once coco-pattern picks up a trustee chartVersion
+  # that includes that fix (>= 0.10.1, pending release).
+  extraSecrets: []
