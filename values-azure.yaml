@@ -90,6 +90,7 @@ clusterGroup:
       chartVersion: 0.9.*
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
+        - '/overrides/values-trustee-azure.yaml'
       overrides:
         - name: global.coco.secured
           value: "true"

@@ -1,0 +1,45 @@
+# Azure SEV-SNP platform configuration reference values, pinned explicitly in
+# coco-pattern rather than silently inherited from trustee-chart's own
+# values.yaml defaults.
+#
+# These describe the SEV-SNP policy Azure enforces for confidential VMs of a
+# given series. They are NOT derived from the workload image -- they are
+# Azure platform constants for the VM type -- and are NOT collected by
+# 'make collect-azure-refvals' (veritas does not compute these; see
+# docs/firmware-reference-values.md "Known Limitations").
+#
+# Current values below match Azure DCasv5-series VMs (this pattern's default
+# VM flavour, see global.azure.defaultVMFlavour in values-global.yaml):
+#
+#   VM Series       | SMT | TSME | ABI Minor | Notes
+#   ----------------|-----|------|-----------|------
+#   DCasv5 (Genoa)  | true| true | 31        | Standard CoCo peer-pod VMs (default)
+#   DCadsv5 (Genoa) | true| true | 31        | With local NVMe
+#   ECasv5 (Genoa)  | true| true | 31        | Memory-optimized
+#   DCesv5 (Milan)  | true| true | 31        | Earlier generation, may differ
+#
+# If you change global.azure.defaultVMFlavour to a series with different
+# platform behaviour, or if Azure updates its confidential VM firmware,
+# update the values below to match. There is currently no automated way to
+# collect them (see the tracking issue for a snpguest-based collection
+# script) -- the only documented method today is: check the trustee logs
+# (RUST_LOG=debug is enabled by default on the KBS pod) for the actual
+# values reported by the VM on attestation failure, and update these to
+# match.
+#
+# NOTE: as of trustee-chart's current attestation-policy.yaml, the Rego
+# checks that would compare evidence against these values (smt_enabled,
+# tsme_enabled, abi_major/minor, single_socket, smt_allowed) are commented
+# out upstream ("Azure manages TCB validation" / "Azure platform
+# constants"), so these are not currently enforced. They are pinned here
+# so the values are visible/versioned in this repo, and ready to take
+# effect if/when upstream re-enables those policy checks.
+kbs:
+  azure:
+    snpLaunchMeasurement: "qnydpVwThuWxZTsSWXi+2ns/laha6w+d2723g84FaijJ0CHaI5w0pYw6ZXZUJw7v"
+    smtEnabled: "true"
+    tsmeEnabled: "true"
+    abiMajor: "0"
+    abiMinor: "31"
+    singleSocket: "false"
+    smtAllowed: "true"

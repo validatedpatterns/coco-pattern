@@ -5,6 +5,10 @@
 include Makefile-common
 
 ##@ Key Management
+.PHONY: gen-secrets
+gen-secrets: ## Generate KBS keys, sealed-secrets signing key, and values-secret template
+	@scripts/gen-secrets.sh
+
 .PHONY: cache-keys
 cache-keys: ## Download Red Hat signing keys from official sources to ~/.coco-pattern/
 	@mkdir -p ~/.coco-pattern
@@ -99,6 +103,14 @@ dcap-offline-provision: ## Full DCAP offline provisioning workflow (collect coll
 	$(MAKE) collect-dcap-collateral
 	$(MAKE) load-secrets
 
+.PHONY: check-pck-expiry
+check-pck-expiry: ## Check expiry of PCK cache secrets and platform data (requires oc login)
+	@scripts/check-pck-expiry.sh
+
+.PHONY: check-collateral-expiry
+check-collateral-expiry: ## Check expiry of TDX DCAP collateral in trustee-operator-system (requires oc login)
+	@scripts/check-collateral-expiry.sh
+
 ##@ AMD SEV-SNP VCEK Provisioning
 
 .PHONY: snp-collect-vcek-urls
@@ -191,6 +203,16 @@ argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd 
 	fi
 
 ##@ Hardware Detection
+.PHONY: get-pccs-node
+get-pccs-node: ## Detect a node with Intel TDX support for PCCS deployment (requires KUBECONFIG or oc login)
+	@NODE=$$(oc get nodes -l intel.feature.node.kubernetes.io/tdx=true \
+		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
+	if [ -z "$$NODE" ]; then \
+		echo "ERROR: No TDX-capable nodes found" >&2; \
+		exit 1; \
+	fi; \
+	echo "$$NODE"
+
 .PHONY: detect-hardware
 detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
 	@echo "Detecting hardware profile from cluster nodes..."
