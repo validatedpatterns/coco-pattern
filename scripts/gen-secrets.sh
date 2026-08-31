@@ -9,6 +9,20 @@ VALUES_FILE="${HOME}/values-secret-coco-pattern.yaml"
 
 mkdir -p ${COCO_SECRETS_DIR}
 
+## Ensure both platform-specific reference-value files exist. The
+## values-secret template enables pcrStash (Azure) and firmwareReferenceValues
+## (bare metal) unconditionally so the same file works on either topology.
+## This pre-touches an empty '{}' placeholder for whichever platform's file
+## doesn't exist yet, so 'make load-secrets' won't fail with a missing-file
+## error before collect-firmware-refvals.sh has been run for your platform.
+## Real collected data (from collect-firmware-refvals.sh) always overwrites
+## these placeholders.
+for refval_file in measurements.json firmware-reference-values.json; do
+	if [ ! -f "${COCO_SECRETS_DIR}/${refval_file}" ]; then
+		echo '{}' >"${COCO_SECRETS_DIR}/${refval_file}"
+	fi
+done
+
 SSH_KEY_FILE="${COCO_SECRETS_DIR}/id_rsa"
 
 if [ "${COCO_ENABLE_SSH_DEBUG:-false}" = "true" ]; then
@@ -47,19 +61,24 @@ if [ ! -f "${VALUES_FILE}" ]; then
 	echo "ACTION REQUIRED: Review and customize this file before deploying:"
 	echo
 	echo "  For Azure deployments:"
+	echo "    - Run 'make collect-azure-refvals' to collect PCR measurements"
+	echo "    - pcrStash is already enabled by default; no need to uncomment anything"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
-	echo "    - DCAP collateral section can remain commented out"
+	echo "    - DCAP collateral (tdxCollateral) is bare-metal-TDX-only; leave commented out"
 	echo
 	echo "  For Bare Metal deployments:"
 	echo "    - Run 'make collect-firmware-refvals' to collect firmware measurements"
-	echo "    - Uncomment firmwareReferenceValues in values-secret file"
-	echo "    - For Intel TDX: run 'make collect-dcap-collateral' for offline attestation"
+	echo "    - firmwareReferenceValues is already enabled by default; no need to uncomment anything"
+	echo "    - For Intel TDX: run 'make collect-dcap-collateral', then uncomment tdxCollateral"
+	echo "      in the values-secret file for offline attestation"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
 	echo "    - See docs/firmware-reference-values.md for reference value collection"
 	echo
 	echo "  For airgap (disconnected) deployments:"
-	echo "    - Bootstrap secrets (mirror-registry-helm-oci) are pre-configured"
-	echo "    - Run 'make cache-registry-ca' to cache the mirror registry CA cert"
+	echo "    - registryCaCert and bootstrap_secrets (mirror-registry-helm-oci) are"
+	echo "      commented out by default -- run 'make cache-registry-ca' and"
+	echo "      'make gen-mirror-helm-secret', then 'make enable-airgap-secrets' to"
+	echo "      uncomment both blocks in the generated values-secret file"
 	echo "    - See airgap/DEPLOY-RUNBOOK.md for the full deployment procedure"
 	echo
 	echo "  Security policies:"

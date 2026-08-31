@@ -69,6 +69,10 @@ gen-mirror-helm-secret: ## Generate mirror-registry Helm OCI password file from 
 	@read -r MRPASS; printf '%s' "$$MRPASS" > ~/.coco-pattern/mirror-registry-password; chmod 600 ~/.coco-pattern/mirror-registry-password
 	@echo "  Saved to ~/.coco-pattern/mirror-registry-password"
 
+.PHONY: enable-airgap-secrets
+enable-airgap-secrets: ## Uncomment disconnected-mirror secrets (registryCaCert, bootstrap_secrets) in the generated values-secret file
+	@scripts/enable-airgap-secrets.sh
+
 .PHONY: pck-register
 pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_API_KEY)
 	@if [ -z "$(INTEL_PCS_API_KEY)" ]; then \
