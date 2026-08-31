@@ -116,7 +116,7 @@ mirror:
     - name: quay.io/validatedpatterns/acm:0.1.27
     - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
-    - name: quay.io/validatedpatterns/trustee:0.10.1
+    - name: quay.io/validatedpatterns/trustee:0.10.2
     - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
     - name: quay.io/validatedpatterns/sandboxed-policies:0.2.0
 
