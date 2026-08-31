@@ -5,7 +5,9 @@ The scripts in this directory help users of that platform automate deployments.
 
 ## Prerequisites
 
-- `podman` installed and running (used for reference value collection)
+- `podman` installed and running (used by `pattern.sh` itself)
+- `veritas` installed on the host (used for reference value collection): `pip install "osc-veritas[snp]==0.1.3rc1"`
+- `cosign` >= 2.0 (used by veritas for Azure image signature verification)
 - `yq`, `jq` installed
 - OpenShift pull secret (default: `~/pull-secret.json`, override with `PULL_SECRET` — see below)
 - An SSH key pair (default: auto-detected, preferring Ed25519 — override with `SSH_PUBLIC_KEY` — see below)
