@@ -7,8 +7,8 @@ The scripts in this directory help users of that platform automate deployments.
 
 - `podman` installed and running (used for reference value collection)
 - `yq`, `jq` installed
-- OpenShift pull secret at `~/pull-secret.json`
-- SSH key at `~/.ssh/id_rsa` (RSA)
+- OpenShift pull secret (default: `~/pull-secret.json`, override with `PULL_SECRET` — see below)
+- An SSH key pair (default: auto-detected, preferring Ed25519 — override with `SSH_PUBLIC_KEY` — see below)
 - RHDP environment variables loaded (see below)
 
 ## Environment variables
@@ -53,6 +53,37 @@ The wrapper handles: cluster provisioning, secret generation, PCR reference valu
 
    1. `bash ./rhdp/wrapper-cluster-only.sh eastasia`
    2. Provisions the cluster without installing secrets or the pattern
+
+## Overriding pull secret / SSH key location
+
+By default:
+
+- The OpenShift pull secret is read from `~/pull-secret.json`.
+- The SSH public key embedded in `install-config.yaml` is auto-detected,
+  preferring `~/.ssh/id_ed25519.pub`, then `~/.ssh/id_ecdsa.pub`, then
+  `~/.ssh/id_rsa.pub` (first match wins). Ed25519 is current best practice,
+  but existing RSA-only setups keep working without changes.
+
+Both can be overridden if your pull secret or SSH key live somewhere else,
+via environment variable:
+
+```shell
+export PULL_SECRET=/path/to/pull-secret.json
+export SSH_PUBLIC_KEY=/path/to/your/key.pub
+bash ./rhdp/wrapper.sh eastasia
+```
+
+Since these are plain environment variables, they apply to all three
+wrapper scripts without any extra flags. If you run `rhdp/rhdp-cluster-define.py`
+directly instead of through a wrapper script, the equivalent CLI flags
+`--pull-secret` and `--ssh-public-key` are also available and take
+precedence over the environment variables.
+
+If neither an override nor a default/auto-detected file can be found, the
+command exits with an error explaining what was checked and how to fix it
+(generate a new key with `ssh-keygen -t ed25519`, download a pull secret
+from [console.redhat.com](https://console.redhat.com/openshift/downloads),
+or set the relevant environment variable).
 
 ## Re-running against an existing install directory
 
