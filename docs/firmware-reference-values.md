@@ -22,7 +22,7 @@ By default, `collect-firmware-refvals.sh` collects reference values for **both T
 - `veritas` installed on the host: `pip install "osc-veritas[snp]==0.1.3rc1"`
 - `cosign` >= 2.0 — Azure only, used by veritas to verify the Red Hat dm-verity image signature: <https://docs.sigstore.dev/cosign/system_config/installation/>
 - `yq` and `jq` installed
-- OpenShift pull secret at `~/pull-secret.json`
+- OpenShift pull secret at `~/pull-secret.json` (override the location with the `PULL_SECRET` environment variable or `--pull-secret`)
 - For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in)
 - For bare metal TDX: `tdx-measure` (`cargo install --git https://github.com/virtee/tdx-measure tdx-measure-cli`) — collection continues with a warning if absent, but TDX RTMR values will be incomplete
 
@@ -71,7 +71,8 @@ Veritas resolves the kata-containers and edk2-ovmf RPMs from the OCP release pay
 Options:
   --platform <platform>    Platform: baremetal (default) or azure
   -o, --output <path>      Override output path
-  -p, --pull-secret <path> Pull secret file (default: ~/pull-secret.json)
+  -p, --pull-secret <path> Pull secret file (default: ~/pull-secret.json,
+                           override via PULL_SECRET env var)
   -v, --ocp-version <ver>  OCP version (baremetal; default: auto-detect)
   --osc-version <ver>      OSC operator version (azure; default: auto-detect)
   -t, --tee <tdx|snp|both> TEE type (default: both -- collects and merges both)
