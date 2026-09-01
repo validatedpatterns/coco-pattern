@@ -119,6 +119,14 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        # Use the unauthenticated registry.access.redhat.com mirror instead of
+        # registry.redhat.io on Azure -- peer-pods (kata-remote) CVMs pull
+        # images via guest-pull and registry.redhat.io requires credentials
+        # that are non-trivial to thread through that path. Same digest,
+        # same content, just served from a registry that doesn't require auth.
+        - name: image
+          value: "registry.access.redhat.com/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
 
     kbs-access-curl:
       name: kbs-access-curl
@@ -128,6 +136,10 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        # See hello-openshift override above for rationale.
+        - name: image
+          value: "registry.access.redhat.com/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
 
     kbs-access-sealed:
       name: kbs-access-sealed
@@ -137,6 +149,10 @@ clusterGroup:
       syncPolicy:
         automated:
           prune: true
+      overrides:
+        # See hello-openshift override above for rationale.
+        - name: image
+          value: "registry.access.redhat.com/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
 
     kyverno:
       name: kyverno
