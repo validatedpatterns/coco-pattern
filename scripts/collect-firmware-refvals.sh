@@ -153,6 +153,25 @@ if [ ! -f "$PULL_SECRET" ]; then
     exit 1
 fi
 
+if [ "$PLATFORM" = "azure" ]; then
+    # veritas passes --authfile to skopeo for pulling/inspecting the
+    # dm-verity image, but its cosign-based signature verification step
+    # invokes `cosign verify` directly with no auth args at all. cosign
+    # (via go-containerregistry's DefaultKeychain) only picks up
+    # credentials from ~/.docker/config.json, $DOCKER_CONFIG/config.json,
+    # or -- if neither of those exists -- $REGISTRY_AUTH_FILE. Export the
+    # latter so the pull secret authenticates the registry.redhat.io pull
+    # cosign does internally; otherwise it silently falls back to
+    # anonymous auth and fails with a confusing UNAUTHORIZED error.
+    export REGISTRY_AUTH_FILE="$PULL_SECRET"
+    if [ -f "${HOME}/.docker/config.json" ]; then
+        echo "WARNING: ${HOME}/.docker/config.json exists and takes precedence over" >&2
+        echo "  REGISTRY_AUTH_FILE for cosign's registry auth. If it lacks" >&2
+        echo "  registry.redhat.io credentials, cosign verification will still fail" >&2
+        echo "  with UNAUTHORIZED regardless of --pull-secret/PULL_SECRET." >&2
+    fi
+fi
+
 # Build version args and resolve version for display
 VERSION_ARG_NAME=""
 VERSION_ARG_VALUE=""
