@@ -189,7 +189,7 @@ bash ./scripts/gen-secrets.sh
 echo "---------------------"
 echo "retrieving PCR measurements"
 echo "---------------------"
-bash ./scripts/collect-firmware-refvals.sh --platform azure --tee snp
+bash ./scripts/collect-firmware-refvals.sh --platform azure --tee snp --pull-secret "${PULL_SECRET:-$HOME/pull-secret.json}"
 
 sleep 60
 echo "---------------------"

@@ -28,7 +28,8 @@
 # Options:
 #   --platform <platform>    Platform: baremetal (default) or azure
 #   -o, --output <path>      Override output path
-#   -p, --pull-secret <path> Pull secret file (default: ~/pull-secret.json)
+#   -p, --pull-secret <path> Pull secret file (default: ~/pull-secret.json,
+#                            override via PULL_SECRET env var)
 #   -v, --ocp-version <ver>  OCP version (baremetal; default: auto-detect)
 #   --osc-version <ver>      OSC operator version (azure; default: auto-detect)
 #   -t, --tee <tdx|snp|both> TEE type (default: both -- collects and merges both)
@@ -43,7 +44,7 @@ set -euo pipefail
 # Defaults
 PLATFORM="baremetal"
 OUTPUT_FILE=""
-PULL_SECRET="${HOME}/pull-secret.json"
+PULL_SECRET="${PULL_SECRET:-${HOME}/pull-secret.json}"
 OCP_VERSION=""
 OSC_VERSION=""
 TEE="both"
@@ -82,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            sed -n '2,39p' "$0" | sed 's/^# \?//'
+            sed -n '2,40p' "$0" | sed 's/^# \?//'
             exit 0
             ;;
         *)
@@ -148,7 +149,7 @@ fi
 # Check pull secret exists
 if [ ! -f "$PULL_SECRET" ]; then
     echo "Error: Pull secret not found at $PULL_SECRET" >&2
-    echo "Provide path via --pull-secret or create ~/pull-secret.json" >&2
+    echo "Provide path via --pull-secret, the PULL_SECRET environment variable, or create ~/pull-secret.json" >&2
     exit 1
 fi
 
