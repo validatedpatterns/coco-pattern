@@ -92,11 +92,11 @@ pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_AP
 
 .PHONY: collect-firmware-refvals
 collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
-	@scripts/collect-firmware-refvals.sh
+	@scripts/collect_firmware_refvals.py --platform baremetal
 
 .PHONY: collect-azure-refvals
 collect-azure-refvals: ## Collect PCR reference values (Azure)
-	@scripts/collect-firmware-refvals.sh --platform azure
+	@scripts/collect_firmware_refvals.py --platform azure
 
 .PHONY: collect-dcap-collateral
 collect-dcap-collateral: ## Collect TDX DCAP collateral from Intel PCS (API key via OS keyring)
