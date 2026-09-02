@@ -62,7 +62,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:  # pragma: no cover - checked explicitly in main()
-    yaml = None
+    yaml = None  # type: ignore[assignment]
 
 VERITAS_PIP_SPEC = "osc-veritas[snp]==0.1.3rc1"
 RVPS_FILENAME = "rvps-reference-values.yaml"

@@ -49,7 +49,7 @@ on whichever cluster you ran the collector against. (An earlier version of
 this script did auto-detect from a live cluster and fall back to `"latest"`
 if that failed, which silently collected the wrong PCR values whenever the
 installed/live OSC version didn't match the pattern's pinned version — see
-the git history of this file for the incident this fixed.)
+the Git history of this file for the incident this fixed.)
 
 The resolved OSC version also determines veritas's `--bot-version` (Red Hat
 build of the Trustee RVPS wire format: `"1.2"` for OSC >= 1.13, `"1.1"` for
