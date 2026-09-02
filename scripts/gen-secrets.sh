@@ -14,8 +14,8 @@ mkdir -p ${COCO_SECRETS_DIR}
 ## (bare metal) unconditionally so the same file works on either topology.
 ## This pre-touches an empty '{}' placeholder for whichever platform's file
 ## doesn't exist yet, so 'make load-secrets' won't fail with a missing-file
-## error before collect-firmware-refvals.sh has been run for your platform.
-## Real collected data (from collect-firmware-refvals.sh) always overwrites
+## error before collect_firmware_refvals.py has been run for your platform.
+## Real collected data (from collect_firmware_refvals.py) always overwrites
 ## these placeholders.
 for refval_file in measurements.json firmware-reference-values.json; do
 	if [ ! -f "${COCO_SECRETS_DIR}/${refval_file}" ]; then

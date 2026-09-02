@@ -172,7 +172,7 @@ bash ./scripts/gen-secrets.sh
 echo "---------------------"
 echo "retrieving PCR measurements"
 echo "---------------------"
-bash ./scripts/collect-firmware-refvals.sh --platform azure
+$PYTHON_CMD ./scripts/collect_firmware_refvals.py --platform azure
 
 echo "---------------------"
 echo "starting pattern install on hub cluster"

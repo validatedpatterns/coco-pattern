@@ -15,29 +15,63 @@ Reference values are cryptographic measurements of the Trusted Computing Base (T
 
 Both platforms use the [veritas](https://github.com/confidential-devhub/veritas) tool. No cluster access is required — veritas computes expected measurements from OCP release artifacts or the dm-verity image.
 
-By default, `collect-firmware-refvals.sh` collects reference values for **both TDX and SNP and merges them** into a single output, so one RVPS ConfigMap supports heterogeneous (mixed-TEE) deployments out of the box — see [Multi-Architecture Collection](#multi-architecture-collection) below.
+By default, `collect_firmware_refvals.py` collects reference values for **both TDX and SNP and merges them** into a single output, so one RVPS ConfigMap supports heterogeneous (mixed-TEE) deployments out of the box — see [Multi-Architecture Collection](#multi-architecture-collection) below.
 
 ## Prerequisites
 
 - `veritas` installed on the host: `pip install "osc-veritas[snp]==0.1.3rc1"`
+- Python 3 with PyYAML: `pip3 install pyyaml`
 - `cosign` >= 2.0 — Azure only, used by veritas to verify the Red Hat dm-verity image signature: <https://docs.sigstore.dev/cosign/system_config/installation/>
-- `yq` and `jq` installed
 - OpenShift pull secret at `~/pull-secret.json` (override the location with the `PULL_SECRET` environment variable or `--pull-secret`)
-- For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in)
+- For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in, or pass `--ocp-version` explicitly)
 - For bare metal TDX: `tdx-measure` (`cargo install --git https://github.com/virtee/tdx-measure tdx-measure-cli`) — collection continues with a warning if absent, but TDX RTMR values will be incomplete
 
 **Why host-installed instead of the `coco-tools` container**: the container image (`quay.io/openshift_sandboxed_containers/coco-tools:0.5.1`) is pinned to an older veritas release that lacks `--skip-tlog`, which is needed to avoid the Azure verification failures described below. This is a deliberate, temporary deviation — see the tracking issue referenced in [Known Limitations](#known-limitations) for moving back to the container once a `coco-tools` release ships with a newer veritas.
+
+## OSC Version Resolution
+
+Both the Azure image tag and the Trustee wire format (`--bot-version`; see
+below) depend on the OSC operator version. `collect_firmware_refvals.py`
+resolves it as follows, for **both** platforms:
+
+1. `--osc-version` (repeatable) if given — always wins.
+2. Otherwise, `clusterGroup.subscriptions.sandbox.csv` is read from
+   `--values-file` (default: `values-azure.yaml` / `values-baremetal.yaml`,
+   matching `--platform`) and the version is extracted from the pinned CSV
+   (e.g. `sandboxed-containers-operator.v1.13.0` → `1.13.0`).
+3. If neither resolves a version, the script **exits with an error** asking
+   for an explicit `--osc-version`.
+
+There is deliberately no live-cluster auto-detection and no silent
+`"latest"` fallback for OSC version. Reference values must match what the
+pattern's own values files declare — not whatever happens to be installed
+on whichever cluster you ran the collector against. (An earlier version of
+this script did auto-detect from a live cluster and fall back to `"latest"`
+if that failed, which silently collected the wrong PCR values whenever the
+installed/live OSC version didn't match the pattern's pinned version — see
+the Git history of this file for the incident this fixed.)
+
+The resolved OSC version also determines veritas's `--bot-version` (Red Hat
+build of the Trustee RVPS wire format: `"1.2"` for OSC >= 1.13, `"1.1"` for
+OSC <= 1.12). This is a structural format switch (flat JSON array vs a
+base64-encoded map), not just a version stamp, and is now always passed to
+veritas explicitly.
+
+OCP version (bare metal only) is unaffected by this — there is no
+values-file pin for the exact OCP patch, so `--ocp-version` still falls
+back to live-cluster auto-detection, or can be passed explicitly.
 
 ## Collecting Reference Values
 
 ### Azure
 
 ```bash
-# Collect PCR values from the dm-verity image
+# Collect PCR values from the dm-verity image (OSC version read from
+# values-azure.yaml's pinned subscription CSV)
 make collect-azure-refvals
 
-# Or with explicit OSC version:
-./scripts/collect-firmware-refvals.sh --platform azure --osc-version 1.12.0
+# Or with an explicit OSC version override:
+./scripts/collect_firmware_refvals.py --platform azure --osc-version 1.13.1
 ```
 
 Output: `~/.coco-pattern/measurements.json`
@@ -53,10 +87,10 @@ Veritas pulls the `osc-dm-verity-image` from the Red Hat registry, verifies its 
 make collect-firmware-refvals
 
 # Or with explicit OCP version:
-./scripts/collect-firmware-refvals.sh --ocp-version 4.20.18
+./scripts/collect_firmware_refvals.py --platform baremetal --ocp-version 4.20.18
 
 # Collect a single TEE only (default is both, see below):
-./scripts/collect-firmware-refvals.sh --tee snp --ocp-version 4.20.18
+./scripts/collect_firmware_refvals.py --platform baremetal --tee snp --ocp-version 4.20.18
 ```
 
 Output: `~/.coco-pattern/firmware-reference-values.json`
@@ -66,17 +100,22 @@ Veritas resolves the kata-containers and edk2-ovmf RPMs from the OCP release pay
 ### Script Options
 
 ```bash
-./scripts/collect-firmware-refvals.sh --help
+./scripts/collect_firmware_refvals.py --help
 
 Options:
-  --platform <platform>    Platform: baremetal (default) or azure
-  -o, --output <path>      Override output path
-  -p, --pull-secret <path> Pull secret file (default: ~/pull-secret.json,
-                           override via PULL_SECRET env var)
-  -v, --ocp-version <ver>  OCP version (baremetal; default: auto-detect)
-  --osc-version <ver>      OSC operator version (azure; default: auto-detect)
-  -t, --tee <tdx|snp|both> TEE type (default: both -- collects and merges both)
-  --verify-tlog            Azure only: verify against Rekor instead of --skip-tlog
+  --platform <platform>     Platform: baremetal or azure (required)
+  -o, --output <path>       Override output path
+  -p, --pull-secret <path>  Pull secret file (default: ~/pull-secret.json,
+                            override via PULL_SECRET env var)
+  -v, --ocp-version <ver>   OCP version (bare metal; repeatable; default:
+                            auto-detect from a live cluster)
+  --osc-version <ver>       OSC operator version (repeatable; default: read
+                            from --values-file's pinned subscription CSV)
+  --values-file <path>      Values file to read the pinned OSC version from
+                            (default: values-azure.yaml / values-baremetal.yaml,
+                            matching --platform)
+  -t, --tee <tdx|snp|both>  TEE type (default: both -- collects and merges both)
+  --verify-tlog             Azure only: verify against Rekor instead of --skip-tlog
 ```
 
 ## Multi-Architecture Collection
@@ -96,7 +135,7 @@ values use the `firmwareReferenceValues` secret. Both are enabled by default
 in `~/values-secret-coco-pattern.yaml`, so the same file works unmodified on
 either topology — nothing needs to be uncommented.
 
-`collect-firmware-refvals.sh` automatically creates an empty `{}` placeholder
+`collect_firmware_refvals.py` automatically creates an empty `{}` placeholder
 for whichever of `~/.coco-pattern/measurements.json` /
 `~/.coco-pattern/firmware-reference-values.json` you are *not* collecting, so
 `make load-secrets` never fails with a missing-file error regardless of
@@ -129,14 +168,19 @@ oc delete externalsecret pcrs-eso -n trustee-operator-system              # azur
 
 ## Multi-Version Support
 
-Different OCP versions (bare metal) or OSC versions (Azure) may ship different artifacts. To support multiple versions, collect for each version and the values will be merged into arrays:
+Different OCP versions (bare metal) or OSC versions (Azure) may ship different artifacts. Both `--ocp-version` and `--osc-version` are repeatable — pass each version you need to support and the resulting reference values are merged into arrays automatically in a single run (veritas itself merges across versions; this script merges across the `--tee` runs on top of that):
 
 ```bash
-# Bare metal: run once per OCP version
-./scripts/collect-firmware-refvals.sh --ocp-version 4.20.15 -o /tmp/fw-4.20.15.json
-./scripts/collect-firmware-refvals.sh --ocp-version 4.20.18 -o /tmp/fw-4.20.18.json
-# Manually merge with jq or re-run with all versions via veritas directly
+# Bare metal: collect for two OCP versions in one run
+./scripts/collect_firmware_refvals.py --platform baremetal \
+  --ocp-version 4.20.15 --ocp-version 4.20.18
+
+# Azure: collect for two OSC versions in one run (e.g. during an upgrade window)
+./scripts/collect_firmware_refvals.py --platform azure \
+  --osc-version 1.13.0 --osc-version 1.13.1
 ```
+
+If the given `--osc-version`s straddle the 1.13 `--bot-version` boundary (see [OSC Version Resolution](#osc-version-resolution)), the script warns and uses the newer (`1.2`) format.
 
 The attestation policy uses `in` (set membership) — a workload passes if its measurement matches **any** value in the array.
 
