@@ -69,8 +69,8 @@ if [ ! -f "${VALUES_FILE}" ]; then
 	echo "  For Bare Metal deployments:"
 	echo "    - Run 'make collect-firmware-refvals' to collect firmware measurements"
 	echo "    - firmwareReferenceValues is already enabled by default; no need to uncomment anything"
-	echo "    - For Intel TDX: run 'make collect-dcap-collateral', then uncomment tdxCollateral"
-	echo "      in the values-secret file for offline attestation"
+	echo "    - For Intel TDX: on the connected low side run 'make collect-dcap-collateral',"
+	echo "      transfer the output to this host, then uncomment tdxCollateral for offline attestation"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
 	echo "    - See docs/firmware-reference-values.md for reference value collection"
 	echo

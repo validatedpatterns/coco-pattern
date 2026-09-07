@@ -16,7 +16,7 @@
 | B | Full Re-Mirror (oc-mirror v2) | ~3-4 hours |
 | C | Cluster Install | ~35 min |
 | D | Bootstrap and Pattern Deploy | ~25 min |
-| E | DCAP and TDX Attestation | ~15 min (+ pcsclient time if QE ID mismatch) |
+| E | DCAP and TDX Attestation | ~15 min (+ connected low-side PCK generation) |
 | F | Verification and Pass/Fail | ~10 min |
 | **Total** | | **~5-6 hours** (first-time add ~30 min) |
 
@@ -1127,74 +1127,34 @@ echo "E-2: QGS socket port verification complete at $(date)" 2>&1 | tee -a "$LOG
 > `oc get mc | grep kata-tdx` shows a MachineConfig with the drop-in content.
 > See Appendix Section A.3 for the temporary sed fallback. Record in DEVIATIONS.md.
 
-### E-3: PCK Registration — pcsclient.py cache (ALWAYS REQUIRED, INTERACTIVE)
+### E-3: PCK Lifecycle
 
-> **This step is ALWAYS required** — even when QE IDs match and cached PCK cert files exist.
-> `pcsclient.py cache` does two things: (1) provisions the PCK certificate secret so QGS can
-> generate quotes, and (2) populates the local cache with **QeIdentity and TcbInfo** that
-> `collect-dcap-collateral.sh` reads in E-4. Skipping this step leaves `qeidentity` empty in
-> `platform_collaterals.json`, causing KBS to fail attestation with
-> `"collateral JSON error: invalid type: string "", expected struct QeIdentity"`.
->
-> **This step must be run interactively** — `pcsclient.py` prompts for the Intel PCS API key
-> via `getpass` and cannot be automated via SSH pipe (see `UPSTREAM-ISSUES-INTEL-DCAP.md` Issue 3).
+PCK certificates are specific to each QGS platform. The Make targets create checksummed request and response bundles, validate the complete QE-ID/PCE-ID set, and restart QGS only after all matching PCK Secrets are applied.
+
+If this bastion can reach **both** the disconnected cluster and Intel PCS, run the combined workflow. The API key is read from `INTEL_PCS_API_KEY` if exported, otherwise Make prompts without echoing it. Never put the key on the Make command line.
 
 ```bash
-echo "=== E-3: PCK Registration (INTERACTIVE — run in tmux) ===" 2>&1 | tee -a "$LOG"
-cd ~/pck-registration
+echo "=== E-3: Combined PCK provisioning ===" 2>&1 | tee -a "$LOG"
+cd ~/coco-pattern
+make dcap-tools dcap-pck-provision 2>&1 | tee -a "$LOG"
+```
 
-# Step 1: Generate platform_list.json from cluster platform-data secrets
-echo "Generating platform_list.json..." 2>&1 | tee -a "$LOG"
-oc get secrets -o json -n intel-dcap-operator-system -l 'type=platform-data' \
-  | jq '[.items[] | .data | map_values(@base64d)]' > platform_list.json
-echo "platform_list.json: $(wc -l < platform_list.json) lines" 2>&1 | tee -a "$LOG"
+If the high-side cluster cannot reach the connected low-side host, use the split workflow:
 
-# Step 2: Compare QE IDs — cache reuse check (informational only)
-CLUSTER_QE_ID=$(oc get secrets -n intel-dcap-operator-system -l type=platform-data \
-  --no-headers -o custom-columns=NAME:.metadata.name | head -1)
-CACHED_QE_ID=$(ls cache/*_0000 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/_0000//')
-echo "Cluster QE ID: $CLUSTER_QE_ID" 2>&1 | tee -a "$LOG"
-echo "Cached QE ID:  $CACHED_QE_ID" 2>&1 | tee -a "$LOG"
-if [ "$CLUSTER_QE_ID" = "$CACHED_QE_ID" ] && [ -n "$CACHED_QE_ID" ]; then
-  echo "QE ID MATCH — PCK cert cache reusable. Still must run pcsclient.py cache for QeIdentity." \
-    2>&1 | tee -a "$LOG"
-else
-  echo "QE ID MISMATCH — record as DEV-2 in DEVIATIONS.md" 2>&1 | tee -a "$LOG"
-fi
+```bash
+# High side: create ~/.coco-pattern/dcap-pck/platform-request and transfer it high -> low.
+make dcap-platform-export
 
-# Step 3: Run pcsclient.py cache INTERACTIVELY
-# Will prompt: "Please input ApiKey for Intel PCS:" — paste your key.
-# Populates cache/ with PCK certs AND QeIdentity/TcbInfo for E-4.
-echo "STOP: Run the following command interactively in this tmux window:" 2>&1 | tee -a "$LOG"
-echo ""
-echo "  python3 ~/confidential-computing.tee.dcap/tools/PcsClientTool/pcsclient.py cache \\"
-echo "    -i platform_list.json \\"
-echo "    -e 8760 \\"
-echo "    -t early"
-echo ""
-echo "Enter API key when prompted, then press Enter."
-echo "When complete, continue to Step 4 below."
+# Low side: copy platform-request to ~/.coco-pattern/dcap-pck/, then run these commands.
+make dcap-tools dcap-pck-generate
 
-# Step 4: Apply PCK cert secret to cluster and restart QGS
-# (Run after pcsclient.py cache completes)
-for f in cache/*_0000; do
-  qe_id=$(basename "$f" _0000)
-  echo "Applying PCK cert for QE ID: $qe_id" 2>&1 | tee -a "$LOG"
-  oc create secret generic "${qe_id}-pck" --from-file=certificate="$f" \
-    -n intel-dcap-operator-system --dry-run=client -o yaml | oc apply -f - \
-    2>&1 | tee -a "$LOG"
-done
-oc delete pod -n intel-dcap-operator-system -l app=intel-tdx-qgs \
-  2>&1 | tee -a "$LOG"
-
-echo "E-3: PCK registration complete at $(date)" 2>&1 | tee -a "$LOG"
+# Transfer ~/.coco-pattern/dcap-pck/pck-response low -> high, then import it on the high side.
+make dcap-pck-import
 ```
 
 ### E-4: Collect DCAP Collateral and Firmware Reference Values
 
-> **Must run AFTER E-3** — `collect-dcap-collateral.sh` calls `pcsclient.py fetch` which reads
-> from the local cache populated by `pcsclient.py cache` in E-3. Running E-4 before E-3
-> produces `platform_collaterals.json` with `qeidentity: ""` — KBS will fail attestation.
+`collect-dcap-collateral` is independent of PCK provisioning. It collects public Intel TDX verification collateral on the connected low side and does not require an Intel PCS API key. Transfer `~/.coco-pattern/dcap-offline/platform_collaterals.json` to the high side before E-5.
 
 ```bash
 echo "=== E-4: Collect DCAP Collateral + Firmware Refvals ===" 2>&1 | tee -a "$LOG"
@@ -1206,8 +1166,8 @@ make collect-dcap-collateral 2>&1 | tee -a "$LOG"
 python3 -c "
 import json, os
 c = json.load(open(os.path.expanduser('~/.coco-pattern/dcap-offline/platform_collaterals.json')))
-qi = c.get('collaterals', {}).get('qeidentity', '')
-print('qeidentity length:', len(qi), '— PASS' if len(qi) > 100 else '— FAIL: re-run E-3 first')
+qi = c.get('collaterals', {}).get('qeidentity_early') or c.get('collaterals', {}).get('qeidentity')
+print('qeidentity present:', isinstance(qi, dict), '— PASS' if isinstance(qi, dict) else '— FAIL: recollect collateral')
 " 2>&1 | tee -a "$LOG"
 
 make collect-firmware-refvals 2>&1 | tee -a "$LOG"

@@ -39,6 +39,7 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 - **Chart architecture:** trustee-chart moved to OCI Helm artifact (`quay.io/validatedpatterns/trustee:0.10.0`). Kyverno chart vendored under `charts/vendor/`. External charts (sandboxed-containers, sandboxed-policies) remain OCI.
 - **TDX MachineConfig:** QGS socket port `socket_port=0` now deployed via MachineConfig drop-in (replaces manual `sed` workaround).
 - **DCAP collateral:** `collect-dcap-collateral.sh` uses `pcsclient.py fetch -p E5` with `jq` fixup for QeIdentity (Red Hat OSC 1.13 disconnected TDX procedure).
+- **TDX PCK lifecycle:** Make targets export platform data, generate PCK cache material on a connected low-side host, and import it into the disconnected high-side cluster. See [the air-gap runbook](airgap/DEPLOY-RUNBOOK.md#phase-e-dcap-and-tdx-attestation).
 - **Experimental:** KubeVirt TDX confidential VMs (`charts/all/kubevirtconfidential/`, `charts/all/kubevirtvm/`). Disabled by default. Requires Intel TDX hardware and KubeVirt post-v1.8.4 for full QGS attestation. See chart readmes for details.
 
 ### Previous versions
@@ -64,7 +65,7 @@ For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/
 
 **Prerequisites for airgap:**
 
-- A jump host with internet access (for `oc-mirror`) and network access to the target cluster
+- A low-side host with Intel PCS access for mirroring, collateral collection, and PCK generation. A connected bastion with access to both Intel PCS and the target cluster can run the combined PCK target.
 - `docker.io/library/registry:2` container running as the mirror registry (setup documented in Phase 0)
 - `scripts/git-http-server.py` serving pattern repos over smart HTTP (required by the patterns-operator's go-git client)
 - All operator images, OCI Helm charts, and workload images mirrored via `airgap/imageset-config-4.22.yaml`
@@ -103,6 +104,14 @@ These scripts generate the cryptographic material and attestation reference valu
    - **Bare metal:** `make collect-firmware-refvals` — computes firmware measurements from OCP release artifacts via veritas. Saves to `~/.coco-pattern/firmware-reference-values.json`. When collecting before cluster access is available, for example from a connected staging host preparing a disconnected deployment, set the target release explicitly: `OCP_VERSION=4.22.8 make collect-firmware-refvals`. `pcrStash` and `firmwareReferenceValues` are both enabled by default in `~/values-secret-coco-pattern.yaml`, so nothing needs to be uncommented — the collection script automatically writes an empty `{}` placeholder for the platform you're not using.
    - See [docs/firmware-reference-values.md](docs/firmware-reference-values.md) for detailed workflow and options.
 3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern.
+
+### Intel TDX PCK lifecycle
+
+All lifecycle actions are invoked with Make. `collect-dcap-collateral` prepares the pinned Intel tool automatically, then retrieves public verification collateral on the connected low side; transfer `~/.coco-pattern/dcap-offline/platform_collaterals.json` to the high side, then use the existing `make load-secrets` to load it into Vault.
+
+PCK certificates are platform-specific and use separate request and response bundles. On a disconnected high-side cluster, run `make dcap-platform-export`, transfer `~/.coco-pattern/dcap-pck/platform-request` to the connected low side, then run `make dcap-tools dcap-pck-generate`. Transfer `~/.coco-pattern/dcap-pck/pck-response` back to the high side and run `make dcap-pck-import`.
+
+When one bastion can reach both Intel PCS and the cluster, run `make dcap-tools dcap-pck-provision`. The generator accepts `INTEL_PCS_API_KEY` from its environment for automation, or requests it through a hidden terminal prompt. Do not pass the key as a Make variable or command-line argument.
 
 > **Note:** `gen-secrets.sh` will not overwrite existing secrets. Delete `~/.coco-pattern/` if you need to regenerate.
 
