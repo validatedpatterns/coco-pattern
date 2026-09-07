@@ -2,5 +2,6 @@
 Jinja2
 osc-veritas[snp]==0.1.3rc1
 PyYAML
+pytest
 rich
 typer

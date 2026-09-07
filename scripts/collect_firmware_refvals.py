@@ -492,7 +492,9 @@ def run(args):
 
     console.print("Next steps:")
     console.print(f"1. Review the collected values: cat {output_file}")
-    console.print(f"2. Ensure '{vault_key}' is configured in ~/values-secret-coco-pattern.yaml")
+    console.print(
+        f"2. Ensure '{vault_key}' is configured in ~/values-secret-coco-pattern.yaml"
+    )
     console.print("3. Run: make load-secrets")
     console.print()
 
@@ -502,7 +504,9 @@ def main(
         Literal["baremetal", "azure"],
         typer.Option("--platform", help="Platform to collect reference values for"),
     ],
-    output: Annotated[Optional[Path], typer.Option("-o", "--output", help="Override output path")] = None,
+    output: Annotated[
+        Optional[Path], typer.Option("-o", "--output", help="Override output path")
+    ] = None,
     pull_secret: Annotated[
         Optional[Path],
         typer.Option(
@@ -525,7 +529,9 @@ def main(
     ] = None,
     values_file: Annotated[
         Optional[Path],
-        typer.Option("--values-file", help="Values file containing the pinned OSC version"),
+        typer.Option(
+            "--values-file", help="Values file containing the pinned OSC version"
+        ),
     ] = None,
     tee: Annotated[
         Literal["tdx", "snp", "both"],
@@ -533,7 +539,10 @@ def main(
     ] = "both",
     verify_tlog: Annotated[
         bool,
-        typer.Option("--verify-tlog", help="Azure only: verify against the Rekor transparency log"),
+        typer.Option(
+            "--verify-tlog",
+            help="Azure only: verify against the Rekor transparency log",
+        ),
     ] = False,
 ):
     args = SimpleNamespace(
