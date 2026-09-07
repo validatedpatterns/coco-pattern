@@ -170,6 +170,11 @@ echo "setting up secrets"
 bash ./scripts/gen-secrets.sh
 
 echo "---------------------"
+echo "caching Red Hat signing keys"
+echo "---------------------"
+make cache-keys
+
+echo "---------------------"
 echo "retrieving PCR measurements"
 echo "---------------------"
 $PYTHON_CMD ./scripts/collect_firmware_refvals.py --platform azure
