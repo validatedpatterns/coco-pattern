@@ -307,6 +307,58 @@ def command_import(arguments: argparse.Namespace) -> None:
     print(f"Imported {len(cache)} PCK cache Secrets from {bundle} (bundle SHA-256: {sha256(bundle / 'manifest.json')})")
 
 
+def command_provision(arguments: argparse.Namespace) -> None:
+    request = Path(arguments.request_bundle).expanduser()
+    response = Path(arguments.response_bundle).expanduser()
+    current = cluster_platforms(arguments.namespace)
+
+    if request.exists():
+        _, exported = request_platforms(request)
+        if exported == current:
+            print(f"Reusing matching platform request bundle: {request}")
+        else:
+            shutil.rmtree(request)
+            if response.exists():
+                shutil.rmtree(response)
+            command_export(SimpleNamespace(namespace=arguments.namespace, output=str(request)))
+    else:
+        command_export(SimpleNamespace(namespace=arguments.namespace, output=str(request)))
+
+    request_digest = sha256(request / "manifest.json")
+    if response.exists():
+        response_manifest, response_platforms, _ = response_cache(response)
+        if response_manifest.get("requestSha256") == request_digest and response_platforms == current:
+            print(f"Reusing matching PCK response bundle: {response}")
+        else:
+            shutil.rmtree(response)
+            command_generate(
+                SimpleNamespace(
+                    input=str(request),
+                    output=str(response),
+                    pcsclient_dir=arguments.pcsclient_dir,
+                    expire_hours=arguments.expire_hours,
+                )
+            )
+    else:
+        command_generate(
+            SimpleNamespace(
+                input=str(request),
+                output=str(response),
+                pcsclient_dir=arguments.pcsclient_dir,
+                expire_hours=arguments.expire_hours,
+            )
+        )
+
+    command_import(
+        SimpleNamespace(
+            input=str(response),
+            namespace=arguments.namespace,
+            qgs_daemonset=arguments.qgs_daemonset,
+            timeout=arguments.timeout,
+        )
+    )
+
+
 def command_tools(arguments: argparse.Namespace) -> None:
     repository = Path(arguments.repository).expanduser()
     tool_dir = Path(arguments.pcsclient_dir).expanduser()
@@ -349,6 +401,15 @@ def build_parser() -> argparse.ArgumentParser:
     importer.add_argument("--timeout", default=os.environ.get("DCAP_QGS_TIMEOUT", "10m"))
     importer.add_argument("--input", default=os.environ.get("DCAP_RESPONSE_BUNDLE", "~/.coco-pattern/dcap-pck/pck-response"))
     importer.set_defaults(func=command_import)
+    provision = commands.add_parser("provision", help="resume the connected-bastion PCK lifecycle")
+    provision.add_argument("--namespace", default=os.environ.get("DCAP_NAMESPACE", "intel-dcap-operator-system"))
+    provision.add_argument("--qgs-daemonset", default=os.environ.get("DCAP_QGS_DAEMONSET", ""))
+    provision.add_argument("--timeout", default=os.environ.get("DCAP_QGS_TIMEOUT", "10m"))
+    provision.add_argument("--request-bundle", default=os.environ.get("DCAP_REQUEST_BUNDLE", "~/.coco-pattern/dcap-pck/platform-request"))
+    provision.add_argument("--response-bundle", default=os.environ.get("DCAP_RESPONSE_BUNDLE", "~/.coco-pattern/dcap-pck/pck-response"))
+    provision.add_argument("--pcsclient-dir", default=os.environ.get("DCAP_PCSCLIENT_DIR", "~/.coco-pattern/intel-dcap/tools/PcsClientTool"))
+    provision.add_argument("--expire-hours", type=expire_hours, default=os.environ.get("DCAP_PCK_EXPIRE_HOURS", "8760"), metavar="HOURS")
+    provision.set_defaults(func=command_provision)
     return parser
 
 

@@ -117,10 +117,8 @@ dcap-pck-import: ## Import a PCK response bundle and restart QGS (disconnected h
 	@python3 scripts/dcap-pck.py import
 
 .PHONY: dcap-pck-provision
-dcap-pck-provision: ## Export, generate, and import PCK cache (bastion connected to both Intel PCS and cluster)
-	@$(MAKE) dcap-platform-export
-	@$(MAKE) dcap-pck-generate
-	@$(MAKE) dcap-pck-import
+dcap-pck-provision: dcap-tools ## Resume export, generation, and import PCK cache (bastion connected to both Intel PCS and cluster)
+	@python3 scripts/dcap-pck.py provision
 
 .PHONY: dcap-status
 dcap-status: ## Check PCK and collateral expiry (requires oc)

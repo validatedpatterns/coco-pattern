@@ -1138,7 +1138,7 @@ If this bastion can reach **both** the disconnected cluster and Intel PCS, run t
 ```bash
 echo "=== E-3: Combined PCK provisioning ===" 2>&1 | tee -a "$LOG"
 cd ~/coco-pattern
-make dcap-tools dcap-pck-provision 2>&1 | tee -a "$LOG"
+make dcap-pck-provision 2>&1 | tee -a "$LOG"
 ```
 
 If the high-side cluster cannot reach the connected low-side host, use the split workflow:

@@ -111,7 +111,7 @@ All lifecycle actions are invoked with Make. `collect-dcap-collateral` prepares 
 
 PCK certificates are platform-specific and use separate request and response bundles. On a disconnected high-side cluster, run `make dcap-platform-export`, transfer `~/.coco-pattern/dcap-pck/platform-request` to the connected low side, then run `make dcap-tools dcap-pck-generate`. Transfer `~/.coco-pattern/dcap-pck/pck-response` back to the high side and run `make dcap-pck-import`.
 
-When one bastion can reach both Intel PCS and the cluster, run `make dcap-tools dcap-pck-provision`. The generator accepts `INTEL_PCS_API_KEY` from its environment for automation, or requests it through a hidden terminal prompt. Do not pass the key as a Make variable or command-line argument.
+When one bastion can reach both Intel PCS and the cluster, run `make dcap-pck-provision`. It resumes safely after interruption: matching request and unexpired response bundles are reused, while changed platform data replaces both bundles. The generator accepts `INTEL_PCS_API_KEY` from its environment for automation, or requests it through a hidden terminal prompt. Do not pass the key as a Make variable or command-line argument.
 
 The importer discovers the QGS DaemonSet from the `pck-certs-watcher` pod owner reference. Set `DCAP_QGS_DAEMONSET` only when that discovery cannot identify a single DaemonSet.
 

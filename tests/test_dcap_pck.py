@@ -126,3 +126,37 @@ def test_qgs_daemonset_uses_pod_owner_reference(monkeypatch):
     )
 
     assert dcap_pck.qgs_daemonset("intel-dcap-operator-system", "") == "intel-tdx-dcap-qgs"
+
+
+def test_provision_reuses_matching_request_and_response(monkeypatch, tmp_path: Path, capsys):
+    request = tmp_path / "request"
+    response = tmp_path / "response"
+    request.mkdir()
+    request_data = request / "platform-list.json"
+    dcap_pck.write_json(request_data, [platform()])
+    dcap_pck.write_json(
+        request / "manifest.json",
+        dcap_pck.create_manifest(dcap_pck.REQUEST_TYPE, {"platform-list.json": request_data}),
+    )
+    cache_dir = response / "pck"
+    cache_dir.mkdir(parents=True)
+    cache = cache_dir / ("a" * 32 + "_0000")
+    cache.write_bytes(struct.pack("<HIQ", 1, 4, 4_000_000_000))
+    dcap_pck.write_json(
+        response / "manifest.json",
+        dcap_pck.create_manifest(
+            dcap_pck.RESPONSE_TYPE,
+            {f"pck/{cache.name}": cache},
+            requestSha256=dcap_pck.sha256(request / "manifest.json"),
+            platforms=[platform()],
+        ),
+    )
+    monkeypatch.setattr(dcap_pck, "cluster_platforms", lambda _: [platform()])
+    monkeypatch.setattr(dcap_pck, "command_import", lambda _: None)
+    monkeypatch.setattr(dcap_pck, "command_generate", lambda _: pytest.fail("should reuse response"))
+
+    dcap_pck.command_provision(
+        type("Arguments", (), {"request_bundle": str(request), "response_bundle": str(response), "namespace": "test", "qgs_daemonset": "", "timeout": "1m", "pcsclient_dir": "unused", "expire_hours": 1})()
+    )
+
+    assert "Reusing matching platform request bundle" in capsys.readouterr().out
