@@ -52,7 +52,33 @@ else
         echo "  PCK secret: ${secret_name} (QE ID: ${qe_id})"
 
         # The PCK cache blob contains URL-encoded PEM X.509 certs + embedded JSON TCB info
-        oc get secret "$secret_name" -n "$NS" -o jsonpath='{.data.certificate}' | \
+        while IFS='|' read -r rtype val1 val2; do
+            case "$rtype" in
+                NONE)
+                    echo -e "    ${YELLOW}UNKNOWN${NC}  No expiry data found in PCK cache blob"
+                    fail=1
+                    ;;
+                CERT)
+                    iso=$(python3 -c "
+from datetime import datetime
+try:
+    dt = datetime.strptime('$val2', '%b %d %H:%M:%S %Y %Z')
+except ValueError:
+    dt = datetime.strptime('$val2', '%b  %d %H:%M:%S %Y %Z')
+print(dt.strftime('%Y-%m-%dT%H:%M:%SZ'))
+" 2>/dev/null)
+                    if [ -z "$iso" ]; then
+                        echo -e "    ${YELLOW}UNKNOWN${NC}  Cannot parse certificate expiry: $val2"
+                        fail=1
+                    else
+                        check_date "    cert: $val1" "$iso"
+                    fi
+                    ;;
+                TCB)
+                    check_date "    TCB nextUpdate" "$val1"
+                    ;;
+            esac
+        done < <(oc get secret "$secret_name" -n "$NS" -o jsonpath='{.data.certificate}' | \
             base64 -d | python3 -c "
 import sys, re, subprocess, urllib.parse
 data = sys.stdin.buffer.read()
@@ -82,27 +108,7 @@ for m in re.findall(r'\"nextUpdate\":\"([^\"]+)\"', text):
 
 if not certs and not re.search(r'nextUpdate', text):
     print('NONE')
-" | while IFS='|' read -r rtype val1 val2; do
-            case "$rtype" in
-                NONE)
-                    echo -e "    ${YELLOW}UNKNOWN${NC}  No expiry data found in PCK cache blob"
-                    ;;
-                CERT)
-                    iso=$(python3 -c "
-from datetime import datetime
-try:
-    dt = datetime.strptime('$val2', '%b %d %H:%M:%S %Y %Z')
-except ValueError:
-    dt = datetime.strptime('$val2', '%b  %d %H:%M:%S %Y %Z')
-print(dt.strftime('%Y-%m-%dT%H:%M:%SZ'))
-" 2>/dev/null)
-                    [ -n "$iso" ] && check_date "    cert: $val1" "$iso"
-                    ;;
-                TCB)
-                    check_date "    TCB nextUpdate" "$val1"
-                    ;;
-            esac
-        done
+")
     done
 fi
 
