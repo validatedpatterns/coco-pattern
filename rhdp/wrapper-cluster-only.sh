@@ -2,16 +2,23 @@
 #!/usr/bin/env bash
 set -e
 
-# Function to detect available python binary
+# Function to detect available Python 3 binary.
 get_python_cmd() {
-    if command -v python &> /dev/null; then
-        echo "python"
-    elif command -v python3 &> /dev/null; then
-        echo "python3"
+    local python_cmd
+    if command -v python3 &> /dev/null; then
+        python_cmd="python3"
+    elif command -v python &> /dev/null; then
+        python_cmd="python"
     else
         echo "ERROR: Neither python3 nor python is available" >&2
         exit 1
     fi
+
+    if ! "$python_cmd" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))'; then
+        echo "ERROR: Python 3.10 or later is required" >&2
+        exit 1
+    fi
+    echo "$python_cmd"
 } 
 
 # Parse arguments
@@ -102,7 +109,8 @@ sleep 10
 echo "---------------------"
 echo "Installing python dependencies"
 echo "---------------------"
-pip install -r rhdp/requirements.txt
+PYTHON_CMD=$(get_python_cmd)
+"$PYTHON_CMD" -m pip install -r requirements.txt
 echo "---------------------"
 echo "requirements installed"
 echo "---------------------"
@@ -116,7 +124,6 @@ sleep 5
 echo "---------------------"
 echo "defining cluster"
 echo "---------------------"
-PYTHON_CMD=$(get_python_cmd)
 DEFINE_ARGS=()
 if [ "$RECREATE" = true ]; then
     DEFINE_ARGS+=(--recreate)

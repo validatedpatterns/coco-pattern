@@ -1,0 +1,6 @@
+# Shared dependencies for all Python utilities in this repository.
+Jinja2
+osc-veritas[snp]==0.1.3rc1
+PyYAML
+rich
+typer

@@ -19,8 +19,7 @@ By default, `collect_firmware_refvals.py` collects reference values for **both T
 
 ## Prerequisites
 
-- `veritas` installed on the host: `pip install "osc-veritas[snp]==0.1.3rc1"`
-- Python 3 with PyYAML: `pip3 install pyyaml`
+- Python 3.10+ with the shared script dependencies: `python3 -m pip install -r requirements.txt` (includes `veritas`, Typer, Rich, and PyYAML)
 - `cosign` >= 2.0 — Azure only, used by veritas to verify the Red Hat dm-verity image signature: <https://docs.sigstore.dev/cosign/system_config/installation/>
 - OpenShift pull secret at `~/pull-secret.json` (override the location with the `PULL_SECRET` environment variable or `--pull-secret`)
 - For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in, set `OCP_VERSION`, or pass `--ocp-version` explicitly)
