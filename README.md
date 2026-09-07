@@ -113,6 +113,8 @@ PCK certificates are platform-specific and use separate request and response bun
 
 When one bastion can reach both Intel PCS and the cluster, run `make dcap-tools dcap-pck-provision`. The generator accepts `INTEL_PCS_API_KEY` from its environment for automation, or requests it through a hidden terminal prompt. Do not pass the key as a Make variable or command-line argument.
 
+The importer discovers the QGS DaemonSet from the `pck-certs-watcher` pod owner reference. Set `DCAP_QGS_DAEMONSET` only when that discovery cannot identify a single DaemonSet.
+
 > **Note:** `gen-secrets.sh` will not overwrite existing secrets. Delete `~/.coco-pattern/` if you need to regenerate.
 
 ### Single cluster deployment (Azure)

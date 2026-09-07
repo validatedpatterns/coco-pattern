@@ -106,4 +106,23 @@ def test_import_refuses_changed_platform_data(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(dcap_pck, "cluster_platforms", lambda _: [changed])
 
     with pytest.raises(ValueError, match="platform data does not match"):
-        dcap_pck.command_import(type("Arguments", (), {"input": str(response), "namespace": "test", "qgs_selector": "app=test", "timeout": "1m"})())
+        dcap_pck.command_import(type("Arguments", (), {"input": str(response), "namespace": "test", "qgs_daemonset": "", "timeout": "1m"})())
+
+
+def test_qgs_daemonset_uses_pod_owner_reference(monkeypatch):
+    monkeypatch.setattr(
+        dcap_pck,
+        "run_oc",
+        lambda _: json.dumps(
+            {
+                "items": [
+                    {
+                        "metadata": {"ownerReferences": [{"kind": "DaemonSet", "name": "intel-tdx-dcap-qgs"}]},
+                        "spec": {"initContainers": [{"name": "pck-certs-watcher"}]},
+                    }
+                ]
+            }
+        ),
+    )
+
+    assert dcap_pck.qgs_daemonset("intel-dcap-operator-system", "") == "intel-tdx-dcap-qgs"

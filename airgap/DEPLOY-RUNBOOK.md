@@ -1131,6 +1131,8 @@ echo "E-2: QGS socket port verification complete at $(date)" 2>&1 | tee -a "$LOG
 
 PCK certificates are specific to each QGS platform. The Make targets create checksummed request and response bundles, validate the complete QE-ID/PCE-ID set, and restart QGS only after all matching PCK Secrets are applied.
 
+The importer discovers the QGS DaemonSet from the `pck-certs-watcher` pod owner reference, avoiding a version-specific DaemonSet label or name. Set `DCAP_QGS_DAEMONSET` only if the namespace has more than one candidate.
+
 If this bastion can reach **both** the disconnected cluster and Intel PCS, run the combined workflow. The API key is read from `INTEL_PCS_API_KEY` if exported, otherwise Make prompts without echoing it. Never put the key on the Make command line.
 
 ```bash

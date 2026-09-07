@@ -269,12 +269,32 @@ def response_cache(bundle: Path) -> tuple[dict[str, Any], list[dict[str, str]], 
     return manifest, platforms, cache
 
 
+def qgs_daemonset(namespace: str, configured_name: str) -> str:
+    if configured_name:
+        run_oc(["get", "daemonset", configured_name, "-n", namespace])
+        return configured_name
+
+    pods = json.loads(run_oc(["get", "pods", "-n", namespace, "-o", "json"])).get("items", [])
+    names = set()
+    for pod in pods:
+        init_containers = pod.get("spec", {}).get("initContainers", [])
+        if not any(container.get("name") == "pck-certs-watcher" for container in init_containers):
+            continue
+        for owner in pod.get("metadata", {}).get("ownerReferences", []):
+            if owner.get("kind") == "DaemonSet" and owner.get("name"):
+                names.add(owner["name"])
+    if len(names) != 1:
+        fail("expected exactly one QGS DaemonSet from pck-certs-watcher pod owners; set DCAP_QGS_DAEMONSET to override")
+    return names.pop()
+
+
 def command_import(arguments: argparse.Namespace) -> None:
     bundle = Path(arguments.input).expanduser()
     manifest, expected, cache = response_cache(bundle)
     current = cluster_platforms(arguments.namespace)
     if current != expected:
         fail("response bundle platform data does not match current platform-data Secrets")
+    daemonset = qgs_daemonset(arguments.namespace, arguments.qgs_daemonset)
     resources = []
     for platform in expected:
         key = platform_key(platform)
@@ -282,10 +302,6 @@ def command_import(arguments: argparse.Namespace) -> None:
         source = cache[key]
         resources.append(run_oc(["create", "secret", "generic", secret_name, "-n", arguments.namespace, f"--from-file=certificate={source}", "--dry-run=client", "-o", "yaml"]))
     run_oc(["apply", "-f", "-"], input_text="---\n".join(resources))
-    daemonsets = json.loads(run_oc(["get", "daemonset", "-n", arguments.namespace, "-l", arguments.qgs_selector, "-o", "json"]))["items"]
-    if len(daemonsets) != 1:
-        fail(f"expected exactly one QGS DaemonSet matching {arguments.qgs_selector}, found {len(daemonsets)}")
-    daemonset = daemonsets[0]["metadata"]["name"]
     run_oc(["rollout", "restart", f"daemonset/{daemonset}", "-n", arguments.namespace])
     run_oc(["rollout", "status", f"daemonset/{daemonset}", "-n", arguments.namespace, f"--timeout={arguments.timeout}"])
     print(f"Imported {len(cache)} PCK cache Secrets from {bundle} (bundle SHA-256: {sha256(bundle / 'manifest.json')})")
@@ -329,7 +345,7 @@ def build_parser() -> argparse.ArgumentParser:
     generate.set_defaults(func=command_generate)
     importer = commands.add_parser("import", help="import a PCK response bundle into the disconnected cluster")
     importer.add_argument("--namespace", default=os.environ.get("DCAP_NAMESPACE", "intel-dcap-operator-system"))
-    importer.add_argument("--qgs-selector", default=os.environ.get("DCAP_QGS_SELECTOR", "app=intel-tdx-qgs"))
+    importer.add_argument("--qgs-daemonset", default=os.environ.get("DCAP_QGS_DAEMONSET", ""))
     importer.add_argument("--timeout", default=os.environ.get("DCAP_QGS_TIMEOUT", "10m"))
     importer.add_argument("--input", default=os.environ.get("DCAP_RESPONSE_BUNDLE", "~/.coco-pattern/dcap-pck/pck-response"))
     importer.set_defaults(func=command_import)
