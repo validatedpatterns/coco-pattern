@@ -44,14 +44,16 @@ Version resolution (OSC operator version, both platforms):
   "1.2" default).
 
 Version resolution (OCP version, bare metal only):
-  --ocp-version (repeatable) wins if given. Otherwise this script
-  auto-detects from a live cluster (`oc version`). Unlike OSC, there is no
-  values-file pin for the exact OCP patch version -- it's genuine live
-  cluster state, not something coco-pattern declares.
+  --ocp-version (repeatable) wins if given, followed by the OCP_VERSION
+  environment variable. Otherwise this script auto-detects from a live
+  cluster (`oc version`). Unlike OSC, there is no values-file pin for the
+  exact OCP patch version -- it's genuine live cluster state, not something
+  coco-pattern declares.
 """
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -101,8 +103,8 @@ def parse_args(argv=None):
         action="append",
         dest="ocp_versions",
         metavar="VER",
-        help="OCP version (bare metal; repeatable; default: auto-detect "
-        "from a live cluster)",
+        help="OCP version (bare metal; repeatable; default: OCP_VERSION "
+        "environment variable or auto-detect from a live cluster)",
     )
     parser.add_argument(
         "--osc-version",
@@ -187,8 +189,6 @@ def check_cosign():
 
 
 def resolve_pull_secret(cli_value):
-    import os
-
     path = Path(
         cli_value or os.environ.get("PULL_SECRET") or Path.home() / "pull-secret.json"
     )
@@ -257,12 +257,15 @@ def resolve_osc_versions(args):
 
 
 def resolve_ocp_versions(args):
-    """Resolve OCP version(s) for bare metal: CLI override, else live-cluster.
+    """Resolve OCP version(s): CLI override, environment override, then cluster.
 
     Unlike OSC, there is no values-file pin for the exact OCP patch version.
     """
     if args.ocp_versions:
         return list(dict.fromkeys(args.ocp_versions)), "--ocp-version"
+
+    if ocp_version := os.environ.get("OCP_VERSION"):
+        return [ocp_version], "OCP_VERSION environment variable"
 
     if shutil.which("oc") is not None:
         whoami = subprocess.run(
@@ -467,8 +470,6 @@ def run(args):
         # latter so the pull secret authenticates the registry.redhat.io pull
         # cosign does internally; otherwise it silently falls back to
         # anonymous auth and fails with a confusing UNAUTHORIZED error.
-        import os
-
         os.environ["REGISTRY_AUTH_FILE"] = str(pull_secret)
         if (Path.home() / ".docker" / "config.json").is_file():
             print(

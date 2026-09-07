@@ -23,7 +23,7 @@ By default, `collect_firmware_refvals.py` collects reference values for **both T
 - Python 3 with PyYAML: `pip3 install pyyaml`
 - `cosign` >= 2.0 — Azure only, used by veritas to verify the Red Hat dm-verity image signature: <https://docs.sigstore.dev/cosign/system_config/installation/>
 - OpenShift pull secret at `~/pull-secret.json` (override the location with the `PULL_SECRET` environment variable or `--pull-secret`)
-- For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in, or pass `--ocp-version` explicitly)
+- For bare metal: OCP version of your cluster (auto-detected if `oc` is logged in, set `OCP_VERSION`, or pass `--ocp-version` explicitly)
 - For bare metal TDX: `tdx-measure` (`cargo install --git https://github.com/virtee/tdx-measure tdx-measure-cli`) — collection continues with a warning if absent, but TDX RTMR values will be incomplete
 
 **Why host-installed instead of the `coco-tools` container**: the container image (`quay.io/openshift_sandboxed_containers/coco-tools:0.5.1`) is pinned to an older veritas release that lacks `--skip-tlog`, which is needed to avoid the Azure verification failures described below. This is a deliberate, temporary deviation — see the tracking issue referenced in [Known Limitations](#known-limitations) for moving back to the container once a `coco-tools` release ships with a newer veritas.
@@ -58,8 +58,16 @@ base64-encoded map), not just a version stamp, and is now always passed to
 veritas explicitly.
 
 OCP version (bare metal only) is unaffected by this — there is no
-values-file pin for the exact OCP patch, so `--ocp-version` still falls
-back to live-cluster auto-detection, or can be passed explicitly.
+values-file pin for the exact OCP patch. It resolves in this order:
+
+1. `--ocp-version` (repeatable), if supplied.
+2. `OCP_VERSION`, if set.
+3. Live-cluster auto-detection through an authenticated `oc` session.
+
+Use `OCP_VERSION` when reference values are collected before a cluster is
+available, such as from a connected staging host preparing artifacts for a
+fully air-gapped environment. The variable accepts one OCP version; use the
+repeatable `--ocp-version` option when collecting for multiple versions.
 
 ## Collecting Reference Values
 
@@ -86,6 +94,10 @@ Veritas pulls the `osc-dm-verity-image` from the Red Hat registry, verifies its 
 # Collect firmware values from OCP release artifacts
 make collect-firmware-refvals
 
+# Collect without an authenticated cluster connection (for example, from a
+# connected staging host preparing artifacts for a fully disconnected environment)
+OCP_VERSION=4.22.8 make collect-firmware-refvals
+
 # Or with explicit OCP version:
 ./scripts/collect_firmware_refvals.py --platform baremetal --ocp-version 4.20.18
 
@@ -107,8 +119,8 @@ Options:
   -o, --output <path>       Override output path
   -p, --pull-secret <path>  Pull secret file (default: ~/pull-secret.json,
                             override via PULL_SECRET env var)
-  -v, --ocp-version <ver>   OCP version (bare metal; repeatable; default:
-                            auto-detect from a live cluster)
+  -v, --ocp-version <ver>   OCP version (bare metal; repeatable; takes
+                             precedence over OCP_VERSION and auto-detection)
   --osc-version <ver>       OSC operator version (repeatable; default: read
                             from --values-file's pinned subscription CSV)
   --values-file <path>      Values file to read the pinned OSC version from
