@@ -47,7 +47,7 @@ clusterGroup:
       namespace: openshift-sandboxed-containers-operator
       channel: stable
       installPlanApproval: Manual
-      csv: sandboxed-containers-operator.v1.13.0
+      csv: sandboxed-containers-operator.v1.13.1
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     trustee:
