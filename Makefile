@@ -91,7 +91,7 @@ pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_AP
 ##@ Reference Value Collection
 
 .PHONY: collect-firmware-refvals
-collect-firmware-refvals: ## Collect firmware reference values (bare metal, default)
+collect-firmware-refvals: ## Collect bare-metal firmware values; set OCP_VERSION=x.y.z if oc is unavailable (e.g. airgap)
 	@scripts/collect_firmware_refvals.py --platform baremetal
 
 .PHONY: collect-azure-refvals

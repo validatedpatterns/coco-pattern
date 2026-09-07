@@ -89,6 +89,7 @@ For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/
 **Common:**
 
 - Tools on your workstation: `podman`, `yq`, `jq`, `skopeo`
+- Python 3.10+ with the shared script dependencies: `python3 -m pip install -r requirements.txt`
 - OpenShift pull secret saved at `~/pull-secret.json` (download from [console.redhat.com](https://console.redhat.com/openshift/downloads)), or point elsewhere via the `PULL_SECRET` environment variable
 - Fork the repository — ArgoCD reconciles cluster state against your fork, so changes must be pushed to your remote
 
@@ -97,9 +98,9 @@ For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/
 These scripts generate the cryptographic material and attestation reference values needed by Trustee. Run them once before your first deployment.
 
 1. `make gen-secrets` — generates KBS key pairs, sealed-secrets signing keys, and copies `values-secret.yaml.template` to `~/values-secret-coco-pattern.yaml`
-2. Collect attestation reference values (requires `veritas` — `pip install "osc-veritas[snp]==0.1.3rc1"` —, `cosign` >= 2.0 for Azure, and `~/pull-secret.json` or `PULL_SECRET`). The OSC operator version is read from the pattern's own pinned values file (`clusterGroup.subscriptions.sandbox.csv`), not auto-detected from a live cluster — see `docs/firmware-reference-values.md`. By default this collects and merges reference values for **both TDX and SNP**:
+2. Collect attestation reference values (requires the shared Python dependencies above, `cosign` >= 2.0 for Azure, and `~/pull-secret.json` or `PULL_SECRET`). The OSC operator version is read from the pattern's own pinned values file (`clusterGroup.subscriptions.sandbox.csv`), not auto-detected from a live cluster — see `docs/firmware-reference-values.md`. By default this collects and merges reference values for **both TDX and SNP**:
    - **Azure:** `make collect-azure-refvals` — pulls PCR measurements from the dm-verity image via veritas. Saves to `~/.coco-pattern/measurements.json`.
-   - **Bare metal:** `make collect-firmware-refvals` — computes firmware measurements from OCP release artifacts via veritas. Saves to `~/.coco-pattern/firmware-reference-values.json`. `pcrStash` and `firmwareReferenceValues` are both enabled by default in `~/values-secret-coco-pattern.yaml`, so nothing needs to be uncommented — the collection script automatically writes an empty `{}` placeholder for the platform you're not using.
+   - **Bare metal:** `make collect-firmware-refvals` — computes firmware measurements from OCP release artifacts via veritas. Saves to `~/.coco-pattern/firmware-reference-values.json`. When collecting before cluster access is available, for example from a connected staging host preparing a disconnected deployment, set the target release explicitly: `OCP_VERSION=4.22.8 make collect-firmware-refvals`. `pcrStash` and `firmwareReferenceValues` are both enabled by default in `~/values-secret-coco-pattern.yaml`, so nothing needs to be uncommented — the collection script automatically writes an empty `{}` placeholder for the platform you're not using.
    - See [docs/firmware-reference-values.md](docs/firmware-reference-values.md) for detailed workflow and options.
 3. Review and customise `~/values-secret-coco-pattern.yaml` — this file is loaded into Vault and provides secrets to the pattern.
 

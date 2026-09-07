@@ -27,8 +27,16 @@
 > **Skip this phase on repeat runs.** These steps configure the jump host infrastructure
 > (mirror registry, git server) that persists across deployments. Run once per jump host.
 >
-> **Prerequisites:** Internet access on the jump host, `podman` and `openssl`
-> installed, and `python3-passlib` or `httpd-tools` for `htpasswd`.
+> **Prerequisites:** Internet access on the jump host, Python 3.10+, `podman`
+> and `openssl` installed, and `python3-passlib` or `httpd-tools` for
+> `htpasswd`.
+
+Install the shared Python dependencies before starting the smart Git HTTP
+server or collecting reference values:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
 
 ### 0-0: Set Site Variables
 
