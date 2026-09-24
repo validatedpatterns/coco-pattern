@@ -146,7 +146,7 @@ def cluster_platforms(namespace: str) -> list[dict[str, str]]:
     return validate_platforms(platforms)
 
 
-def command_export(arguments: argparse.Namespace) -> None:
+def command_export(arguments: SimpleNamespace) -> None:
     output = Path(arguments.output).expanduser()
     if output.exists():
         fail(f"output bundle already exists: {output}")
@@ -224,7 +224,7 @@ def expire_hours(value: str) -> int:
     return hours
 
 
-def command_generate(arguments: argparse.Namespace) -> None:
+def command_generate(arguments: SimpleNamespace) -> None:
     request = Path(arguments.input).expanduser()
     request_manifest, platforms = request_platforms(request)
     output = Path(arguments.output).expanduser()
@@ -288,7 +288,7 @@ def qgs_daemonset(namespace: str, configured_name: str) -> str:
     return names.pop()
 
 
-def command_import(arguments: argparse.Namespace) -> None:
+def command_import(arguments: SimpleNamespace) -> None:
     bundle = Path(arguments.input).expanduser()
     manifest, expected, cache = response_cache(bundle)
     current = cluster_platforms(arguments.namespace)
@@ -307,7 +307,7 @@ def command_import(arguments: argparse.Namespace) -> None:
     print(f"Imported {len(cache)} PCK cache Secrets from {bundle} (bundle SHA-256: {sha256(bundle / 'manifest.json')})")
 
 
-def command_provision(arguments: argparse.Namespace) -> None:
+def command_provision(arguments: SimpleNamespace) -> None:
     request = Path(arguments.request_bundle).expanduser()
     response = Path(arguments.response_bundle).expanduser()
     current = cluster_platforms(arguments.namespace)
@@ -359,7 +359,7 @@ def command_provision(arguments: argparse.Namespace) -> None:
     )
 
 
-def command_tools(arguments: argparse.Namespace) -> None:
+def command_tools(arguments: SimpleNamespace) -> None:
     repository = Path(arguments.repository).expanduser()
     tool_dir = Path(arguments.pcsclient_dir).expanduser()
     repository.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
