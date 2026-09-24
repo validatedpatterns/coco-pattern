@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("dcap_pck", REPOSITORY_ROOT / "scripts/dcap-pck.py")
+SPEC = importlib.util.spec_from_file_location(
+    "dcap_pck", REPOSITORY_ROOT / "scripts/dcap-pck.py"
+)
 assert SPEC and SPEC.loader
 dcap_pck = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(dcap_pck)
@@ -42,7 +44,9 @@ def test_request_bundle_detects_tampered_platform_list(tmp_path: Path):
     dcap_pck.write_json(platforms, [platform()])
     dcap_pck.write_json(
         bundle / "manifest.json",
-        dcap_pck.create_manifest(dcap_pck.REQUEST_TYPE, {"platform-list.json": platforms}),
+        dcap_pck.create_manifest(
+            dcap_pck.REQUEST_TYPE, {"platform-list.json": platforms}
+        ),
     )
     platforms.write_text("[]\n", encoding="utf-8")
 
@@ -77,8 +81,13 @@ def test_read_api_key_removes_environment_value(monkeypatch):
 
 
 def test_platform_data_decoding_uses_exact_required_fields(monkeypatch):
-    encoded = {key: dcap_pck.base64.b64encode(value.encode()).decode() for key, value in platform().items()}
-    monkeypatch.setattr(dcap_pck, "run_oc", lambda _: json.dumps({"items": [{"data": encoded}]}))
+    encoded = {
+        key: dcap_pck.base64.b64encode(value.encode()).decode()
+        for key, value in platform().items()
+    }
+    monkeypatch.setattr(
+        dcap_pck, "run_oc", lambda _: json.dumps({"items": [{"data": encoded}]})
+    )
 
     assert dcap_pck.cluster_platforms("intel-dcap-operator-system") == [platform()]
 
@@ -99,14 +108,27 @@ def test_import_refuses_changed_platform_data(monkeypatch, tmp_path: Path):
     cache.write_bytes(struct.pack("<HIQ", 1, 4, 4_000_000_000))
     dcap_pck.write_json(
         response / "manifest.json",
-        dcap_pck.create_manifest(dcap_pck.RESPONSE_TYPE, {f"pck/{cache.name}": cache}, platforms=[platform()]),
+        dcap_pck.create_manifest(
+            dcap_pck.RESPONSE_TYPE, {f"pck/{cache.name}": cache}, platforms=[platform()]
+        ),
     )
     changed = platform()
     changed["cpu_svn"] = "d" * 32
     monkeypatch.setattr(dcap_pck, "cluster_platforms", lambda _: [changed])
 
     with pytest.raises(ValueError, match="platform data does not match"):
-        dcap_pck.command_import(type("Arguments", (), {"input": str(response), "namespace": "test", "qgs_daemonset": "", "timeout": "1m"})())
+        dcap_pck.command_import(
+            type(
+                "Arguments",
+                (),
+                {
+                    "input": str(response),
+                    "namespace": "test",
+                    "qgs_daemonset": "",
+                    "timeout": "1m",
+                },
+            )()
+        )
 
 
 def test_qgs_daemonset_uses_pod_owner_reference(monkeypatch):
@@ -117,7 +139,11 @@ def test_qgs_daemonset_uses_pod_owner_reference(monkeypatch):
             {
                 "items": [
                     {
-                        "metadata": {"ownerReferences": [{"kind": "DaemonSet", "name": "intel-tdx-dcap-qgs"}]},
+                        "metadata": {
+                            "ownerReferences": [
+                                {"kind": "DaemonSet", "name": "intel-tdx-dcap-qgs"}
+                            ]
+                        },
                         "spec": {"initContainers": [{"name": "pck-certs-watcher"}]},
                     }
                 ]
@@ -125,10 +151,14 @@ def test_qgs_daemonset_uses_pod_owner_reference(monkeypatch):
         ),
     )
 
-    assert dcap_pck.qgs_daemonset("intel-dcap-operator-system", "") == "intel-tdx-dcap-qgs"
+    assert (
+        dcap_pck.qgs_daemonset("intel-dcap-operator-system", "") == "intel-tdx-dcap-qgs"
+    )
 
 
-def test_provision_reuses_matching_request_and_response(monkeypatch, tmp_path: Path, capsys):
+def test_provision_reuses_matching_request_and_response(
+    monkeypatch, tmp_path: Path, capsys
+):
     request = tmp_path / "request"
     response = tmp_path / "response"
     request.mkdir()
@@ -136,7 +166,9 @@ def test_provision_reuses_matching_request_and_response(monkeypatch, tmp_path: P
     dcap_pck.write_json(request_data, [platform()])
     dcap_pck.write_json(
         request / "manifest.json",
-        dcap_pck.create_manifest(dcap_pck.REQUEST_TYPE, {"platform-list.json": request_data}),
+        dcap_pck.create_manifest(
+            dcap_pck.REQUEST_TYPE, {"platform-list.json": request_data}
+        ),
     )
     cache_dir = response / "pck"
     cache_dir.mkdir(parents=True)
@@ -153,10 +185,24 @@ def test_provision_reuses_matching_request_and_response(monkeypatch, tmp_path: P
     )
     monkeypatch.setattr(dcap_pck, "cluster_platforms", lambda _: [platform()])
     monkeypatch.setattr(dcap_pck, "command_import", lambda _: None)
-    monkeypatch.setattr(dcap_pck, "command_generate", lambda _: pytest.fail("should reuse response"))
+    monkeypatch.setattr(
+        dcap_pck, "command_generate", lambda _: pytest.fail("should reuse response")
+    )
 
     dcap_pck.command_provision(
-        type("Arguments", (), {"request_bundle": str(request), "response_bundle": str(response), "namespace": "test", "qgs_daemonset": "", "timeout": "1m", "pcsclient_dir": "unused", "expire_hours": 1})()
+        type(
+            "Arguments",
+            (),
+            {
+                "request_bundle": str(request),
+                "response_bundle": str(response),
+                "namespace": "test",
+                "qgs_daemonset": "",
+                "timeout": "1m",
+                "pcsclient_dir": "unused",
+                "expire_hours": 1,
+            },
+        )()
     )
 
     assert "Reusing matching platform request bundle" in capsys.readouterr().out
