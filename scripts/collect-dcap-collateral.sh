@@ -10,9 +10,8 @@
 # the Trustee dcap_verifier in file:// mode. This is platform-level data that
 # does NOT change per-cluster — only per CPU family (identified by FMSPC).
 #
-# IMPORTANT: Run AFTER pcsclient.py cache (E-3). The cache step provisions PCK
-# certs for the specific platform. This fetch step gets the verification collateral
-# (QeIdentity, TcbInfo, CRLs) needed by KBS to verify attestation reports.
+# This collection is independent of platform registration and PCK cache generation.
+# It gets public verification collateral (QeIdentity, TcbInfo, CRLs) needed by KBS.
 #
 # Usage:
 #   ./scripts/collect-dcap-collateral.sh [OPTIONS]
@@ -34,7 +33,7 @@
 set -euo pipefail
 
 # Defaults
-PCSCLIENT_DIR="${HOME}/confidential-computing.tee.dcap/tools/PcsClientTool"
+PCSCLIENT_DIR="${PCSCLIENT_DIR:-${DCAP_PCSCLIENT_DIR:-${HOME}/confidential-computing.tee.dcap/tools/PcsClientTool}}"
 OUTPUT_DIR="${HOME}/.coco-pattern/dcap-offline"
 
 # Parse arguments

@@ -73,21 +73,6 @@ gen-mirror-helm-secret: ## Generate mirror-registry Helm OCI password file from 
 enable-airgap-secrets: ## Uncomment disconnected-mirror secrets (registryCaCert, bootstrap_secrets) in the generated values-secret file
 	@scripts/enable-airgap-secrets.sh
 
-.PHONY: pck-register
-pck-register: ## Register PCK certificates with Intel PCS (requires INTEL_PCS_API_KEY)
-	@if [ -z "$(INTEL_PCS_API_KEY)" ]; then \
-		echo "ERROR: Set INTEL_PCS_API_KEY environment variable"; \
-		echo "  Usage: make pck-register INTEL_PCS_API_KEY=<key>"; \
-		exit 1; \
-	fi
-	@PCS_TOOL="$(HOME)/confidential-computing.tee.dcap/tools/PcsClientTool/pcsclient.py"; \
-	if [ ! -f "$$PCS_TOOL" ]; then \
-		echo "ERROR: PCS Client Tool not found at $$PCS_TOOL"; \
-		echo "  Clone: git clone https://github.com/intel/confidential-computing.tee.dcap ~/confidential-computing.tee.dcap"; \
-		exit 1; \
-	fi; \
-	cd "$$(dirname $$PCS_TOOL)" && python3 pcsclient.py -t register -k "$(INTEL_PCS_API_KEY)"
-
 ##@ Reference Value Collection
 
 .PHONY: collect-firmware-refvals
@@ -99,13 +84,46 @@ collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect_firmware_refvals.py --platform azure
 
 .PHONY: collect-dcap-collateral
-collect-dcap-collateral: ## Collect TDX DCAP collateral from Intel PCS (API key via OS keyring)
+collect-dcap-collateral: dcap-tools ## Collect platform-independent TDX DCAP verification collateral (connected low side)
 	@scripts/collect-dcap-collateral.sh
 
-.PHONY: dcap-offline-provision
-dcap-offline-provision: ## Full DCAP offline provisioning workflow (collect collateral + load secrets)
-	$(MAKE) collect-dcap-collateral
-	$(MAKE) load-secrets
+##@ Intel TDX PCK Lifecycle
+DCAP_PCSCLIENT_REPO ?= $(HOME)/.coco-pattern/intel-dcap
+DCAP_PCSCLIENT_DIR ?= $(DCAP_PCSCLIENT_REPO)/tools/PcsClientTool
+DCAP_PCSCLIENT_REF ?= 64b78f3766e7196d3d2c60e401540f0f853b2deb
+DCAP_PCK_DIR ?= $(HOME)/.coco-pattern/dcap-pck
+DCAP_REQUEST_BUNDLE ?= $(DCAP_PCK_DIR)/platform-request
+DCAP_RESPONSE_BUNDLE ?= $(DCAP_PCK_DIR)/pck-response
+DCAP_NAMESPACE ?= intel-dcap-operator-system
+DCAP_QGS_DAEMONSET ?=
+DCAP_PCK_EXPIRE_HOURS ?= 8760
+DCAP_QGS_TIMEOUT ?= 10m
+export DCAP_PCSCLIENT_REPO DCAP_PCSCLIENT_DIR DCAP_PCSCLIENT_REF DCAP_PCK_DIR DCAP_REQUEST_BUNDLE DCAP_RESPONSE_BUNDLE DCAP_NAMESPACE DCAP_QGS_DAEMONSET DCAP_PCK_EXPIRE_HOURS DCAP_QGS_TIMEOUT
+
+.PHONY: dcap-tools
+dcap-tools: ## Clone the pinned Intel PcsClientTool and install its Python dependencies (connected low side)
+	@python3 scripts/dcap-pck.py tools
+
+.PHONY: dcap-platform-export
+dcap-platform-export: ## Export QGS platform data as a transfer bundle (disconnected high side; requires oc)
+	@python3 scripts/dcap-pck.py export
+
+.PHONY: dcap-pck-generate
+dcap-pck-generate: dcap-tools ## Generate a PCK response bundle (connected low side; requires Intel PCS access)
+	@python3 scripts/dcap-pck.py generate
+
+.PHONY: dcap-pck-import
+dcap-pck-import: ## Import a PCK response bundle and restart QGS (disconnected high side; requires oc)
+	@python3 scripts/dcap-pck.py import
+
+.PHONY: dcap-pck-provision
+dcap-pck-provision: dcap-tools ## Resume export, generation, and import PCK cache (bastion connected to both Intel PCS and cluster)
+	@python3 scripts/dcap-pck.py provision
+
+.PHONY: dcap-status
+dcap-status: ## Check PCK and collateral expiry (requires oc)
+	@$(MAKE) check-pck-expiry
+	@$(MAKE) check-collateral-expiry
 
 .PHONY: check-pck-expiry
 check-pck-expiry: ## Check expiry of PCK cache secrets and platform data (requires oc login)
