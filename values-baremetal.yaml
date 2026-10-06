@@ -197,6 +197,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "20"
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
+        - '/overrides/values-snp-vcek.yaml'
       overrides:
         # Enable attestation-gated secret delivery via KBS
         - name: global.coco.secured

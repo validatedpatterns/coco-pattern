@@ -5,6 +5,11 @@ set -euo pipefail
 # Requires: ~/.coco-pattern/snp-vcek/<hwid>/vcek.der from download step.
 # Output: overrides/values-snp-vcek.yaml (chart values)
 #         stdout: values-secret.yaml entries to add
+#
+# kbs.snp.enabled is set separately in overrides/values-hw-amd-snp.yaml — this
+# script only owns overrides/values-snp-vcek.yaml (kbs.snp.vcekSecrets), which
+# is merged with the rest of the trustee overrides natively by Helm via the
+# trustee application's extraValueFiles list in values-baremetal.yaml.
 
 VCEKDIR="${HOME}/.coco-pattern/snp-vcek"
 OVERRIDE_FILE="overrides/values-snp-vcek.yaml"
