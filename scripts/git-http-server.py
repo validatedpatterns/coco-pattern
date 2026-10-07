@@ -17,14 +17,16 @@ Systemd user service (persistent):
 import os
 import socketserver
 import subprocess
-import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Annotated
 from urllib.parse import urlparse
 
-GIT_PROJECT_ROOT = os.path.expanduser(
-    sys.argv[2] if len(sys.argv) > 2 else "~/public_html/git"
-)
+import typer
+from rich.console import Console
+
+GIT_PROJECT_ROOT = ""
 GIT_HTTP_BACKEND = "/usr/libexec/git-core/git-http-backend"
+console = Console()
 
 
 class GitHTTPHandler(BaseHTTPRequestHandler):
@@ -98,8 +100,18 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 
-if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+def main(
+    port: Annotated[int, typer.Argument(help="TCP port to listen on")] = 8080,
+    git_project_root: Annotated[
+        str, typer.Argument(help="Directory containing exported Git repositories")
+    ] = "~/public_html/git",
+):
+    global GIT_PROJECT_ROOT
+    GIT_PROJECT_ROOT = os.path.expanduser(git_project_root)
     srv = ThreadedHTTPServer(("0.0.0.0", port), GitHTTPHandler)
-    print(f"Git HTTP server on port {port}, root={GIT_PROJECT_ROOT}", flush=True)
+    console.print(f"Git HTTP server on port {port}, root={GIT_PROJECT_ROOT}")
     srv.serve_forever()
+
+
+if __name__ == "__main__":
+    typer.run(main)

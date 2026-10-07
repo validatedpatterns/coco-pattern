@@ -45,7 +45,9 @@ if ! oc get secret "$SECRET" -n "$NS" &>/dev/null; then
     exit 1
 fi
 
-oc get secret "$SECRET" -n "$NS" \
+while IFS='|' read -r label next_update; do
+    check_date "$label" "$next_update"
+done < <(oc get secret "$SECRET" -n "$NS" \
     -o jsonpath='{.data.platform_collaterals\.json}' | base64 -d | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
@@ -63,22 +65,18 @@ for ti in col.get('tcbinfos', []):
         if nu:
             print(f'{key} FMSPC={fmspc}|{nu}')
 
-for qi in col.get('qeidentities', []):
-    for key in ['qe_identity_early', 'qe_identity']:
-        ei = qi.get(key, {})
-        if isinstance(ei, str):
-            try:
-                ei = json.loads(ei)
-            except json.JSONDecodeError:
-                continue
-        if isinstance(ei, dict):
-            info = ei.get('enclaveIdentity', {})
-            nu = info.get('nextUpdate')
-            if nu:
-                print(f'{key}|{nu}')
-" | while IFS='|' read -r label next_update; do
-    check_date "$label" "$next_update"
-done
+for key in ['qeidentity_early', 'qeidentity', 'tdqeidentity_early', 'tdqeidentity', 'qveidentity_early', 'qveidentity']:
+    identity = col.get(key, {})
+    if isinstance(identity, str):
+        try:
+            identity = json.loads(identity)
+        except json.JSONDecodeError:
+            continue
+    if isinstance(identity, dict):
+        next_update = identity.get('enclaveIdentity', {}).get('nextUpdate')
+        if next_update:
+            print(f'{key}|{next_update}')
+")
 
 echo ""
 if [ "$fail" -ne 0 ]; then

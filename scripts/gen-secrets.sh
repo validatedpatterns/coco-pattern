@@ -14,8 +14,8 @@ mkdir -p ${COCO_SECRETS_DIR}
 ## (bare metal) unconditionally so the same file works on either topology.
 ## This pre-touches an empty '{}' placeholder for whichever platform's file
 ## doesn't exist yet, so 'make load-secrets' won't fail with a missing-file
-## error before collect-firmware-refvals.sh has been run for your platform.
-## Real collected data (from collect-firmware-refvals.sh) always overwrites
+## error before collect_firmware_refvals.py has been run for your platform.
+## Real collected data (from collect_firmware_refvals.py) always overwrites
 ## these placeholders.
 for refval_file in measurements.json firmware-reference-values.json; do
 	if [ ! -f "${COCO_SECRETS_DIR}/${refval_file}" ]; then
@@ -69,8 +69,8 @@ if [ ! -f "${VALUES_FILE}" ]; then
 	echo "  For Bare Metal deployments:"
 	echo "    - Run 'make collect-firmware-refvals' to collect firmware measurements"
 	echo "    - firmwareReferenceValues is already enabled by default; no need to uncomment anything"
-	echo "    - For Intel TDX: run 'make collect-dcap-collateral', then uncomment tdxCollateral"
-	echo "      in the values-secret file for offline attestation"
+	echo "    - For Intel TDX: on the connected low side run 'make collect-dcap-collateral',"
+	echo "      transfer the output to this host, then uncomment tdxCollateral for offline attestation"
 	echo "    - SSH debug is optional (uncomment sshKey if needed)"
 	echo "    - See docs/firmware-reference-values.md for reference value collection"
 	echo

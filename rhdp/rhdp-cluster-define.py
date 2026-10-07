@@ -5,12 +5,11 @@ import json
 import os
 import pathlib
 import shutil
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from rich import print as rprint
-from typing_extensions import Annotated
 
 
 def get_default_cluster_configs(prefix: str = "") -> List[Dict]:

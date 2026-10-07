@@ -6,7 +6,7 @@ The scripts in this directory help users of that platform automate deployments.
 ## Prerequisites
 
 - `podman` installed and running (used by `pattern.sh` itself)
-- `veritas` installed on the host (used for reference value collection): `pip install "osc-veritas[snp]==0.1.3rc1"`
+- Python 3.10+ with the shared script dependencies: `python3 -m pip install -r requirements.txt`
 - `cosign` >= 2.0 (used by veritas for Azure image signature verification)
 - `yq`, `jq` installed
 - OpenShift pull secret (default: `~/pull-secret.json`, override with `PULL_SECRET` — see below)
@@ -40,7 +40,7 @@ export RESOURCEGROUP=
    3. The wrapper script **requires** an azure region code. This code SHOULD be the same as what was selected in RHDP.
    4. Optionally use `--prefix` for custom cluster naming: `bash ./rhdp/wrapper.sh --prefix dev1 eastasia`
 
-The wrapper handles: cluster provisioning, secret generation, PCR reference value collection (via veritas), and pattern installation.
+The wrapper installs the root `requirements.txt` with its selected Python interpreter, then handles cluster provisioning, secret generation, PCR reference value collection (via veritas), and pattern installation.
 
 ### Multi-Cluster Deployment (Hub and Spoke)
 
