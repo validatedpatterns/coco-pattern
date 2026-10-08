@@ -344,9 +344,9 @@ PYEOF
 mirror_oci_charts() {
     step 5 "Mirror OCI Helm charts and utility images"
 
-    local imageset="${PATTERN_DIR}/airgap/imageset-config.yaml"
+    local imageset="${PATTERN_DIR}/airgap/imageset-config-4.22.yaml"
     if [[ ! -f "$imageset" ]]; then
-        warn "No imageset-config.yaml found at $imageset — skipping"
+        warn "No ImageSetConfiguration found at $imageset — skipping"
         return
     fi
 
@@ -701,8 +701,8 @@ create_operator_config() {
 import yaml
 with open('${PATTERN_DIR}/values-global.yaml') as f:
     d = yaml.safe_load(f)
-    print(d.get('main',{}).get('gitops',{}).get('channel','latest'))
-" 2>/dev/null || echo "latest")
+    print(d.get('main',{}).get('gitops',{}).get('channel','gitops-1.22'))
+" 2>/dev/null || echo "gitops-1.22")
 
     local gitops_source
     gitops_source=$(python3 -c "

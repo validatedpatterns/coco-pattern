@@ -31,17 +31,17 @@ mirror:
         - name: sandboxed-containers-operator
           channels:
             - name: stable
-              minVersion: "1.13.0"
-              maxVersion: "1.13.0"
+              minVersion: "1.13.1"
+              maxVersion: "1.13.1"
         - name: trustee-operator
           channels:
             - name: stable
               minVersion: "1.2.0"
               maxVersion: "1.2.0"
-        # GitOps (ArgoCD)
+        # GitOps (ArgoCD) — keep aligned with main.gitops.channel in values-global.yaml
         - name: openshift-gitops-operator
           channels:
-            - name: latest
+            - name: gitops-1.22
         # External Secrets
         - name: openshift-external-secrets-operator
           channels:
@@ -114,7 +114,8 @@ mirror:
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
     - name: quay.io/validatedpatterns/acm:0.1.27
-    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8
+    # Minimum selected by the Vault applications (~0.1.10); mirror newer patches before use.
+    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.10
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
     - name: quay.io/validatedpatterns/trustee:0.10.2
     - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
