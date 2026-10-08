@@ -74,7 +74,8 @@ clusterGroup:
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      chartVersion: 0.1.*
+      # Require 0.1.10 or newer within the 0.1.x release series.
+      chartVersion: "~0.1.10"
 
     secrets-operator:
       name: openshift-external-secrets
