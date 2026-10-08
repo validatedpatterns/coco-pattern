@@ -9,7 +9,6 @@ This file provides rules and context for any AI coding assistant working in this
 - **DO NOT** commit secrets, credentials, or private keys. `values-secret.yaml.template` is a template only.
 - **DO NOT** use Kustomize. This project uses Helm exclusively.
 - **DO NOT** create charts with `apiVersion: v1`. Use `apiVersion: v2` (Helm 3+).
-- **DO NOT** place cloud-provider-specific logic in chart templates. Use `/overrides/` via `sharedValueFiles` instead.
 - **DO NOT** hardcode secrets in templates. Use External Secrets Operator with vault paths (see `charts/hub/trustee/templates/dynamic-eso.yaml` for reference).
 
 ## Feature Development Precedence Order

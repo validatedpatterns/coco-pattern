@@ -26,6 +26,12 @@ spec:
         io.katacontainers.config.runtime.create_container_timeout: "900"
     spec:
       serviceAccountName: kbs-access-curl
+      {{- $clusterGroupName := get (.Values.clusterGroup | default dict) "name" }}
+      {{- if or (eq $clusterGroupName "azure") (eq $clusterGroupName "azure-spoke") }}
+      # Azure peer-pods use the ACM-distributed pull secret; other groups use KBS.
+      imagePullSecrets:
+        - name: pull-secret
+      {{- end }}
       runtimeClassName: {{ .Values.global.coco.runtimeClassName }}
       securityContext:
         runAsUser: 0
