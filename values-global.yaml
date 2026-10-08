@@ -57,9 +57,8 @@ main:
   gitops:
     # Required for airgap -- set to your mirrored catalog source name
     # operatorSource: cs-redhat-operator-index-v4-22
-    # Channel must match what's available in the mirrored catalog.
-    # The mirrored catalog may only have 'latest', not version-specific channels.
-    channel: latest
+    # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
+    channel: gitops-1.22
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.58
