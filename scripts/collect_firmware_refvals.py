@@ -22,8 +22,17 @@ Prerequisites:
   python3 -m pip install -r requirements.txt
   cosign >= 2.0 (Azure only;
     https://docs.sigstore.dev/cosign/system_config/installation/)
-  tdx-measure (bare metal TDX only; cargo install --git
+  tdx-measure (bare metal TDX only; stage the pinned release with
+    scripts/stage-tdx-measure.sh, or cargo install --git
     https://github.com/virtee/tdx-measure tdx-measure-cli)
+
+XFAM feature allow-list (bare metal TDX only):
+  The TD's XFAM CPU feature mask is computed by veritas from a list of
+  allowed CPU feature names (--hw-xfam-allow). The default list targets the
+  lab's Sapphire Rapids (Xeon R760) generation: x87, sse, avx, avx512, pkru,
+  amx -> xfam e702060000000000. An incomplete list produces a mismatching
+  xfam reference value and attestation fails the configuration check. Pass
+  --xfam-features to override for a different hardware generation.
 
 Version resolution (OSC operator version, both platforms):
   --osc-version (repeatable) wins if given. Otherwise this script reads
@@ -56,6 +65,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Literal, Optional
@@ -97,6 +107,85 @@ def check_pyyaml():
             "python3 with PyYAML module is required. Install shared "
             "dependencies with: python3 -m pip install -r requirements.txt"
         )
+
+
+def check_tdx_measure():
+    """veritas shells out to tdx-measure for rtmr_1/rtmr_2 computation.
+
+    When the binary is absent veritas only logs a warning and silently
+    omits the RTMR reference values, leaving the RVPS without runtime
+    measurements and failing attestation (executables=Unexpected). Fail
+    here, before any collection work, with the staging instructions.
+    """
+    if shutil.which("tdx-measure") is None:
+        raise CollectionError(
+            "tdx-measure is required for bare metal TDX reference values "
+            "(veritas computes rtmr_1/rtmr_2 through it and silently skips "
+            "them when it is missing).\n"
+            "  Stage the pinned release with: scripts/stage-tdx-measure.sh"
+        )
+
+
+def veritas_version():
+    """Best-effort version identification for the toolchain manifest."""
+    result = subprocess.run(
+        ["pip3", "show", "osc-veritas"], capture_output=True, text=True, check=False
+    )
+    for line in result.stdout.splitlines():
+        if line.startswith("Version:"):
+            return line.split(":", 1)[1].strip()
+    return "unknown"
+
+
+def tdx_measure_manifest():
+    """Read the staging manifest written by stage-tdx-measure.sh, if any."""
+    path = Path.home() / ".coco-pattern" / "tdx-measure" / "manifest.json"
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def cross_check_cluster_version(ocp_versions):
+    """Refuse to collect for an OCP version that differs from the live cluster.
+
+    Best effort: when no cluster is reachable the check is skipped with a
+    notice rather than failing, so reference values can still be pre-staged
+    before a cluster exists.
+    """
+    oc = shutil.which("oc")
+    if oc is None:
+        console.print(
+            "NOTE: oc not found; skipping live-cluster OCP version cross-check"
+        )
+        return
+    result = subprocess.run(
+        [oc, "get", "clusterversion", "version", "-o", "json"],
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
+    if result.returncode != 0:
+        console.print(
+            "NOTE: no reachable cluster; skipping OCP version cross-check "
+            f"({result.stderr.strip().splitlines()[-1] if result.stderr.strip() else 'unavailable'})"
+        )
+        return
+    try:
+        observed = json.loads(result.stdout)["status"]["desired"]["version"]
+    except (ValueError, KeyError):
+        console.print("NOTE: could not parse live clusterversion; skipping cross-check")
+        return
+    for requested in ocp_versions:
+        if observed != requested:
+            raise CollectionError(
+                f"Requested OCP version {requested} does not match the live "
+                f"cluster version {observed}. Reference values are "
+                "version-specific; pass --ocp-version {observed} or repoint "
+                "at the intended cluster."
+            )
+    console.print(f"OCP version cross-check: requested == live cluster ({observed})")
 
 
 def check_cosign():
@@ -264,7 +353,8 @@ def compute_bot_version(osc_versions):
 
 
 def run_veritas(
-    platform, tee, versions, pull_secret, skip_tlog, bot_version, output_dir
+    platform, tee, versions, pull_secret, skip_tlog, bot_version, output_dir,
+    xfam_features,
 ):
     args = [
         "veritas",
@@ -284,17 +374,12 @@ def run_veritas(
 
     # XFAM CPU features only matter for TDX; only add for the tdx run to
     # avoid veritas's harmless-but-noisy "only relevant for TDX" warning.
+    # The feature list is hardware-generation specific: the default targets
+    # Sapphire Rapids (x87+sse+avx+avx512+pkru+amx -> e702060000000000).
+    # An incomplete list produces a mismatching xfam reference value.
     if platform == "baremetal" and tee == "tdx":
-        args.extend(
-            [
-                "--hw-xfam-allow",
-                "x87",
-                "--hw-xfam-allow",
-                "sse",
-                "--hw-xfam-allow",
-                "avx",
-            ]
-        )
+        for feature in xfam_features:
+            args.extend(["--hw-xfam-allow", feature])
 
     # cosign/Rekor verification only applies to the Azure branch. Default to
     # --skip-tlog: Red Hat signs and logs these images against its own
@@ -395,6 +480,8 @@ def run(args):
     check_pyyaml()
     if args.platform == "azure":
         check_cosign()
+    if args.platform == "baremetal" and args.tee in ("tdx", "both"):
+        check_tdx_measure()
 
     pull_secret = resolve_pull_secret(args.pull_secret)
 
@@ -427,6 +514,7 @@ def run(args):
     else:
         versions, version_source = resolve_ocp_versions(args)
         version_display = f"OCP {', '.join(versions)}"
+        cross_check_cluster_version(versions)
 
     output_file = (
         Path(args.output) if args.output else default_output_file(args.platform)
@@ -459,14 +547,44 @@ def run(args):
                 skip_tlog,
                 bot_version,
                 out_dir,
+                args.xfam_features,
             )
             per_tee_values.append(extract_reference_values(out_dir / RVPS_FILENAME))
 
     console.print(f"Merging reference values from: {' '.join(tees_to_run)}...")
     merged = merge_reference_values(per_tee_values)
 
+    if args.platform == "baremetal" and "tdx" in tees_to_run:
+        missing = [k for k in ("rtmr_1", "rtmr_2") if k not in merged]
+        if missing:
+            raise CollectionError(
+                f"Bare metal TDX collection is missing {', '.join(missing)} "
+                "reference values. veritas silently skips RTMR computation "
+                "when the tdx-measure binary is missing or fails; the "
+                "resulting reference set fails attestation. Stage the tool "
+                "with scripts/stage-tdx-measure.sh and re-run."
+            )
+
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(json.dumps(merged, indent=2) + "\n")
+
+    manifest = {
+        "collected_at": datetime.now(UTC).isoformat(),
+        "platform": args.platform,
+        "tee": args.tee,
+        "ocp_versions": versions if args.platform == "baremetal" else None,
+        "osc_versions": osc_versions,
+        "bot_version": bot_version,
+        "veritas_version": veritas_version(),
+        "tdx_measure": tdx_measure_manifest(),
+        "xfam_features": (
+            args.xfam_features
+            if args.platform == "baremetal" and "tdx" in tees_to_run
+            else None
+        ),
+    }
+    manifest_file = output_file.with_suffix(".manifest.json")
+    manifest_file.write_text(json.dumps(manifest, indent=2) + "\n")
 
     console.print()
     console.print("Collected firmware reference values:")
@@ -544,6 +662,15 @@ def main(
             help="Azure only: verify against the Rekor transparency log",
         ),
     ] = False,
+    xfam_features: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--xfam-features",
+            help="XFAM CPU features allowed for the TD (bare metal TDX only; "
+            "hardware-generation specific). Default targets Sapphire Rapids: "
+            "x87,sse,avx,avx512,pkru,amx",
+        ),
+    ] = None,
 ):
     args = SimpleNamespace(
         platform=platform,
@@ -554,6 +681,8 @@ def main(
         values_file=values_file,
         tee=tee,
         verify_tlog=verify_tlog,
+        xfam_features=xfam_features
+        or ["x87", "sse", "avx", "avx512", "pkru", "amx"],
     )
     try:
         run(args)
