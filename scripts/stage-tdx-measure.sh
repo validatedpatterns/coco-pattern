@@ -64,7 +64,7 @@ fi
 chmod 0755 "$STAGE_DIR/tdx-measure"
 
 echo ">> Verifying binary"
-file "$STAGE_DIR/tdx-measure" | grep -q "ELF 64-bit LSB executable, x86-64" || {
+file "$STAGE_DIR/tdx-measure" | grep -q "ELF 64-bit LSB.*executable, x86-64" || {
     echo "ERROR: staged artifact is not an x86-64 ELF binary" >&2; exit 1; }
 "$STAGE_DIR/tdx-measure" --version >/dev/null || {
     echo "ERROR: staged binary does not execute" >&2; exit 1; }
