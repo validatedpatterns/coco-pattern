@@ -55,7 +55,7 @@ clusterGroup:
       namespace: trustee-operator-system
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.2.0
+      csv: trustee-operator.v1.2.1
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     cert-manager:

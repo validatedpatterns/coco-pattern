@@ -42,7 +42,7 @@ clusterGroup:
       namespace: trustee-operator-system
       channel: stable
       installPlanApproval: Manual
-      csv: trustee-operator.v1.2.0
+      csv: trustee-operator.v1.2.1
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
