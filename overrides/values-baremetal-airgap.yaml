@@ -1,3 +1,9 @@
-global:
-  catalogSource: cs-redhat-operator-index-v4-22
-  catalogSourceNamespace: openshift-marketplace
+# Neutralized for connected deployments on this branch.
+# global.catalogSource redirects every OLM subscription to an airgap mirror
+# catalog (cs-redhat-operator-index-v4-22) that only exists on mirrored
+# clusters; on a connected cluster it leaves ESO/CNV/LVMS subscriptions
+# permanently unresolved (CatalogSourcesUnhealthy/ResolutionFailed).
+# Re-enable these two lines for airgap deployments of this branch:
+# global:
+#   catalogSource: cs-redhat-operator-index-v4-22
+#   catalogSourceNamespace: openshift-marketplace
