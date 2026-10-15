@@ -80,7 +80,9 @@ clusterGroup:
     intel-device-plugins:
       name: intel-device-plugins-operator
       namespace: openshift-operators
-      # Required for airgap -- set to your mirrored catalog source name
+      # These Intel operators live in the certified-operators catalog, not redhat-operators
+      source: certified-operators
+      # Required for airgap -- point at your mirrored catalog source instead
       # source: cs-certified-operator-index-v4-22
       channel: stable
       annotations:
@@ -88,7 +90,9 @@ clusterGroup:
     intel-tdx-dcap:
       name: intel-tdx-dcap-operator
       namespace: intel-dcap-operator-system
-      # Required for airgap -- set to your mirrored catalog source name
+      # These Intel operators live in the certified-operators catalog, not redhat-operators
+      source: certified-operators
+      # Required for airgap -- point at your mirrored catalog source instead
       # source: cs-certified-operator-index-v4-22
       channel: alpha
       annotations:
