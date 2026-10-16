@@ -1,9 +1,13 @@
-# Neutralized for connected deployments on this branch.
-# global.catalogSource redirects every OLM subscription to an airgap mirror
-# catalog (cs-redhat-operator-index-v4-22) that only exists on mirrored
-# clusters; on a connected cluster it leaves ESO/CNV/LVMS subscriptions
-# permanently unresolved (CatalogSourcesUnhealthy/ResolutionFailed).
-# Re-enable these two lines for airgap deployments of this branch:
-# global:
-#   catalogSource: cs-redhat-operator-index-v4-22
-#   catalogSourceNamespace: openshift-marketplace
+# Airgap / disconnected overlay — loaded ONLY when global.airgap is true
+# (see the conditional sharedValueFiles entry in values-baremetal.yaml).
+# The connected default (global.airgap: false) does not load this file.
+global:
+  airgap: true
+  # Mirrored catalog for OLM subscriptions (produced by oc-mirror)
+  catalogSource: cs-redhat-operator-index-v4-22
+  catalogSourceNamespace: openshift-marketplace
+# Trustee: flip platform collateral to the offline file backend.
+# Collect with `make collect-dcap-collateral` before deploy.
+kbs:
+  tdx:
+    collateralService: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"

@@ -5,7 +5,24 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "25"
 spec:
+  {{- $connected := true }}
+  {{- if hasKey .Values "global" }}
+    {{- if hasKey .Values.global "airgap" }}
+      {{- $connected = not .Values.global.airgap }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.dcap }}
+    {{- if hasKey .Values.dcap "connected" }}
+      {{- $connected = .Values.dcap.connected }}
+    {{- end }}
+  {{- end }}
+  {{- if $connected }}
+  platformRegistration:
+    Online:
+      apiKeySecretName: {{ .Values.dcap.apiKeySecretName | default "intel-pcs-api-key" }}
+  {{- else }}
   platformRegistration:
     Offline: {}
+  {{- end }}
   nodeSelector:
     - "intel.feature.node.kubernetes.io/sgx=true"

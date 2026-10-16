@@ -1,3 +1,22 @@
 secretStore:
   name: vault-backend
   kind: ClusterSecretStore
+
+dcap:
+  # Platform registration mode for the QGS.
+  #   connected (default): zero-touch registration with Intel PCS. The operator
+  #     injects the Intel PCS API key from the secret named by apiKeySecretName
+  #     (created from Vault via ESO, key 'api-key') into the QGS deployment in
+  #     the operator namespace, and the QGS registers the platform itself.
+  #     No manual PCK certificate management (dcap-pck.py) is needed.
+  #   disconnected: platformRegistration Offline mode; the platform is
+  #     registered and PCK certificates provisioned manually via
+  #     scripts/dcap-pck.py provision (airgap / lab workflow).
+  # The mode follows global.airgap by default (airgap=true -> disconnected).
+  # Set dcap.connected explicitly here only to override the global flag.
+  # connected: true
+  # Name of the secret containing the Intel PCS API key (connected mode only).
+  # Must exist in the intel-dcap-operator-system namespace with key 'api-key';
+  # created by the intel-pcs-api-key ExternalSecret from the Vault
+  # 'intelPcsApiKey' entry (see values-secret.yaml.template).
+  apiKeySecretName: intel-pcs-api-key

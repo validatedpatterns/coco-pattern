@@ -1,0 +1,32 @@
+{{- $connected := true }}
+{{- if hasKey .Values "global" }}
+  {{- if hasKey .Values.global "airgap" }}
+    {{- $connected = not .Values.global.airgap }}
+  {{- end }}
+{{- end }}
+{{- if .Values.dcap }}
+  {{- if hasKey .Values.dcap "connected" }}
+    {{- $connected = .Values.dcap.connected }}
+  {{- end }}
+{{- end }}
+{{- if $connected }}
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: intel-pcs-api-key
+  namespace: intel-dcap-operator-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.secretStore.name }}
+    kind: {{ .Values.secretStore.kind }}
+  target:
+    name: intel-pcs-api-key
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: hub/intelPcsApiKey
+        property: api-key
+{{- end }}

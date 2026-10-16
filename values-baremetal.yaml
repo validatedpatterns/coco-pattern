@@ -124,7 +124,9 @@ clusterGroup:
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
+  {{- if $.Values.global.airgap }}
   - '/overrides/values-baremetal-airgap.yaml'
+  {{- end }}
 
   extraObjects:
     wait-for-vault-unsealed:
@@ -219,11 +221,13 @@ clusterGroup:
         # Inject mirror-registry CA into KBS trust store (required for airgap image pulls)
         - name: kbs.registryCa.enabled
           value: "true"
-        # TDX DCAP collateral — offline attestation without Intel PCS network access.
-        # Collateral is collected via `make collect-dcap-collateral` and loaded into Vault.
-        # The file path below is where the AS container mounts the collateral from its ESO secret.
+        # TDX DCAP collateral — connected (default): the trustee AS fetches
+        # platform collateral (TCB info, QE identity, CRLs) directly from
+        # Intel PCS; these endpoints are public and need no API key.
+        # Airgap: overrides/values-baremetal-airgap.yaml flips this to the
+        # file:// backend (collateral collected via make collect-dcap-collateral).
         - name: kbs.tdx.collateralService
-          value: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
+          value: "https://api.trustedservices.intel.com/sgx/certification/v4/"
         - name: kbs.tdx.collateralMountPath
           value: "/opt/confidential-containers/attestation-service/tdx"
         - name: kbs.tdx.collateralFileName
