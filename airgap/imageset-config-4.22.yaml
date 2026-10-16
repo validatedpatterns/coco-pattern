@@ -1,11 +1,11 @@
 ---
 # ImageSetConfiguration for CoCo Validated Pattern airgap deployment
 # Target: MIRROR_REGISTRY_HOST:8443 (mirror-registry — sole airgap target, Phase 25.2)
-# OCP: 4.22.8
+# OCP: 4.22.17
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
 # Naming convention: imageset-config-<minor>.yaml (4.22 covers all 4.22.x patches)
-# Patch target: 4.22.8 — update minVersion/maxVersion to change patch target
+# Patch target: 4.22.17 — update minVersion/maxVersion to change patch target
 #
 # Usage:
 #   oc-mirror -c airgap/imageset-config-4.22.yaml \
@@ -19,8 +19,8 @@ mirror:
   platform:
     channels:
       - name: fast-4.22
-        minVersion: "4.22.8"
-        maxVersion: "4.22.8"
+        minVersion: "4.22.17"
+        maxVersion: "4.22.17"
         type: ocp
 
   # Red Hat operators (from values-baremetal.yaml subscriptions)
@@ -36,8 +36,8 @@ mirror:
         - name: trustee-operator
           channels:
             - name: stable
-              minVersion: "1.2.0"
-              maxVersion: "1.2.0"
+              minVersion: "1.2.1"
+              maxVersion: "1.2.1"
         # GitOps (ArgoCD) — keep aligned with main.gitops.channel in values-global.yaml
         - name: openshift-gitops-operator
           channels:
