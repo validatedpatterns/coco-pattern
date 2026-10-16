@@ -76,14 +76,17 @@ mirror:
   # Certified operators
     - catalog: registry.redhat.io/redhat/certified-operator-index:v4.22
       packages:
-        - name: gpu-operator-certified
-          # defaultChannel override required: the catalog default is v26.7; pinning
-          # v26.3 without re-pointing the default fails oc-mirror v2 catalog filtering.
-          defaultChannel: v26.3
-          channels:
-            - name: v26.3
-              minVersion: "26.3.0"
-              maxVersion: "26.3.0"
+        # GPU operator DISABLED for T1 — matches values-baremetal.yaml (the
+        # gpu-operator subscription is commented out there: "NVIDIA bundle image
+        # has oc-mirror signature issue"). The nvcr.io related images
+        # (dcgm/driver) repeatedly hit copy timeouts, and nothing in T1 consumes
+        # the bundle. Tranche 2 re-enables the operator at v26.7 (pawelpros),
+        # which requires its own mirror update per the T022 trigger logic.
+        # - name: gpu-operator-certified
+        #   channels:
+        #     - name: v26.3
+        #       minVersion: "26.3.0"
+        #       maxVersion: "26.3.0"
         # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
         # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
         - name: intel-device-plugins-operator
