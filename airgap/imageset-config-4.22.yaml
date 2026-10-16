@@ -39,7 +39,12 @@ mirror:
               minVersion: "1.2.1"
               maxVersion: "1.2.1"
         # GitOps (ArgoCD) — keep aligned with main.gitops.channel in values-global.yaml
+        # defaultChannel override required: the catalog default is "latest"; filtering
+        # it out without re-pointing the default fails catalog filtering in oc-mirror v2
+        # ("invalid default channel configuration ... a new default channel must be
+        # configured for this package").
         - name: openshift-gitops-operator
+          defaultChannel: gitops-1.22
           channels:
             - name: gitops-1.22
         # External Secrets
@@ -72,6 +77,9 @@ mirror:
     - catalog: registry.redhat.io/redhat/certified-operator-index:v4.22
       packages:
         - name: gpu-operator-certified
+          # defaultChannel override required: the catalog default is v26.7; pinning
+          # v26.3 without re-pointing the default fails oc-mirror v2 catalog filtering.
+          defaultChannel: v26.3
           channels:
             - name: v26.3
               minVersion: "26.3.0"
