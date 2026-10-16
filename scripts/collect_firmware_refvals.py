@@ -353,7 +353,13 @@ def compute_bot_version(osc_versions):
 
 
 def run_veritas(
-    platform, tee, versions, pull_secret, skip_tlog, bot_version, output_dir,
+    platform,
+    tee,
+    versions,
+    pull_secret,
+    skip_tlog,
+    bot_version,
+    output_dir,
     xfam_features,
 ):
     args = [
@@ -681,8 +687,7 @@ def main(
         values_file=values_file,
         tee=tee,
         verify_tlog=verify_tlog,
-        xfam_features=xfam_features
-        or ["x87", "sse", "avx", "avx512", "pkru", "amx"],
+        xfam_features=xfam_features or ["x87", "sse", "avx", "avx512", "pkru", "amx"],
     )
     try:
         run(args)
