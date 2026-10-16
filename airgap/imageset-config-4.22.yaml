@@ -157,15 +157,16 @@ mirror:
     - name: registry.access.redhat.com/ubi9/ubi:9.7-1764578509
 
     # --- CNV guest images (OPTIONAL — CNV-OPTIONAL) ---
-    # CNV-OPTIONAL: Remove or comment out these entries before merging upstream.
-    # These images are large (~2 GB each). They enable VM boot from DataSource in connected
-    # environments. In airgap, they must be mirrored or enableCommonBootImageImport must be
-    # set to false in the HyperConverged CR (Phase 26 sets it to false by default).
-    # Re-enable after verifying guest images are present in the mirror registry.
-    # oc-mirror v2 requires tag or digest — :latest is used here; pin to a specific version if reproducibility matters.
-    - name: registry.redhat.io/rhel9/rhel-guest-image:latest
-    - name: registry.redhat.io/rhel8/rhel-guest-image:latest
-    - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
+    # CNV-OPTIONAL: DISABLED — these images are large (~2 GB each) and NOT
+    # consumed by the pattern: Phase 26 sets enableCommonBootImageImport: false
+    # in the HyperConverged CR, so CNV never imports common boot images.
+    # Additionally, registry.redhat.io REJECTS :latest for virtio-win
+    # ("must be pulled with an explicit version") — a hard mirror error, not a
+    # transient one. Keep commented unless VM boot from DataSource is needed;
+    # if re-enabling, pin explicit version tags.
+    #- name: registry.redhat.io/rhel9/rhel-guest-image:latest
+    #- name: registry.redhat.io/rhel8/rhel-guest-image:latest
+    #- name: registry.redhat.io/container-native-virtualization/virtio-win:latest
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
     # it is not applicable to this topology and would pull unneeded RHCOS artifacts.
