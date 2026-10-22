@@ -33,10 +33,10 @@ for NODE in ${NODES}; do
     continue
   fi
 
-  HWID=$(echo "${URL}" | grep -oP '[0-9a-fA-F]{64}' | tr '[:upper:]' '[:lower:]' | head -1)
+  HWID=$(echo "${URL%%\?*}" | sed 's#.*/##' | tr '[:upper:]' '[:lower:]')
 
-  if [ -z "${HWID}" ]; then
-    echo "    ERROR: could not extract hardware ID from URL: ${URL}"
+  if ! echo "${HWID}" | grep -qE '^[0-9a-f]+$'; then
+    echo "    ERROR: could not extract hardware ID (chip_id) from URL: ${URL}"
     continue
   fi
 
