@@ -54,7 +54,7 @@ main:
   git:
     # Connected mode: repoURL is inferred from your local git remote.
     # Disconnected: uncomment and set to the HTTP URL served by git-http-server.py
-    # repoURL: http://JUMP_HOST_IP:8080/coco-pattern.git
+    # repoURL: http://user-jump.int.apac-tech-lab.net:8080/coco-pattern.git
     revision: main
   patternsOperator:
     # Required for airgap -- set to your mirrored catalog source name
