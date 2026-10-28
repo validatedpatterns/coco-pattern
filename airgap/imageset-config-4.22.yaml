@@ -1,11 +1,11 @@
 ---
 # ImageSetConfiguration for CoCo Validated Pattern airgap deployment
 # Target: MIRROR_REGISTRY_HOST:8443 (mirror-registry — sole airgap target, Phase 25.2)
-# OCP: 4.22.8
+# OCP: 4.22.17
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
 # Naming convention: imageset-config-<minor>.yaml (4.22 covers all 4.22.x patches)
-# Patch target: 4.22.8 — update minVersion/maxVersion to change patch target
+# Patch target: 4.22.17 — update minVersion/maxVersion to change patch target
 #
 # Usage:
 #   oc-mirror -c airgap/imageset-config-4.22.yaml \
@@ -19,8 +19,8 @@ mirror:
   platform:
     channels:
       - name: fast-4.22
-        minVersion: "4.22.8"
-        maxVersion: "4.22.8"
+        minVersion: "4.22.17"
+        maxVersion: "4.22.17"
         type: ocp
 
   # Red Hat operators (from values-baremetal.yaml subscriptions)
@@ -36,10 +36,15 @@ mirror:
         - name: trustee-operator
           channels:
             - name: stable
-              minVersion: "1.2.0"
-              maxVersion: "1.2.0"
+              minVersion: "1.2.1"
+              maxVersion: "1.2.1"
         # GitOps (ArgoCD) — keep aligned with main.gitops.channel in values-global.yaml
+        # defaultChannel override required: the catalog default is "latest"; filtering
+        # it out without re-pointing the default fails catalog filtering in oc-mirror v2
+        # ("invalid default channel configuration ... a new default channel must be
+        # configured for this package").
         - name: openshift-gitops-operator
+          defaultChannel: gitops-1.22
           channels:
             - name: gitops-1.22
         # External Secrets
@@ -71,11 +76,17 @@ mirror:
   # Certified operators
     - catalog: registry.redhat.io/redhat/certified-operator-index:v4.22
       packages:
-        - name: gpu-operator-certified
-          channels:
-            - name: v26.3
-              minVersion: "26.3.0"
-              maxVersion: "26.3.0"
+        # GPU operator DISABLED for T1 — matches values-baremetal.yaml (the
+        # gpu-operator subscription is commented out there: "NVIDIA bundle image
+        # has oc-mirror signature issue"). The nvcr.io related images
+        # (dcgm/driver) repeatedly hit copy timeouts, and nothing in T1 consumes
+        # the bundle. Tranche 2 re-enables the operator at v26.7 (pawelpros),
+        # which requires its own mirror update per the T022 trigger logic.
+        # - name: gpu-operator-certified
+        #   channels:
+        #     - name: v26.3
+        #       minVersion: "26.3.0"
+        #       maxVersion: "26.3.0"
         # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
         # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
         - name: intel-device-plugins-operator
@@ -149,15 +160,16 @@ mirror:
     - name: registry.access.redhat.com/ubi9/ubi:9.7-1764578509
 
     # --- CNV guest images (OPTIONAL — CNV-OPTIONAL) ---
-    # CNV-OPTIONAL: Remove or comment out these entries before merging upstream.
-    # These images are large (~2 GB each). They enable VM boot from DataSource in connected
-    # environments. In airgap, they must be mirrored or enableCommonBootImageImport must be
-    # set to false in the HyperConverged CR (Phase 26 sets it to false by default).
-    # Re-enable after verifying guest images are present in the mirror registry.
-    # oc-mirror v2 requires tag or digest — :latest is used here; pin to a specific version if reproducibility matters.
-    - name: registry.redhat.io/rhel9/rhel-guest-image:latest
-    - name: registry.redhat.io/rhel8/rhel-guest-image:latest
-    - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
+    # CNV-OPTIONAL: DISABLED — these images are large (~2 GB each) and NOT
+    # consumed by the pattern: Phase 26 sets enableCommonBootImageImport: false
+    # in the HyperConverged CR, so CNV never imports common boot images.
+    # Additionally, registry.redhat.io REJECTS :latest for virtio-win
+    # ("must be pulled with an explicit version") — a hard mirror error, not a
+    # transient one. Keep commented unless VM boot from DataSource is needed;
+    # if re-enabling, pin explicit version tags.
+    # - name: registry.redhat.io/rhel9/rhel-guest-image:latest
+    # - name: registry.redhat.io/rhel8/rhel-guest-image:latest
+    # - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
     # it is not applicable to this topology and would pull unneeded RHCOS artifacts.

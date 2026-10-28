@@ -42,11 +42,18 @@ python3 -m pip install -r requirements.txt
 
 ```bash
 # ── Update these for your environment ──────────────────────────────────────
-export MIRROR_REGISTRY=MIRROR_REGISTRY_HOST:8443   # host:port of your mirror registry
+# Mirror identity is DNS-based (R6/FR-017): the canonical reference is the
+# registry's DNS name so a host address change does not break generated
+# artifacts. The IP is a generation-time fact only (cert IP SAN, diagnostics).
+export MIRROR_REGISTRY_DNS=user-jump.int.apac-tech-lab.net
+export MIRROR_REGISTRY=${MIRROR_REGISTRY_DNS}:8443   # canonical mirror reference
 export GIT_SERVER_PORT=8080                  # port for local git HTTP server
 # ───────────────────────────────────────────────────────────────────────────
-export MREG_HOST="${MIRROR_REGISTRY%%:*}"
+export MREG_HOST="${MIRROR_REGISTRY%%:*}"    # DNS name
 export MREG_PORT="${MIRROR_REGISTRY##*:}"
+# Generation-time fact for the cert's IP SAN (and diagnostics):
+export MREG_IP=$(getent hosts "${MREG_HOST}" | awk '{print $1}' | head -1)
+echo "Mirror: ${MIRROR_REGISTRY} (resolved: ${MREG_IP:-UNRESOLVED — check DNS before proceeding})"
 ```
 
 ### 0-1: Mirror Registry Initialisation (ONE-TIME)
@@ -68,7 +75,9 @@ openssl req -new -x509 -days 3650 \
   -subj "/CN=mirror-registry-ca"
 echo "CA cert generated: $(openssl x509 -noout -subject -in ~/mirror-registry-certs/ca.crt)"
 
-# b) Generate server TLS cert signed by the CA (SAN = host IP)
+# b) Generate server TLS cert signed by the CA (SAN = DNS name + IP)
+# DNS SAN is the identity (survives address changes); IP SAN is a generation-time
+# fact so tools still referencing the address validate during transition.
 openssl genrsa -out ~/mirror-registry-certs/server.key 4096
 openssl req -new \
   -key ~/mirror-registry-certs/server.key \
@@ -80,9 +89,9 @@ openssl x509 -req -days 3650 \
   -CAkey ~/mirror-registry-certs/ca.key \
   -CAcreateserial \
   -out ~/mirror-registry-certs/server.crt \
-  -extfile <(printf "[v3_req]\nsubjectAltName=IP:${MREG_HOST}\n") \
+  -extfile <(printf "[v3_req]\nsubjectAltName=DNS:${MREG_HOST},IP:${MREG_IP}\n") \
   -extensions v3_req
-echo "Server cert signed by CA"
+echo "Server cert signed by CA (SAN: DNS:${MREG_HOST} + IP:${MREG_IP})"
 
 # c) Generate registry password
 # Use printf (NOT echo) — echo appends a newline which breaks Helm registry login (401)
@@ -146,8 +155,12 @@ echo "local-registry systemd user service enabled"
 # podman/skopeo/oc-mirror read from this directory automatically.
 # curl: pass --cacert ~/mirror-registry-certs/ca.crt
 # oc image mirror: pass --insecure=true
+# Trust entries for BOTH the DNS name (canonical) and the IP (transition safety).
+mkdir -p ~/.config/containers/certs.d/${MIRROR_REGISTRY}
 cp ~/mirror-registry-certs/ca.crt ~/.config/containers/certs.d/${MIRROR_REGISTRY}/ca.crt
-echo "CA trusted for container tools"
+mkdir -p ~/.config/containers/certs.d/${MREG_IP}:${MREG_PORT}
+cp ~/mirror-registry-certs/ca.crt ~/.config/containers/certs.d/${MREG_IP}:${MREG_PORT}/ca.crt
+echo "CA trusted for container tools (DNS name + IP)"
 
 # h2) Skip sigstore attachment lookups for certified vendors
 # Intel, HashiCorp, and NVIDIA images on registry.connect.redhat.com lack cosign
@@ -281,8 +294,8 @@ Switch between windows with `Ctrl-b <number>` or `Ctrl-b n/p`.
 
 ```bash
 # ── Site-specific variables — update these for each deployment environment ──
-export MIRROR_REGISTRY=MIRROR_REGISTRY_HOST:8443   # mirror-registry host:port
-export GIT_SERVER=http://JUMP_HOST_IP:8080  # local git HTTP server
+export MIRROR_REGISTRY=user-jump.int.apac-tech-lab.net:8443   # mirror-registry (DNS identity — see Phase 0-0)
+export GIT_SERVER=http://user-jump.int.apac-tech-lab.net:8080  # local git HTTP server (DNS identity)
 # Persist to all tmux windows (restore in each window with: eval "$(tmux showenv -g)")
 tmux set-environment -g MIRROR_REGISTRY "$MIRROR_REGISTRY"
 tmux set-environment -g GIT_SERVER "$GIT_SERVER"
@@ -596,6 +609,9 @@ podman login ${MIRROR_REGISTRY} \
 # Run oc-mirror v2 — full mirror to mirror-registry (sole airgap target, Phase 25.2)
 # Note: --v2 (double dash) is mandatory; -v2 (single dash) is not recognised
 # CA trust comes from ~/.config/containers/certs.d/${MIRROR_REGISTRY}/ca.crt (set in A-0)
+# oc-mirror runs against the DNS name so ALL generated cluster-resources
+# (IDMS, ITMS, CatalogSources) reference the DNS name — the IP never enters
+# the ignition chain (FR-017). The CA is trusted via certs.d (Phase 0-1h).
 oc-mirror \
   --config ~/coco-pattern/airgap/imageset-config-4.22.yaml \
   docker://${MIRROR_REGISTRY} \
@@ -1534,7 +1550,7 @@ Auto-set during run:
 
 ```bash
 export KUBECONFIG=<set in C-6 from build dir>
-export MIRROR_REGISTRY=MIRROR_REGISTRY_HOST:8443
+export MIRROR_REGISTRY=user-jump.int.apac-tech-lab.net:8443
 ```
 
 Persistent in `~/.envrc`:
@@ -1547,7 +1563,8 @@ export LABCTL_IDRAC_PASSWORD="..."
 ### A.6: Add local-registry to pull-secret.json
 
 The cluster's global pull-secret (embedded in `install-config.yaml` by labctl) must include
-credentials for MIRROR_REGISTRY_HOST:8443. Without this, cluster nodes cannot pull images redirected
+credentials for the mirror registry (`user-jump.int.apac-tech-lab.net:8443` — the DNS
+identity per Phase 0-0). Without this, cluster nodes cannot pull images redirected
 by the IDMS files generated by oc-mirror.
 
 Run once after initial auth setup, or if the registry password is regenerated:

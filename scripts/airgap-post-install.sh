@@ -195,14 +195,20 @@ print(yaml.dump_all(docs, default_flow_style=False))
     done
 
     # Apply manually maintained ITMS (community-operator-pipeline-prod, intel, hashicorp)
+    # MIRROR_REGISTRY_HOST placeholders are substituted from $MIRROR_REGISTRY at apply
+    # time (FR-017: canonical identity is the DNS name, so the mirrors follow the env).
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local manual_itms="${script_dir}/../airgap/itms-manual-mirrors.yaml"
     if [[ -f "$manual_itms" ]]; then
         info "  Applying manual ITMS: $(basename "$manual_itms") with NeverContactSource policy"
-        python3 -c "
-import sys, yaml
-docs = list(yaml.safe_load_all(open('$manual_itms')))
+        MIRROR_REGISTRY="${MIRROR_REGISTRY}" python3 -c "
+import sys, os, yaml
+raw = open('$manual_itms').read()
+mirror = os.environ.get('MIRROR_REGISTRY', '')
+if mirror and 'MIRROR_REGISTRY_HOST:8443' in raw and mirror != 'MIRROR_REGISTRY_HOST:8443':
+    raw = raw.replace('MIRROR_REGISTRY_HOST:8443', mirror)
+docs = list(yaml.safe_load_all(raw))
 for doc in docs:
     if doc and doc.get('kind') == 'ImageTagMirrorSet':
         for entry in doc.get('spec', {}).get('imageTagMirrors', []):
@@ -677,15 +683,16 @@ SVCEOF
         fi
     fi
 
-    # Report URLs
-    local host_ip
-    host_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "JUMP_HOST_IP")
+    # Report URLs — use the DNS name (FR-017): the node resolves it via lab DNS
+    # (the ignition's resolver), so a host address change does not break pulls.
+    local host_name
+    host_name=$(hostname -f 2>/dev/null || echo "JUMP_HOST_DNS")
     info ""
     info "Git HTTP URLs:"
     for repo_path in "${repos[@]}"; do
         local repo_name
         repo_name=$(basename "$repo_path")
-        info "  http://${host_ip}:${GIT_HTTP_PORT}/${repo_name}.git"
+        info "  http://${host_name}:${GIT_HTTP_PORT}/${repo_name}.git"
     done
 }
 
