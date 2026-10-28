@@ -167,9 +167,9 @@ mirror:
     # ("must be pulled with an explicit version") — a hard mirror error, not a
     # transient one. Keep commented unless VM boot from DataSource is needed;
     # if re-enabling, pin explicit version tags.
-    #- name: registry.redhat.io/rhel9/rhel-guest-image:latest
-    #- name: registry.redhat.io/rhel8/rhel-guest-image:latest
-    #- name: registry.redhat.io/container-native-virtualization/virtio-win:latest
+    # - name: registry.redhat.io/rhel9/rhel-guest-image:latest
+    # - name: registry.redhat.io/rhel8/rhel-guest-image:latest
+    # - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
     # it is not applicable to this topology and would pull unneeded RHCOS artifacts.
