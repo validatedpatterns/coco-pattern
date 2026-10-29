@@ -346,6 +346,43 @@ PYEOF
 # The old inline ITMS used registry_base with /mirror/ prefix which was
 # incorrect for single-registry (mirror-registry) architecture.
 
+# ─── Step 3d: Repoint default-catalog subscriptions to the mirror catalog ─
+# Operators created at runtime (e.g. the MCH operator's multicluster-engine
+# subscription) reference the DEFAULT catalog sources (redhat-operators etc.),
+# which are disabled in airgap. Without repointing, the operator never
+# resolves and upstream reconciles stall (observed: MCH stuck Installing on a
+# missing MultiClusterEngine CRD for hours, with only a reconciler error).
+repoint_default_catalog_subscriptions() {
+    step "3d" "Repoint default-catalog subscriptions to mirrored catalogs"
+
+    local map="
+redhat-operators:cs-redhat-operator-index-v4-22
+certified-operators:cs-certified-operator-index-v4-22
+community-operators:cs-community-operator-index-v4-22
+"
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        local def="${line%%:*}" mirror="${line##*:}"
+        local subs
+        subs=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
+            python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for s in d.get('items', []):
+    if s['spec'].get('source') == '$def':
+        print(s['metadata']['namespace'] + ' ' + s['metadata']['name'])
+" 2>/dev/null) || true
+        local sub ns name
+        for sub in $subs; do
+            ns="${sub%% *}"; name="${sub##* }"
+            info "  repointing $ns/$name: $def -> $mirror"
+            oc patch subscriptions.operators.coreos.com "$name" -n "$ns" --type merge \
+                -p "{\"spec\":{\"source\":\"$mirror\",\"sourceNamespace\":\"openshift-marketplace\"}}" || true
+        done
+    done <<< "$map"
+    info "Subscription catalog repointing complete"
+}
+
 # ─── Step 5: Mirror OCI Helm charts and utility images ───────────
 mirror_oci_charts() {
     step 5 "Mirror OCI Helm charts and utility images"
@@ -859,6 +896,7 @@ disable_default_catalogs
 create_catalog_sources
 apply_ocmirror_resources
 normalise_mirror_source_policy
+repoint_default_catalog_subscriptions
 mirror_oci_charts
 fix_manifest_lists
 add_argocd_ca
