@@ -170,6 +170,15 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
+      # Wave 15 — AFTER the wave-10 OLM subscriptions: the ACM chart renders
+      # the MultiClusterHub, whose CRD is registered by the ACM operator
+      # (Subscription rendered by the root app at wave 10). At wave 0 the
+      # app deadlocks under sync-wave gating: ArgoCD discovery fails on the
+      # not-yet-served operator.open-cluster-management.io/v1 group, the app
+      # never goes healthy, and wave 10 — which would install the operator —
+      # is gated behind it (observed live, 2026-11-02 no-bounce experiment).
+      annotations:
+        argocd.argoproj.io/sync-wave: "15"
       # Airgap: the MCE subscription source is flipped by the airgap overlay
       # (overrides/values-baremetal-airgap.yaml) via acm.mce_operator.source —
       # the MCH operator honors the mce-subscription-spec annotation when it
