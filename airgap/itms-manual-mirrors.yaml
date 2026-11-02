@@ -14,3 +14,10 @@ spec:
         - MIRROR_REGISTRY_HOST:8443/hashicorp
     # NOTE: quay.io/community-operator-pipeline-prod removed — oc-mirror 4.22
     # generates ITMS for it in itms-oc-mirror.yaml automatically.
+    # Kyverno chart images: the vendored chart defaults to reg.kyverno.io
+    # (Kyverno's own registry), which is not mirrored by oc-mirror (the
+    # imageset mirrors the content-identical ghcr.io/kyverno/* images).
+    # Redirect tag pulls to the mirror's kyverno/* paths.
+    - source: reg.kyverno.io
+      mirrors:
+        - MIRROR_REGISTRY_HOST:8443
