@@ -1,3 +1,9 @@
+# NOTE (org-prefixed registries): when the mirror target serves content
+# under an org/namespace prefix (e.g. a Quay 'mirror' org), MIRROR_REGISTRY
+# must be set to the ORG-PREFIXED root for this substitution — e.g.
+# quay.example:443/mirror — so the entries below resolve to
+# quay.example:443/mirror/<path>. Using the bare host:port produces
+# unauthorized/404 pulls for every tag-based operand image.
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
