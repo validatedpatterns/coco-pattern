@@ -17,6 +17,17 @@ global:
   # Mirrored catalog for the Argo-rendered OLM subscriptions (oc-mirror output)
   catalogSource: cs-redhat-operator-index-v4-22
   catalogSourceNamespace: openshift-marketplace
+# The Intel operator subscriptions stay on the certified catalog in the
+# connected default; repoint them at the mirrored certified catalog here.
+# If left on certified-operators (disabled in airgap), each root-app sync
+# attempt fails to resolve (CatalogSourcesUnhealthy) and retries — burning
+# the sync retry budget and stalling the operators.
+clusterGroup:
+  subscriptions:
+    intel-device-plugins:
+      source: cs-certified-operator-index-v4-22
+    intel-tdx-dcap:
+      source: cs-certified-operator-index-v4-22
 # Trustee: flip platform collateral to the offline file backend.
 # Collect with `make collect-dcap-collateral` before deploy.
 kbs:
