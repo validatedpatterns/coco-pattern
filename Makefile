@@ -83,6 +83,40 @@ collect-firmware-refvals: ## Collect bare-metal firmware values; set OCP_VERSION
 collect-azure-refvals: ## Collect PCR reference values (Azure)
 	@scripts/collect_firmware_refvals.py --platform azure
 
+
+.PHONY: detect-hardware
+detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
+	@echo "Detecting hardware profile from cluster nodes..."
+	@echo "---"
+	@CPU_VENDOR=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-model\.vendor_id}' 2>/dev/null) && \
+	TDX_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.tdx\.enabled}' 2>/dev/null) && \
+	SNP_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.sev\.snp}' 2>/dev/null) && \
+	GPU_PRESENT=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.present}' 2>/dev/null) && \
+	echo "CPU Vendor:  $${CPU_VENDOR:-unknown}" && \
+	echo "TDX Enabled: $${TDX_ENABLED:-false}" && \
+	echo "SNP Enabled: $${SNP_ENABLED:-false}" && \
+	echo "GPU Present: $${GPU_PRESENT:-false}" && \
+	echo "---" && \
+	if [ "$${CPU_VENDOR}" = "Intel" ] && [ "$${TDX_ENABLED}" = "true" ]; then \
+		if [ "$${GPU_PRESENT}" = "true" ]; then \
+			echo "Recommended profile: intel-tdx-gpu"; \
+		else \
+			echo "Recommended profile: intel-tdx"; \
+		fi; \
+	elif [ "$${CPU_VENDOR}" = "AuthenticAMD" ] || [ "$${SNP_ENABLED}" = "true" ]; then \
+		if [ "$${GPU_PRESENT}" = "true" ]; then \
+			echo "Recommended profile: amd-snp-gpu"; \
+		else \
+			echo "Recommended profile: amd-snp"; \
+		fi; \
+	else \
+		echo "Could not determine hardware profile."; \
+		echo "Ensure NFD operator is running and node labels are populated."; \
+		echo "Set global.hardware.profile manually in values-global.yaml"; \
+	fi && \
+	echo "" && \
+	echo "To apply: edit values-global.yaml and set global.hardware.profile to the recommended value."
+
 .PHONY: collect-dcap-collateral
 collect-dcap-collateral: dcap-tools ## Collect platform-independent TDX DCAP verification collateral (connected low side)
 	@scripts/collect-dcap-collateral.sh
@@ -120,10 +154,6 @@ dcap-pck-import: ## Import a PCK response bundle and restart QGS (disconnected h
 dcap-pck-provision: dcap-tools ## Resume export, generation, and import PCK cache (bastion connected to both Intel PCS and cluster)
 	@python3 scripts/dcap-pck.py provision
 
-.PHONY: dcap-status
-dcap-status: ## Check PCK and collateral expiry (requires oc)
-	@$(MAKE) check-pck-expiry
-	@$(MAKE) check-collateral-expiry
 
 .PHONY: check-pck-expiry
 check-pck-expiry: ## Check expiry of PCK cache secrets and platform data (requires oc login)
@@ -150,6 +180,15 @@ snp-gen-overrides: ## Generate SNP VCEK values override from cached certs (local
 .PHONY: snp-offline-provision
 snp-offline-provision: snp-collect-vcek-urls snp-download-vcek snp-gen-overrides ## Full SNP VCEK offline provisioning
 
+.PHONY: update-kyverno-chart
+update-kyverno-chart: ## Pull and embed upstream Kyverno Helm chart (requires internet)
+	@echo "Pulling kyverno chart v$(KYVERNO_VERSION)..."
+	@rm -rf charts/vendor/kyverno
+	@helm pull kyverno --repo $(KYVERNO_REPO) --version $(KYVERNO_VERSION) --untar -d charts/vendor/
+	@find charts/vendor/kyverno -name "README.md" -o -name "README.md.gotmpl" | xargs rm -f
+	@echo "Embedded charts/vendor/kyverno (v$(KYVERNO_VERSION))"
+	@echo "Next: commit, push, and sync ArgoCD"
+
 ##@ Disconnected Deployment
 MIRROR_REGISTRY ?= quay.example.com:443/mirror
 IMAGESET_CONFIG ?= airgap/imageset-config.yaml
@@ -166,17 +205,8 @@ airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGIS
 airgap-post-install: ## Post-install bootstrap (after airgap-mirror + labctl apply-mirror-resources)
 	@scripts/airgap-post-install.sh
 
-.PHONY: airgap-deploy-pattern
-airgap-deploy-pattern: ## Deploy Pattern CR directly (skip pattern.sh, use values-global.yaml config)
-	@scripts/airgap-post-install.sh --deploy-pattern
 
-.PHONY: airgap-fix-manifests
-airgap-fix-manifests: ## Fix oc-mirror manifest list failures with fallback mirroring
-	@scripts/airgap-post-install.sh --fix-manifest-lists
 
-.PHONY: airgap-sync-repos
-airgap-sync-repos: ## Push working copy changes to bare HTTP repos and restart git server
-	@scripts/airgap-post-install.sh --sync-repos-only
 
 ARGOCD_CLI_DIR ?= $(HOME)/.local/bin
 
@@ -201,82 +231,25 @@ argocd-install: ## Download argocd CLI from the cluster's ArgoCD image into ~/.l
 	$(ARGOCD_CLI_DIR)/argocd version --client | head -1
 
 .PHONY: argocd-login
-argocd-login: ## Extract ArgoCD credentials from cluster and log in with argocd CLI
+argocd-login: ## Extract ArgoCD credentials and log in with the argocd CLI
 	@ARGOCD_NS=$$(oc get argocd -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null) && \
 	ARGOCD_NAME=$$(oc get argocd -n $$ARGOCD_NS -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) && \
 	ARGOCD_ROUTE=$$(oc get route $${ARGOCD_NAME}-server -n $$ARGOCD_NS -o jsonpath='{.spec.host}' 2>/dev/null) && \
 	ARGOCD_PASS=$$(oc get secret $${ARGOCD_NAME}-cluster -n $$ARGOCD_NS -o jsonpath='{.data.admin\.password}' 2>/dev/null | base64 -d) && \
 	echo "ArgoCD URL:  https://$$ARGOCD_ROUTE" && \
 	echo "Username:    admin" && \
-	echo "Password:    $$ARGOCD_PASS" && \
-	echo "" && \
 	if command -v argocd >/dev/null 2>&1; then \
-		oc config set-context --current --namespace=$$ARGOCD_NS && \
-		argocd login --core && \
-		echo "" && \
-		echo "Logged in (core mode, namespace $$ARGOCD_NS)." && \
-		echo "Usage: argocd app list"; \
+		argocd login $$ARGOCD_ROUTE --username admin --password $$ARGOCD_PASS --insecure && \
+		echo "Logged in. Use 'argocd app list' to get started."; \
 	else \
-		echo "argocd CLI not installed. To install:" && \
-		echo "  curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64" && \
-		echo "  chmod +x /usr/local/bin/argocd" && \
-		echo "" && \
-		echo "Or use the web UI at: https://$$ARGOCD_ROUTE"; \
+		echo "Password:    $$ARGOCD_PASS" && \
+		echo "(argocd CLI not found — install with 'make argocd-install')"; \
 	fi
 
 ##@ Hardware Detection
-.PHONY: get-pccs-node
-get-pccs-node: ## Detect a node with Intel TDX support for PCCS deployment (requires KUBECONFIG or oc login)
-	@NODE=$$(oc get nodes -l intel.feature.node.kubernetes.io/tdx=true \
-		-o jsonpath='{.items[0].metadata.name}' 2>/dev/null); \
-	if [ -z "$$NODE" ]; then \
-		echo "ERROR: No TDX-capable nodes found" >&2; \
-		exit 1; \
-	fi; \
-	echo "$$NODE"
 
-.PHONY: detect-hardware
-detect-hardware: ## Detect hardware profile from cluster nodes (requires KUBECONFIG or oc login)
-	@echo "Detecting hardware profile from cluster nodes..."
-	@echo "---"
-	@CPU_VENDOR=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-model\.vendor_id}' 2>/dev/null) && \
-	TDX_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.tdx\.enabled}' 2>/dev/null) && \
-	SNP_ENABLED=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.feature\.node\.kubernetes\.io/cpu-security\.sev\.snp}' 2>/dev/null) && \
-	GPU_PRESENT=$$(oc get nodes -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.present}' 2>/dev/null) && \
-	echo "CPU Vendor:  $${CPU_VENDOR:-unknown}" && \
-	echo "TDX Enabled: $${TDX_ENABLED:-false}" && \
-	echo "SNP Enabled: $${SNP_ENABLED:-false}" && \
-	echo "GPU Present: $${GPU_PRESENT:-false}" && \
-	echo "---" && \
-	if [ "$${CPU_VENDOR}" = "Intel" ] && [ "$${TDX_ENABLED}" = "true" ]; then \
-		if [ "$${GPU_PRESENT}" = "true" ]; then \
-			echo "Recommended profile: intel-tdx-gpu"; \
-		else \
-			echo "Recommended profile: intel-tdx"; \
-		fi; \
-	elif [ "$${CPU_VENDOR}" = "AuthenticAMD" ] || [ "$${SNP_ENABLED}" = "true" ]; then \
-		if [ "$${GPU_PRESENT}" = "true" ]; then \
-			echo "Recommended profile: amd-snp-gpu"; \
-		else \
-			echo "Recommended profile: amd-snp"; \
-		fi; \
-	else \
-		echo "Could not determine hardware profile."; \
-		echo "Ensure NFD operator is running and node labels are populated."; \
-		echo "Set global.hardware.profile manually in values-global.yaml"; \
-	fi && \
-	echo "" && \
-	echo "To apply: edit values-global.yaml and set global.hardware.profile to the recommended value."
 
 ##@ Chart Management
 KYVERNO_VERSION ?= 3.7.2
 KYVERNO_REPO ?= https://kyverno.github.io/kyverno/
 
-.PHONY: update-kyverno-chart
-update-kyverno-chart: ## Pull and embed upstream Kyverno Helm chart (requires internet)
-	@echo "Pulling kyverno chart v$(KYVERNO_VERSION)..."
-	@rm -rf charts/vendor/kyverno
-	@helm pull kyverno --repo $(KYVERNO_REPO) --version $(KYVERNO_VERSION) --untar -d charts/vendor/
-	@find charts/vendor/kyverno -name "README.md" -o -name "README.md.gotmpl" | xargs rm -f
-	@echo "Embedded charts/vendor/kyverno (v$(KYVERNO_VERSION))"
-	@echo "Next: commit, push, and sync ArgoCD"
