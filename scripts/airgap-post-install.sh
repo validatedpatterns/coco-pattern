@@ -347,11 +347,8 @@ PYEOF
 # incorrect for single-registry (mirror-registry) architecture.
 
 # ─── Step 3d: Repoint default-catalog subscriptions to the mirror catalog ─
-# Operators created at runtime (e.g. the MCH operator's multicluster-engine
-# subscription) reference the DEFAULT catalog sources (redhat-operators etc.),
-# which are disabled in airgap. Without repointing, the operator never
-# resolves and upstream reconciles stall (observed: MCH stuck Installing on a
-# missing MultiClusterEngine CRD for hours, with only a reconciler error).
+# Operators created at runtime reference the DEFAULT catalog sources, which
+# are disabled in airgap — without repointing they never resolve.
 repoint_default_catalog_subscriptions() {
     step "3d" "Repoint default-catalog subscriptions to mirrored catalogs"
 
@@ -769,15 +766,11 @@ data:
   gitops.channel: "${gitops_channel}"
   gitops.catalogSource: "${gitops_source}"
   gitops.sourceNamespace: "openshift-marketplace"
-  # App-of-apps wave gating: ArgoCD dropped the Application health check in
-  # 1.8 (argoproj/argo-cd#3781); the patterns-operator can restore it via
-  # this flag. Without it, child Applications have unknown health and the
-  # root app applies ALL sync waves ungated — every child app is created at
-  # once and later-wave apps (workloads, wave 30) race earlier-wave
-  # dependencies (trustee/KBS, wave 20) instead of waiting for them.
+  # App-of-apps sync-wave gating (Application health check) — see
+  # argoproj/argo-cd#3781; without it the root app applies all waves ungated.
   gitops.applicationHealthCheckEnabled: "true"
 EOF
-    info "patterns-operator-config ConfigMap created (application health check enabled — sync-wave gating active)"
+    info "patterns-operator-config ConfigMap created"
 }
 
 # ─── Step 11: Deploy Pattern CR directly ─────────────────────────
