@@ -28,8 +28,3 @@ clusterGroup:
       source: cs-certified-operator-index-v4-22
     intel-tdx-dcap:
       source: cs-certified-operator-index-v4-22
-# Trustee: flip platform collateral to the offline file backend.
-# Collect with `make collect-dcap-collateral` before deploy.
-kbs:
-  tdx:
-    collateralService: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
