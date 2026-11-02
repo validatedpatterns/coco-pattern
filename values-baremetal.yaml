@@ -82,8 +82,9 @@ clusterGroup:
       namespace: openshift-operators
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Required for airgap -- point at your mirrored catalog source instead
-      # source: cs-certified-operator-index-v4-22
+      # Airgap: the default catalogs are disabled — the airgap overlay
+      # (overrides/values-baremetal-airgap.yaml) repoints these at the
+      # mirrored catalog source (cs-certified-operator-index-v4-22).
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -92,8 +93,9 @@ clusterGroup:
       namespace: intel-dcap-operator-system
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Required for airgap -- point at your mirrored catalog source instead
-      # source: cs-certified-operator-index-v4-22
+      # Airgap: repointed by overrides/values-baremetal-airgap.yaml —
+      # each root-app sync against the disabled default catalog burns the
+      # retry budget (CatalogSourcesUnhealthy) and stalls the operator.
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
