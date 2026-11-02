@@ -769,8 +769,15 @@ data:
   gitops.channel: "${gitops_channel}"
   gitops.catalogSource: "${gitops_source}"
   gitops.sourceNamespace: "openshift-marketplace"
+  # App-of-apps wave gating: ArgoCD dropped the Application health check in
+  # 1.8 (argoproj/argo-cd#3781); the patterns-operator can restore it via
+  # this flag. Without it, child Applications have unknown health and the
+  # root app applies ALL sync waves ungated — every child app is created at
+  # once and later-wave apps (workloads, wave 30) race earlier-wave
+  # dependencies (trustee/KBS, wave 20) instead of waiting for them.
+  gitops.applicationHealthCheckEnabled: "true"
 EOF
-    info "patterns-operator-config ConfigMap created"
+    info "patterns-operator-config ConfigMap created (application health check enabled — sync-wave gating active)"
 }
 
 # ─── Step 11: Deploy Pattern CR directly ─────────────────────────
