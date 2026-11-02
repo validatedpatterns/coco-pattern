@@ -9,10 +9,8 @@ global:
   # Airgap / disconnected master switch. false (default, connected):
   # Intel DCAP zero-touch platform registration (vault/ESO PCS API key),
   # trustee fetches platform collateral directly from Intel PCS.
-  # true (disconnected): set here on the disconnected branch — loads
-  # overrides/values-baremetal-airgap.yaml (via the sharedValueFiles
-  # selector in values-baremetal.yaml), which repoints subscriptions and
-  # workload images at the mirror; requires manual PCK provisioning
+  # true (disconnected): loads the airgap overlay (repoints subscriptions
+  # and workload images at the mirror); manual PCK provisioning
   # (scripts/dcap-pck.py) and file-backed collateral.
   airgap: false
   secretStore:
@@ -73,9 +71,7 @@ main:
     clusterGroupChartVersion: 0.9.58
     # VP OCI Helm charts are mirrored to mirror-registry by oc-mirror additionalImages.
     # Use mirror-registry directly — no Quay dependency for airgap deploys.
-    # REQUIRED in airgap: with multiSourceConfig, ArgoCD pulls the VP Helm
-    # charts from this URL directly and the repo-server performs no IDMS
-    # redirect — point it at the mirror (e.g. <mirror-host>:8443/validatedpatterns).
+    # REQUIRED in airgap: no IDMS redirect in the ArgoCD repo-server.
     helmRepoUrl: quay.io/validatedpatterns
 
 # Common secret store configuration used across multiple charts.

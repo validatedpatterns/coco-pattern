@@ -82,9 +82,7 @@ clusterGroup:
       namespace: openshift-operators
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Airgap: the default catalogs are disabled — the airgap overlay
-      # (overrides/values-baremetal-airgap.yaml) repoints these at the
-      # mirrored catalog source (cs-certified-operator-index-v4-22).
+      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -93,9 +91,7 @@ clusterGroup:
       namespace: intel-dcap-operator-system
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Airgap: repointed by overrides/values-baremetal-airgap.yaml —
-      # each root-app sync against the disabled default catalog burns the
-      # retry budget (CatalogSourcesUnhealthy) and stalls the operator.
+      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -170,19 +166,11 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      # Wave 15 — AFTER the wave-10 OLM subscriptions: the ACM chart renders
-      # the MultiClusterHub, whose CRD is registered by the ACM operator
-      # (Subscription rendered by the root app at wave 10). At wave 0 the
-      # app deadlocks under sync-wave gating: ArgoCD discovery fails on the
-      # not-yet-served operator.open-cluster-management.io/v1 group, the app
-      # never goes healthy, and wave 10 — which would install the operator —
-      # is gated behind it (observed live, 2026-11-02 no-bounce experiment).
+      # Wave 15: after the wave-10 ACM operator subscription (MCH CRD),
+      # before trustee at 20.
       annotations:
         argocd.argoproj.io/sync-wave: "15"
-      # Airgap: the MCE subscription source is flipped by the airgap overlay
-      # (overrides/values-baremetal-airgap.yaml) via acm.mce_operator.source —
-      # the MCH operator honors the mce-subscription-spec annotation when it
-      # creates the multicluster-engine subscription at runtime.
+      # Airgap: MCE source set by the airgap overlay (acm.mce_operator.source).
 
     vault:
       name: vault
@@ -230,14 +218,9 @@ clusterGroup:
         # Inject mirror-registry CA into KBS trust store (required for airgap image pulls)
         - name: kbs.registryCa.enabled
           value: "true"
-        # TDX DCAP collateral — connected (default): the trustee AS fetches
-        # platform collateral (TCB info, QE identity, CRLs) directly from
-        # Intel PCS; these endpoints are public and need no API key.
-        # Airgap: the offline file backend (collateral collected via
-        # make collect-dcap-collateral, mounted from the tdx-collateral
-        # Secret) — the remote URL is unreachable and every TEE-evidence
-        # verification fails with 401. The clustergroup chart tpl-renders
-        # override values, so the global.airgap flag selects the backend.
+        # TDX DCAP collateral — connected: Intel PCS (public, no API key).
+        # Airgap: the offline file backend (make collect-dcap-collateral).
+        # The chart tpl-renders override values — global.airgap selects.
         - name: kbs.tdx.collateralService
           value: "{{ if $.Values.global.airgap }}file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json{{ else }}https://api.trustedservices.intel.com/sgx/certification/v4/{{ end }}"
         - name: kbs.tdx.collateralMountPath
@@ -357,10 +340,7 @@ clusterGroup:
       path: charts/coco-supported/hello-openshift
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Airgap — CoCo guest VMs pull images directly from the pod-spec
-      # reference (no IDMS/ITMS inside the CVM): the airgap overlay
-      # (overrides/values-baremetal-airgap.yaml) activates the image
-      # overrides against global.mirrorRegistry.
+      # Airgap: image overrides activated by the airgap overlay.
       syncPolicy:
         automated:
           prune: true
