@@ -39,6 +39,16 @@ clusterGroup:
   # via the KBS regcred / cluster pull secret). These overrides are absent
   # in connected mode (chart defaults) and activate only in airgap.
   applications:
+    acm:
+      # The MCH operator creates the multicluster-engine subscription at
+      # runtime from the mce-subscription-spec annotation on the
+      # MultiClusterHub — the ACM chart templates that annotation from
+      # acm.mce_operator.source. Without this override the subscription is
+      # born on redhat-operators (disabled in airgap) and MCH stalls
+      # Installing until a manual repoint.
+      overrides:
+        - name: acm.mce_operator.source
+          value: cs-redhat-operator-index-v4-22
     hello-openshift:
       overrides:
         - name: image

@@ -170,10 +170,10 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      # Required for airgap -- set to your mirrored catalog source name
-      # overrides:
-      #   - name: acm.mce_operator.source
-      #     value: "cs-redhat-operator-index-v4-22"
+      # Airgap: the MCE subscription source is flipped by the airgap overlay
+      # (overrides/values-baremetal-airgap.yaml) via acm.mce_operator.source —
+      # the MCH operator honors the mce-subscription-spec annotation when it
+      # creates the multicluster-engine subscription at runtime.
 
     vault:
       name: vault
