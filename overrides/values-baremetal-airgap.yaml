@@ -17,6 +17,11 @@ global:
   # Mirrored catalog for the Argo-rendered OLM subscriptions (oc-mirror output)
   catalogSource: cs-redhat-operator-index-v4-22
   catalogSourceNamespace: openshift-marketplace
+  # Mirror root for the CoCo workload image overrides (deploy-time: set to
+  # your mirror registry, org-prefixed where applicable — e.g.
+  # quay.example:443/mirror or mirror.example:8443). The workload overrides
+  # below are tpl-rendered against this value at chart render time.
+  mirrorRegistry: "MIRROR_REGISTRY_HOST:8443"
 # The Intel operator subscriptions stay on the certified catalog in the
 # connected default; repoint them at the mirrored certified catalog here.
 # If left on certified-operators (disabled in airgap), each root-app sync
@@ -28,3 +33,23 @@ clusterGroup:
       source: cs-certified-operator-index-v4-22
     intel-tdx-dcap:
       source: cs-certified-operator-index-v4-22
+  # CoCo guest VMs pull images directly from the pod-spec reference — no
+  # IDMS/ITMS inside the CVM — so the workloads must reference the mirror
+  # registry directly (reachable, trusted via the initdata CA, authenticated
+  # via the KBS regcred / cluster pull secret). These overrides are absent
+  # in connected mode (chart defaults) and activate only in airgap.
+  applications:
+    hello-openshift:
+      overrides:
+        - name: image
+          value: "{{ $.Values.global.mirrorRegistry }}/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+    kbs-access-curl:
+      overrides:
+        - name: image
+          value: "{{ $.Values.global.mirrorRegistry }}/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+        - name: initImage
+          value: "{{ $.Values.global.mirrorRegistry }}/ubi9/ubi:latest"
+    kbs-access-sealed:
+      overrides:
+        - name: image
+          value: "{{ $.Values.global.mirrorRegistry }}/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
