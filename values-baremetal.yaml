@@ -224,10 +224,13 @@ clusterGroup:
         # TDX DCAP collateral — connected (default): the trustee AS fetches
         # platform collateral (TCB info, QE identity, CRLs) directly from
         # Intel PCS; these endpoints are public and need no API key.
-        # Airgap: overrides/values-baremetal-airgap.yaml flips this to the
-        # file:// backend (collateral collected via make collect-dcap-collateral).
+        # Airgap: the offline file backend (collateral collected via
+        # make collect-dcap-collateral, mounted from the tdx-collateral
+        # Secret) — the remote URL is unreachable and every TEE-evidence
+        # verification fails with 401. The clustergroup chart tpl-renders
+        # override values, so the global.airgap flag selects the backend.
         - name: kbs.tdx.collateralService
-          value: "https://api.trustedservices.intel.com/sgx/certification/v4/"
+          value: "{{ if $.Values.global.airgap }}file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json{{ else }}https://api.trustedservices.intel.com/sgx/certification/v4/{{ end }}"
         - name: kbs.tdx.collateralMountPath
           value: "/opt/confidential-containers/attestation-service/tdx"
         - name: kbs.tdx.collateralFileName
