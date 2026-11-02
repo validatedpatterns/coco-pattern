@@ -348,11 +348,10 @@ clusterGroup:
       path: charts/coco-supported/hello-openshift
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # Uncomment and set MIRROR_REGISTRY_HOST to your mirror registry.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      # Airgap — CoCo guest VMs pull images directly from the pod-spec
+      # reference (no IDMS/ITMS inside the CVM): the airgap overlay
+      # (overrides/values-baremetal-airgap.yaml) activates the image
+      # overrides against global.mirrorRegistry.
       syncPolicy:
         automated:
           prune: true
@@ -364,12 +363,7 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-curl
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
-      #   - name: initImage
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/ubi:latest"
+      # Airgap — image overrides activated by the airgap overlay.
       syncPolicy:
         automated:
           prune: true
@@ -381,10 +375,7 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-sealed
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      # Airgap — image overrides activated by the airgap overlay.
       syncPolicy:
         automated:
           prune: true
