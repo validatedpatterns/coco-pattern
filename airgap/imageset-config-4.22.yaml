@@ -125,8 +125,8 @@ mirror:
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
     - name: quay.io/validatedpatterns/acm:0.1.27
-    # Minimum selected by the Vault applications (~0.1.10); mirror newer patches before use.
-    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.10
+    # values pin ~0.1.10 resolves the newest 0.1.x — mirror that, not the floor
+    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
     - name: quay.io/validatedpatterns/trustee:0.10.2
     - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
@@ -139,7 +139,10 @@ mirror:
     - name: quay.io/validatedpatterns/utility-container:latest
     - name: quay.io/validatedpatterns/imperative-container:latest
     - name: quay.io/validatedpatterns/imperative-container:v1
-    - name: quay.io/validatedpatterns/pattern-ui-catalog:stable-v1
+    # pattern-ui-catalog deliberately NOT mirrored: non-essential (console-tab
+    # catalog content; nothing in the pattern or the operator CSV deploys it)
+    # and its OCI-index-wrapping-Docker-children manifest is rejected by Quay.
+    # See coco-gsd specs/003-quay-sole-retest.
 
     # --- UBI minimal (ArgoCD repo-server init container) ---
     - name: registry.redhat.io/ubi9/ubi-minimal:latest
@@ -167,9 +170,9 @@ mirror:
     # ("must be pulled with an explicit version") — a hard mirror error, not a
     # transient one. Keep commented unless VM boot from DataSource is needed;
     # if re-enabling, pin explicit version tags.
-    #- name: registry.redhat.io/rhel9/rhel-guest-image:latest
-    #- name: registry.redhat.io/rhel8/rhel-guest-image:latest
-    #- name: registry.redhat.io/container-native-virtualization/virtio-win:latest
+    # - name: registry.redhat.io/rhel9/rhel-guest-image:latest
+    # - name: registry.redhat.io/rhel8/rhel-guest-image:latest
+    # - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
     # it is not applicable to this topology and would pull unneeded RHCOS artifacts.
