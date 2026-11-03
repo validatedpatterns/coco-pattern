@@ -66,6 +66,15 @@ main:
     # operatorSource: cs-redhat-operator-index-v4-22
     # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
     channel: gitops-1.22
+    # App-of-apps sync-wave gating. ArgoCD 1.8 dropped the Application
+    # health check (argoproj/argo-cd#3781); the patterns-operator can restore
+    # it but defaults it OFF. Without it the root Application treats child
+    # Applications as healthy and applies ALL waves at once, so wave ordering
+    # (e.g. workloads after trustee) is not enforced. Rendered into the
+    # patterns-operator-config ConfigMap by pattern-install >= 0.0.19
+    # (validatedpatterns/pattern-install-chart#53); the disconnected bootstrap
+    # writes it directly (scripts/airgap-post-install.sh step 10).
+    applicationHealthCheckEnabled: "true"
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.58
