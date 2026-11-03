@@ -13,6 +13,13 @@ global:
   # and workload images at the mirror); manual PCK provisioning
   # (scripts/dcap-pck.py) and file-backed collateral.
   airgap: false
+  # Mirror root for the workload image rewrite — set on the disconnected
+  # deploy branch (config-only delta), the same value oc-mirror was pointed
+  # at. MUST include the org path for Quay targets (e.g.
+  # quay.example:443/mirror): the CoCo guest VMs pull images directly and
+  # every reference carries it. Empty is fine while connected; the workload
+  # charts fail rendering if this is empty (or a placeholder) in airgap mode.
+  mirrorRegistry: ""
   secretStore:
     # Warning: This must be present even if it is set to none.
     backend: vault # none, vault, kubernetes

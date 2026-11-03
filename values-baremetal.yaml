@@ -170,15 +170,26 @@ clusterGroup:
       # before trustee at 20.
       annotations:
         argocd.argoproj.io/sync-wave: "15"
-      # Airgap: MCE source set by the airgap overlay (acm.mce_operator.source).
+      # The MCH operator creates the multicluster-engine subscription at
+      # runtime from the mce-subscription-spec annotation (rendered from this
+      # value), so it must be born on the right catalog. Connected: the
+      # default redhat-operators. Airgap: the mirrored catalog (the default
+      # catalogs are disabled). Kept as a single tpl-conditional list entry —
+      # an overlay list would replace this one wholesale.
+      overrides:
+        - name: acm.mce_operator.source
+          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'
 
     vault:
       name: vault
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      # Require 0.1.10 or newer within the 0.1.x release series.
-      chartVersion: "~0.1.10"
+      # Exact pin: chart 0.1.11 deploys vault:2.1.2-ubi — the version the
+      # imageset mirrors. A range (~0.1.10) would resolve to whatever is
+      # newest at deploy time and desync from the mirrored vault image
+      # (0.1.10 deploys 1.21.4-ubi).
+      chartVersion: 0.1.11
       annotations:
         argocd.argoproj.io/sync-wave: "0"
 
@@ -340,7 +351,9 @@ clusterGroup:
       path: charts/coco-supported/hello-openshift
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Airgap: image overrides activated by the airgap overlay.
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true
@@ -352,7 +365,9 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-curl
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Airgap — image overrides activated by the airgap overlay.
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true
@@ -364,7 +379,9 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-sealed
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Airgap — image overrides activated by the airgap overlay.
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true
