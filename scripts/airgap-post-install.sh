@@ -768,9 +768,25 @@ data:
   gitops.sourceNamespace: "openshift-marketplace"
   # App-of-apps sync-wave gating (Application health check) — see
   # argoproj/argo-cd#3781; without it the root app applies all waves ungated.
+  # The connected path sets this declaratively via values-global.yaml
+  # (main.gitops.applicationHealthCheckEnabled) once pattern-install renders
+  # it (validatedpatterns/pattern-install-chart#52); this bootstrap writes it
+  # directly because the operator subscription predates any chart render.
   gitops.applicationHealthCheckEnabled: "true"
 EOF
     info "patterns-operator-config ConfigMap created"
+
+    # Post-apply assertion: the operator only restores the Application health
+    # check when the key is present at its first reconcile — fail loudly here
+    # rather than let the root app apply all waves ungated.
+    local key
+    key=$(oc get configmap patterns-operator-config -n openshift-operators \
+        -o jsonpath='{.data.gitops\.applicationHealthCheckEnabled}' 2>/dev/null || true)
+    if [[ "$key" != "true" ]]; then
+        error "gitops.applicationHealthCheckEnabled is not \"true\" on patterns-operator-config"
+        exit 1
+    fi
+    info "Application health check key verified on patterns-operator-config"
 }
 
 # ─── Step 11: Deploy Pattern CR directly ─────────────────────────
