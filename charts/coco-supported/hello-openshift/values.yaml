@@ -11,3 +11,9 @@ runtimeClassName: ""
 # Global values used by this chart (overridden by values-global.yaml)
 global:
   clusterPlatform: ""  # Cluster platform: "Azure" or "AWS" - determines runtime class
+  # Airgap mode comes from values-global.yaml (global.airgap); the default here
+  # is connected so standalone chart rendering uses upstream registries.
+  airgap: false
+  # Mirror root (org-prefixed for Quay targets) — required when airgap is true.
+  # The workload charts rewrite their images against it; see _helpers.tpl.
+  mirrorRegistry: ""

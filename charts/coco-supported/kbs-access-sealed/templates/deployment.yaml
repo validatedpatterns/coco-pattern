@@ -24,7 +24,7 @@ spec:
       runtimeClassName: {{ .Values.global.coco.runtimeClassName }}
       containers:
       - name: httpd
-        image: {{ .Values.image }}
+        image: {{ include "kbs-access-sealed.image" (dict "root" $ "image" .Values.image) }}
         ports:
         - containerPort: 8080
           protocol: TCP

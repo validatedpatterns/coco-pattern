@@ -37,7 +37,7 @@ spec:
         runAsUser: 0
       containers:
         - name: httpd
-          image: {{ .Values.image }}
+          image: {{ include "kbs-access-curl.image" (dict "root" $ "image" .Values.image) }}
           ports:
             - containerPort: 8080
           securityContext:
@@ -50,7 +50,7 @@ spec:
             readOnly: true
       initContainers:
       - name: curl
-        image: {{ .Values.initImage }}
+        image: {{ include "kbs-access-curl.image" (dict "root" $ "image" .Values.initImage) }}
         command: ['sh', '-c', 'curl -s http://127.0.0.1:8006/cdh/resource/default/kbsres1/key3 > /var/www/html/secret.txt']
         securityContext:
           privileged: true
