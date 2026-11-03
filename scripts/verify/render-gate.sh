@@ -134,6 +134,30 @@ val="$(collateral_override "$CONNECTED")"
     && pass "kbs.tdx.collateralService → Intel PCS" \
     || fail "kbs.tdx.collateralService → '${val}' (expected Intel PCS URL)"
 
+# ── RBAC bootstrap bridge (patterns-operator#887) ───────────────────
+echo "── RBAC bridge"
+for mode in airgap connected; do
+    out="$(render_root "$mode")" || { fail "$mode root render errored"; continue; }
+    # All documents mentioning the bridge name (the CRB itself, plus the
+    # helm-values ConfigMap which embeds the values indented). The real CRB is
+    # distinguished by an UNINDENTED "kind: ClusterRoleBinding" line.
+    block="$(echo "$out" | awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/')"
+    if [[ -z "$block" ]]; then
+        fail "$mode: RBAC bridge CRB missing from root render"
+        continue
+    fi
+    ok=1
+    echo "$block" | grep -q "^kind: ClusterRoleBinding" || ok=0
+    echo "$block" | grep -q "cluster-admin$" || ok=0
+    echo "$block" | grep -q "vp-gitops-argocd-application-controller" || ok=0
+    echo "$block" | grep -q 'sync-wave: "-1"' || ok=0
+    if [[ $ok -eq 1 ]]; then
+        pass "$mode: RBAC bridge CRB at wave -1 for the controller SA"
+    else
+        fail "$mode: RBAC bridge CRB malformed (kind/role/subject/wave)"
+    fi
+done
+
 # ── Workload charts ──────────────────────────────────────────────────
 echo "── workload charts"
 for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
