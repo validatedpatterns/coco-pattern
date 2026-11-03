@@ -1,5 +1,6 @@
 # Org-prefixed mirror targets: MIRROR_REGISTRY must include the org path
-# (e.g. quay.example:443/mirror) or every tag-based operand pull 404s.
+# (e.g. quay.example:443/mirror) — the same value scripts/airgap-post-install.sh
+# requires — or every tag-based operand pull 404s.
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
