@@ -205,6 +205,10 @@ airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGIS
 airgap-post-install: ## Post-install bootstrap (after airgap-mirror + labctl apply-mirror-resources)
 	@scripts/airgap-post-install.sh
 
+.PHONY: airgap-repoint-subs
+airgap-repoint-subs: ## Re-run the default-catalog subscription repoint (safety net; safe any time, e.g. after MCH deploys)
+	@scripts/airgap-post-install.sh --repoint-subs
+
 
 
 
