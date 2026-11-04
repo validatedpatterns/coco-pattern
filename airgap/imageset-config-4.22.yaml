@@ -1,6 +1,7 @@
 ---
 # ImageSetConfiguration for CoCo Validated Pattern airgap deployment
-# Target: MIRROR_REGISTRY_HOST:8443 (mirror-registry — sole airgap target, Phase 25.2)
+# Target: a single mirror registry (org-prefixed target for Quay, e.g.
+# quay.example:443/mirror — MIRROR_REGISTRY includes the org path)
 # OCP: 4.22.17
 # Topology: baremetal (full operator set from values-baremetal.yaml)
 #
@@ -10,7 +11,7 @@
 # Usage:
 #   oc-mirror -c airgap/imageset-config-4.22.yaml \
 #     --workspace file://$HOME/oc-mirror-workspace \
-#     docker://MIRROR_REGISTRY_HOST:8443 --v2
+#     docker://<mirror-root-including-org> --v2
 
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
@@ -113,7 +114,8 @@ mirror:
     # NFD operand — worker/master/gc DaemonSets use this tag, NOT the operator digest.
     - name: registry.redhat.io/openshift4/ose-node-feature-discovery-rhel9:v4.22
     # Vault — Red Hat certified UBI image from registry.connect.redhat.com
-    - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi
+    # (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi by default)
+    - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
     # Kyverno (Helm chart, not OLM — images from ghcr.io)
     - name: ghcr.io/kyverno/kyverno:v1.17.2
     - name: ghcr.io/kyverno/kyvernopre:v1.17.2
@@ -125,7 +127,7 @@ mirror:
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
     - name: quay.io/validatedpatterns/acm:0.1.27
-    # values pin ~0.1.10 resolves the newest 0.1.x — mirror that, not the floor
+    # values pin 0.1.11 exactly (chart 0.1.11 deploys vault:2.1.2-ubi)
     - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
     - name: quay.io/validatedpatterns/trustee:0.10.2

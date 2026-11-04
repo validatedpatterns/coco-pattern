@@ -23,7 +23,7 @@ spec:
       runtimeClassName: {{ include "hello-openshift.runtimeClassName" . }}
       containers:
         - name: hello-openshift
-          image: {{ .Values.image }}
+          image: {{ include "hello-openshift.image" (dict "root" $ "image" .Values.image) }}
           ports:
             - containerPort: 8080
           volumeMounts:

@@ -82,8 +82,7 @@ clusterGroup:
       namespace: openshift-operators
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Required for airgap -- point at your mirrored catalog source instead
-      # source: cs-certified-operator-index-v4-22
+      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -92,8 +91,7 @@ clusterGroup:
       namespace: intel-dcap-operator-system
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Required for airgap -- point at your mirrored catalog source instead
-      # source: cs-certified-operator-index-v4-22
+      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -127,6 +125,33 @@ clusterGroup:
   - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ else }}connected{{ end }}.yaml'
 
   extraObjects:
+    # Bridge for the first-sync ordering race (patterns-operator#887): ArgoCD
+    # applies wave-0 resources by kind, so the imperative ServiceAccounts are
+    # attempted before the cluster-admin ClusterRoleBinding that authorises the
+    # controller to create them. Ungated installs self-heal on the next
+    # auto-sync; with sync-wave gating the first operation parks on wave-0
+    # health and deadlocks. This binding applies at wave -1, before any wave-0
+    # kind, which the controller can create from the start (the operator's
+    # instance role already grants rbac.authorization.k8s.io: */*).
+    # Distinct name on purpose — matching the clustergroup chart's own
+    # vp-gitops-cluster-admin-rolebinding would collide in the manifest.
+    # TODO: remove once patterns-operator creates the binding (or the
+    # clustergroup chart moves its own to wave -1) — see patterns-operator#887.
+    argocd-cluster-admin-bootstrap:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: coco-pattern-argocd-cluster-admin-bootstrap
+        annotations:
+          argocd.argoproj.io/sync-wave: "-1"
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: vp-gitops-argocd-application-controller
+          namespace: vp-gitops
     wait-for-vault-unsealed:
       apiVersion: batch/v1
       kind: Job
@@ -168,18 +193,30 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      # Required for airgap -- set to your mirrored catalog source name
-      # overrides:
-      #   - name: acm.mce_operator.source
-      #     value: "cs-redhat-operator-index-v4-22"
+      # Wave 15: after the wave-10 ACM operator subscription (MCH CRD),
+      # before trustee at 20.
+      annotations:
+        argocd.argoproj.io/sync-wave: "15"
+      # The MCH operator creates the multicluster-engine subscription at
+      # runtime from the mce-subscription-spec annotation (rendered from this
+      # value), so it must be born on the right catalog. Connected: the
+      # default redhat-operators. Airgap: the mirrored catalog (the default
+      # catalogs are disabled). Kept as a single tpl-conditional list entry —
+      # an overlay list would replace this one wholesale.
+      overrides:
+        - name: acm.mce_operator.source
+          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'
 
     vault:
       name: vault
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      # Require 0.1.10 or newer within the 0.1.x release series.
-      chartVersion: "~0.1.10"
+      # Exact pin: chart 0.1.11 deploys vault:2.1.2-ubi — the version the
+      # imageset mirrors. A range (~0.1.10) would resolve to whatever is
+      # newest at deploy time and desync from the mirrored vault image
+      # (0.1.10 deploys 1.21.4-ubi).
+      chartVersion: 0.1.11
       annotations:
         argocd.argoproj.io/sync-wave: "0"
 
@@ -219,13 +256,11 @@ clusterGroup:
         # Inject mirror-registry CA into KBS trust store (required for airgap image pulls)
         - name: kbs.registryCa.enabled
           value: "true"
-        # TDX DCAP collateral — connected (default): the trustee AS fetches
-        # platform collateral (TCB info, QE identity, CRLs) directly from
-        # Intel PCS; these endpoints are public and need no API key.
-        # Airgap: overrides/values-baremetal-airgap.yaml flips this to the
-        # file:// backend (collateral collected via make collect-dcap-collateral).
+        # TDX DCAP collateral — connected: Intel PCS (public, no API key).
+        # Airgap: the offline file backend (make collect-dcap-collateral).
+        # The chart tpl-renders override values — global.airgap selects.
         - name: kbs.tdx.collateralService
-          value: "https://api.trustedservices.intel.com/sgx/certification/v4/"
+          value: "{{ if $.Values.global.airgap }}file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json{{ else }}https://api.trustedservices.intel.com/sgx/certification/v4/{{ end }}"
         - name: kbs.tdx.collateralMountPath
           value: "/opt/confidential-containers/attestation-service/tdx"
         - name: kbs.tdx.collateralFileName
@@ -343,11 +378,9 @@ clusterGroup:
       path: charts/coco-supported/hello-openshift
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # Uncomment and set MIRROR_REGISTRY_HOST to your mirror registry.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true
@@ -359,12 +392,9 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-curl
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
-      #   - name: initImage
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/ubi:latest"
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true
@@ -376,10 +406,9 @@ clusterGroup:
       path: charts/coco-supported/kbs-access-sealed
       annotations:
         argocd.argoproj.io/sync-wave: "30"
-      # Required for airgap — CoCo guest VMs pull images directly, no IDMS/ITMS in the CVM.
-      # overrides:
-      #   - name: image
-      #     value: "MIRROR_REGISTRY_HOST:8443/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2"
+      # Airgap: the chart rewrites its image against global.mirrorRegistry
+      # (see charts/coco-supported/<chart>/templates/_helpers.tpl) — no
+      # overrides needed here in either mode.
       syncPolicy:
         automated:
           prune: true

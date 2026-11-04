@@ -3,9 +3,12 @@
 # The connected default (global.airgap: false) loads the inert
 # values-baremetal-connected.yaml instead.
 #
-# SCOPE: this overlay applies when ArgoCD renders the clustergroup chart —
-# i.e. to the clusterGroup OLM subscriptions (ESO, CNV, LVMS, trustee,
-# cert-manager, intel-*, ACM, NFD) and the chart values below.
+# SCOPE — this overlay reaches the ROOT clustergroup render: the
+# patterns-operator resolves clusterGroup.sharedValueFiles itself when it
+# builds the root Application (internal/controller/argo.go,
+# commonApplicationSourceHelm → getSharedValueFiles), in addition to the
+# chart forwarding them to child Applications. So the clusterGroup
+# subscriptions and the app overrides below are all in scope.
 #
 # It does NOT reach the bootstrap operators: the openshift-gitops-operator
 # and patterns-operator subscriptions are created by the patterns-operator
@@ -13,12 +16,24 @@
 # be set directly in values-global.yaml:
 #   main.gitops.operatorSource: cs-redhat-operator-index-v4-22
 #   main.patternsOperator.source: cs-community-operator-index-v4-22
+#
+# LIST WARNING: Helm replaces lists when merging — an `overrides:` list here
+# would drop any entry added to the same app in values-baremetal.yaml. This
+# overlay therefore sets ONLY scalars (map values). Mode-dependent list
+# entries (e.g. acm.mce_operator.source) are tpl-conditionals in the base
+# file instead.
 global:
-  # Mirrored catalog for the Argo-rendered OLM subscriptions (oc-mirror output)
+  # Mirrored catalog for the Argo-rendered OLM subscriptions (oc-mirror output).
+  # The names track the operator index tags in airgap/imageset-config-<minor>.yaml
+  # (e.g. redhat/redhat-operator-index:v4.22 → cs-redhat-operator-index-v4-22 for
+  # global.clusterVersion 4.22); scripts/airgap-post-install.sh step 3e fails fast
+  # if any catalog referenced here is missing from the cluster.
   catalogSource: cs-redhat-operator-index-v4-22
   catalogSourceNamespace: openshift-marketplace
-# Trustee: flip platform collateral to the offline file backend.
-# Collect with `make collect-dcap-collateral` before deploy.
-kbs:
-  tdx:
-    collateralService: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
+# Connected default: the certified-operators catalog, disabled in airgap.
+clusterGroup:
+  subscriptions:
+    intel-device-plugins:
+      source: cs-certified-operator-index-v4-22
+    intel-tdx-dcap:
+      source: cs-certified-operator-index-v4-22
