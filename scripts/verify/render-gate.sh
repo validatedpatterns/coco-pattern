@@ -18,8 +18,8 @@
 #     - the trustee collateral override renders the Intel PCS URL
 #   sync-wave layout (all six cluster groups, connected mode)
 #     - every gating-relevant object renders at its expected wave
-#       (RBAC bridge -1, vault/secrets 0, operator subscriptions 10, acm 15,
-#       trustee/policies 20, workloads 30, vault-wait Job 5; spokes/hubs
+#       (RBAC bridge -1, vault/secrets/kyverno 0, operator subscriptions 10,
+#       acm 15, trustee/policies 20, workloads 30, vault-wait Job 5; spokes/hubs
 #       assert the objects they must NOT have as ABSENT)
 #   workload charts (each, standalone)
 #     - connected: upstream registry.redhat.io images unchanged
@@ -240,17 +240,31 @@ while IFS='|' read -r group kind name wave; do
     fi
 done <<'EOF'
 # baremetal (single-cluster hub): full stack
+# NOTE: the eso/lvms/cnv subscriptions render WITHOUT a sync-wave annotation
+# ("-") — that is the current, live-validated state, pinned as-is.
 baremetal|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
 baremetal|Job|wait-for-vault-unsealed|5
 baremetal|Application|acm|15
 baremetal|Application|vault|0
 baremetal|Application|openshift-external-secrets|0
+baremetal|Application|kyverno|0
+baremetal|Application|storage|0
 baremetal|Subscription|advanced-cluster-management|10
+baremetal|Subscription|openshift-external-secrets-operator|-
 baremetal|Subscription|trustee-operator|10
 baremetal|Subscription|sandboxed-containers-operator|10
 baremetal|Subscription|openshift-cert-manager-operator|10
+baremetal|Subscription|nfd|10
+baremetal|Subscription|lvms-operator|-
+baremetal|Subscription|kubevirt-hyperconverged|-
+baremetal|Subscription|intel-device-plugins-operator|10
+baremetal|Subscription|intel-tdx-dcap-operator|10
+baremetal|Application|sandbox|10
+baremetal|Application|baremetal|10
 baremetal|Application|trustee|20
 baremetal|Application|sandbox-policies|20
+baremetal|Application|coco-kyverno-policies|20
+baremetal|Application|intel-dcap|20
 baremetal|Application|hello-openshift|30
 baremetal|Application|kbs-access-curl|30
 baremetal|Application|kbs-access-sealed|30
@@ -260,12 +274,24 @@ baremetal-hub|Job|wait-for-vault-unsealed|5
 baremetal-hub|Application|acm|15
 baremetal-hub|Application|vault|0
 baremetal-hub|Application|openshift-external-secrets|0
+baremetal-hub|Application|kyverno|0
+baremetal-hub|Application|storage|0
 baremetal-hub|Subscription|advanced-cluster-management|10
+baremetal-hub|Subscription|openshift-external-secrets-operator|-
 baremetal-hub|Subscription|trustee-operator|10
 baremetal-hub|Subscription|sandboxed-containers-operator|10
 baremetal-hub|Subscription|openshift-cert-manager-operator|10
+baremetal-hub|Subscription|nfd|10
+baremetal-hub|Subscription|lvms-operator|-
+baremetal-hub|Subscription|kubevirt-hyperconverged|-
+baremetal-hub|Subscription|intel-device-plugins-operator|10
+baremetal-hub|Subscription|intel-tdx-dcap-operator|10
+baremetal-hub|Application|sandbox|10
+baremetal-hub|Application|baremetal|10
 baremetal-hub|Application|trustee|20
 baremetal-hub|Application|sandbox-policies|20
+baremetal-hub|Application|coco-kyverno-policies|20
+baremetal-hub|Application|intel-dcap|20
 baremetal-hub|Application|hello-openshift|30
 baremetal-hub|Application|kbs-access-curl|30
 baremetal-hub|Application|kbs-access-sealed|30
@@ -275,12 +301,18 @@ baremetal-spoke|Job|wait-for-vault-unsealed|ABSENT
 baremetal-spoke|Application|acm|ABSENT
 baremetal-spoke|Application|vault|ABSENT
 baremetal-spoke|Application|openshift-external-secrets|0
+baremetal-spoke|Application|kyverno|0
 baremetal-spoke|Subscription|advanced-cluster-management|ABSENT
+baremetal-spoke|Subscription|openshift-external-secrets-operator|-
 baremetal-spoke|Subscription|trustee-operator|ABSENT
 baremetal-spoke|Subscription|sandboxed-containers-operator|10
 baremetal-spoke|Subscription|openshift-cert-manager-operator|10
+baremetal-spoke|Subscription|nfd|10
+baremetal-spoke|Application|sandbox|10
+baremetal-spoke|Application|baremetal|10
 baremetal-spoke|Application|trustee|ABSENT
 baremetal-spoke|Application|sandbox-policies|20
+baremetal-spoke|Application|coco-kyverno-policies|20
 baremetal-spoke|Application|hello-openshift|30
 baremetal-spoke|Application|kbs-access-curl|30
 baremetal-spoke|Application|kbs-access-sealed|30
@@ -290,37 +322,48 @@ azure|Job|wait-for-vault-unsealed|5
 azure|Application|acm|15
 azure|Application|vault|0
 azure|Application|openshift-external-secrets|0
+azure|Application|kyverno|0
 azure|Subscription|advanced-cluster-management|10
+azure|Subscription|openshift-external-secrets-operator|-
 azure|Subscription|trustee-operator|10
 azure|Subscription|sandboxed-containers-operator|10
 azure|Subscription|openshift-cert-manager-operator|10
+azure|Application|sandbox|10
 azure|Application|trustee|20
 azure|Application|sandbox-policies|20
+azure|Application|coco-kyverno-policies|20
 azure|Application|hello-openshift|30
 azure|Application|kbs-access-curl|30
 azure|Application|kbs-access-sealed|30
-# azure-spoke: workloads only — no acm/vault/trustee stack, no policies
+# azure-spoke: workloads only — no acm/vault/trustee stack, no policies and
+# no kyverno engine either (unlike baremetal-spoke, which carries kyverno)
 azure-spoke|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
 azure-spoke|Job|wait-for-vault-unsealed|ABSENT
 azure-spoke|Application|acm|ABSENT
 azure-spoke|Application|vault|ABSENT
 azure-spoke|Application|openshift-external-secrets|0
+azure-spoke|Application|kyverno|ABSENT
 azure-spoke|Subscription|advanced-cluster-management|ABSENT
+azure-spoke|Subscription|openshift-external-secrets-operator|-
 azure-spoke|Subscription|trustee-operator|ABSENT
 azure-spoke|Subscription|sandboxed-containers-operator|10
 azure-spoke|Subscription|openshift-cert-manager-operator|10
+azure-spoke|Application|sandbox|10
 azure-spoke|Application|trustee|ABSENT
 azure-spoke|Application|sandbox-policies|ABSENT
+azure-spoke|Application|coco-kyverno-policies|ABSENT
 azure-spoke|Application|hello-openshift|30
 azure-spoke|Application|kbs-access-curl|30
 azure-spoke|Application|kbs-access-sealed|30
-# trusted-hub: hub stack (trustee/acm/vault), no workloads, no sandbox sub
+# trusted-hub: hub stack (trustee/acm/vault/kyverno), no workloads, no sandbox sub
 trusted-hub|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
 trusted-hub|Job|wait-for-vault-unsealed|5
 trusted-hub|Application|acm|15
 trusted-hub|Application|vault|0
 trusted-hub|Application|openshift-external-secrets|0
+trusted-hub|Application|kyverno|0
 trusted-hub|Subscription|advanced-cluster-management|10
+trusted-hub|Subscription|openshift-external-secrets-operator|-
 trusted-hub|Subscription|trustee-operator|10
 trusted-hub|Subscription|sandboxed-containers-operator|ABSENT
 trusted-hub|Subscription|openshift-cert-manager-operator|10
@@ -338,16 +381,16 @@ for mode in airgap connected; do
     # All documents mentioning the bridge name (the CRB itself, plus the
     # helm-values ConfigMap which embeds the values indented). The real CRB is
     # distinguished by an UNINDENTED "kind: ClusterRoleBinding" line.
-    block="$(echo "$out" | awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/')"
+    block="$(awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/' <<< "$out")"
     if [[ -z "$block" ]]; then
         fail "$mode: RBAC bridge CRB missing from root render"
         continue
     fi
     ok=1
-    echo "$block" | grep -q "^kind: ClusterRoleBinding" || ok=0
-    echo "$block" | grep -q "cluster-admin$" || ok=0
-    echo "$block" | grep -q "vp-gitops-argocd-application-controller" || ok=0
-    echo "$block" | grep -q 'sync-wave: "-1"' || ok=0
+    grep -q "^kind: ClusterRoleBinding" <<< "$block" || ok=0
+    grep -q "cluster-admin$" <<< "$block" || ok=0
+    grep -q "vp-gitops-argocd-application-controller" <<< "$block" || ok=0
+    grep -q 'sync-wave: "-1"' <<< "$block" || ok=0
     if [[ $ok -eq 1 ]]; then
         pass "$mode: RBAC bridge CRB at wave -1 for the controller SA"
     else
@@ -361,7 +404,7 @@ for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
     out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
         --set global.coco.runtimeClassName=kata-cc 2>/dev/null)" \
         || { fail "$chart connected render errored"; continue; }
-    if echo "$out" | grep -q "registry.redhat.io/ubi9/httpd-24@sha256:68a91ff"; then
+    if grep -q "registry.redhat.io/ubi9/httpd-24@sha256:68a91ff" <<< "$out"; then
         pass "$chart connected: upstream image unchanged"
     else
         fail "$chart connected: image not the upstream registry.redhat.io reference"
@@ -371,8 +414,8 @@ for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
         --set global.coco.runtimeClassName=kata-cc --set global.airgap=true \
         --set-string "global.mirrorRegistry=${MIRROR_ROOT}" 2>/dev/null)" \
         || { fail "$chart airgap render errored"; continue; }
-    if echo "$out" | grep -q "${MIRROR_ROOT}/ubi9/httpd-24@sha256:68a91ff" \
-        && ! echo "$out" | grep -q "registry.redhat.io/ubi9"; then
+    if grep -q "${MIRROR_ROOT}/ubi9/httpd-24@sha256:68a91ff" <<< "$out" \
+        && ! grep -q "registry.redhat.io/ubi9" <<< "$out"; then
         pass "$chart airgap: image rewritten to ${MIRROR_ROOT}/ubi9/..."
     else
         fail "$chart airgap: image not rewritten to the mirror root"
@@ -383,7 +426,7 @@ done
 out="$(helm template x "${PATTERN_DIR}/charts/coco-supported/kbs-access-curl" \
     --set global.coco.runtimeClassName=kata-cc --set global.airgap=true \
     --set-string "global.mirrorRegistry=${MIRROR_ROOT}" 2>/dev/null)" \
-    && echo "$out" | grep -q "${MIRROR_ROOT}/ubi9/ubi:latest" \
+    && grep -q "${MIRROR_ROOT}/ubi9/ubi:latest" <<< "$out" \
     && pass "kbs-access-curl airgap: initImage rewritten (registry.access path)" \
     || fail "kbs-access-curl airgap: initImage not rewritten"
 
