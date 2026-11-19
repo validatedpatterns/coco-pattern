@@ -20,7 +20,9 @@ spec:
         - __MIRROR_REGISTRY__/hashicorp
     # NOTE: quay.io/community-operator-pipeline-prod removed — oc-mirror 4.22
     # generates ITMS for it in itms-oc-mirror.yaml automatically.
-    # Kyverno chart images: the chart pulls from reg.kyverno.io, not ghcr.io.
+    # Kyverno chart images: the chart's defaultRegistry is reg.kyverno.io, but
+    # the image paths are identical under ghcr.io — the imageset mirrors from
+    # ghcr.io and this rule redirects reg.kyverno.io pulls to the mirror.
     - source: reg.kyverno.io
       mirrors:
         - __MIRROR_REGISTRY__
