@@ -334,11 +334,6 @@ clusterGroup:
           value: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
         - name: global.targetRevision
           value: f582a1183dc13ee15f8df4349e8467c981a39250
-        # Kata stays unavailable until the live RuntimeClass has an approved
-        # SAW placement and attachable label.
-        - name: portal.deploymentModes
-          value: '{vm}'
-
     governance-policy:
       name: governance-policy
       namespace: openshell-agents
