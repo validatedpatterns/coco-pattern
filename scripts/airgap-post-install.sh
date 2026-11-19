@@ -13,7 +13,6 @@
 #                         on Quay.
 #
 # Optional env:
-#   EXTRA_CA_CERT           — path to CA cert file for the mirror registry
 #   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
@@ -281,6 +280,13 @@ normalise_mirror_source_policy() {
 
     local changed=0 conflicts=0
 
+    # Scratch file for the python MODIFIED/NOOP verdicts — mktemp, not a
+    # fixed /tmp path: concurrent runs (or a stale file from a previous
+    # run) would otherwise read each other's status.
+    local status_file
+    status_file="$(mktemp)"
+    trap 'rm -f "$status_file"' RETURN
+
     # Patch all ImageDigestMirrorSet objects
     while IFS= read -r name; do
         [[ -z "$name" ]] && continue
@@ -298,8 +304,8 @@ for k in ['managedFields', 'resourceVersion', 'uid', 'generation', 'creationTime
 d.pop('status', None)
 print(json.dumps(d))
 print('MODIFIED' if modified else 'NOOP', file=sys.stderr)
-" 2>/tmp/idms_status)
-        local status; status=$(cat /tmp/idms_status)
+" 2>"$status_file")
+        local status; status=$(<"$status_file")
         if [[ "$status" == "MODIFIED" ]]; then
             echo "$patched" | oc apply -f - 2>/dev/null && \
                 info "  Patched IDMS: $name" && changed=$(( changed + 1 ))
@@ -325,8 +331,8 @@ for k in ['managedFields', 'resourceVersion', 'uid', 'generation', 'creationTime
 d.pop('status', None)
 print(json.dumps(d))
 print('MODIFIED' if modified else 'NOOP', file=sys.stderr)
-" 2>/tmp/itms_status)
-        local status; status=$(cat /tmp/itms_status)
+" 2>"$status_file")
+        local status; status=$(<"$status_file")
         if [[ "$status" == "MODIFIED" ]]; then
             echo "$patched" | oc apply -f - 2>/dev/null && \
                 info "  Patched ITMS: $name" && changed=$(( changed + 1 ))
@@ -433,9 +439,15 @@ community-operators:cs-community-operator-index-${catalog_suffix}
         # One "namespace name" pair per line — read line by line, NOT
         # for-loop word splitting (which would feed each token to both
         # ns and name and patch the wrong objects).
+        # Fetch the JSON explicitly: a failed oc query must not read as
+        # "no subscriptions to repoint" — that would silently skip the def.
+        local subs_json
+        if ! subs_json=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null); then
+            error "  cannot list subscriptions (oc query failed) — $def repoint skipped"
+            continue
+        fi
         local subs
-        subs=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
-            python3 -c "
+        subs=$(printf '%s' "$subs_json" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 for s in d.get('items', []):
@@ -450,21 +462,30 @@ for s in d.get('items', []):
             # annotation; older label tracking sets the instance label.
             # Check both — a miss patches an ArgoCD-managed subscription out
             # of band and self-heal reverts it on the next sync.
+            # Fail CLOSED: if ownership cannot be determined (oc query
+            # failed, invalid JSON), the subscription is skipped — an
+            # out-of-band patch ArgoCD would revert is worse than leaving
+            # it on the disabled default for a later re-run.
             local argocd_owned=""
             argocd_owned=$(oc get subscription.operators.coreos.com "$name" -n "$ns" -o json 2>/dev/null | python3 -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
 except Exception:
-    sys.exit(0)
+    print('ERROR'); sys.exit(0)
 m = d.get('metadata') or {}
 labels = m.get('labels') or {}
 annots = m.get('annotations') or {}
 print('yes' if ('argocd.argoproj.io/instance' in labels
-               or 'argocd.argoproj.io/tracking-id' in annots) else '')
-" 2>/dev/null) || argocd_owned=""
-            if [[ -n "$argocd_owned" ]]; then
+               or 'argocd.argoproj.io/tracking-id' in annots) else 'no')
+" 2>/dev/null) || argocd_owned="ERROR"
+            if [[ "$argocd_owned" == "yes" ]]; then
                 info "  skipping $ns/$name (ArgoCD-owned — declarative via the airgap overlay)"
+                skipped=$((skipped + 1))
+                continue
+            fi
+            if [[ -z "$argocd_owned" || "$argocd_owned" == "ERROR" ]]; then
+                warn "  cannot determine ownership of $ns/$name (query failed) — skipping to avoid an out-of-band patch ArgoCD would revert"
                 skipped=$((skipped + 1))
                 continue
             fi
@@ -484,9 +505,19 @@ print('yes' if ('argocd.argoproj.io/instance' in labels
     # resolve. Hard-fail in --repoint-subs mode (a deliberate re-check);
     # warn during bootstrap, where entries the loop skipped on purpose and
     # day-0 subscriptions unrelated to the pattern must not abort the run.
+    # A failed query is not a pass: hard-fail in --repoint-subs mode, and in
+    # bootstrap mode do NOT print the success line on a query failure.
+    local stragglers_json
+    if ! stragglers_json=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null); then
+        error "cannot list subscriptions for the final check (oc query failed)"
+        if [[ "$MODE" == "repoint" ]]; then
+            exit 1
+        fi
+        warn "Skipping the final default-catalog check (bootstrap mode) — re-run 'make airgap-repoint-subs' to verify"
+        return 0
+    fi
     local stragglers
-    stragglers=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
-        python3 -c "
+    stragglers=$(printf '%s' "$stragglers_json" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 for s in d.get('items', []):
@@ -506,8 +537,9 @@ for s in d.get('items', []):
         warn "Left on default catalogs during bootstrap (see above) — the pattern"
         warn "deploy may repoint or replace them; re-run 'make airgap-repoint-subs'"
         warn "after the pattern deploys to verify."
+    else
+        info "No subscriptions remain on disabled default catalogs"
     fi
-    info "No subscriptions remain on disabled default catalogs"
 }
 
 # ─── Step 3e: Validate the airgap overlay's catalog references ───
@@ -525,6 +557,16 @@ validate_airgap_overlay() {
         return
     fi
 
+    # This whole step is airgap-only by design ("connected works by
+    # default"): unless global.airgap is true the function is inert, so a
+    # connected run never aborts on airgap-only conditions (mirrored
+    # catalogs absent, mirrorRegistry empty, connected-default sources).
+    local airgap_flag helm_repo operator_source patterns_source
+    airgap_flag=$(read_global_key global.airgap false)
+    if [[ "${airgap_flag,,}" != "true" ]]; then
+        return
+    fi
+
     # Every cs-* catalog named in the overlay must exist and be READY.
     local catalogs
     catalogs=$(python3 -c "
@@ -533,22 +575,52 @@ text = open('${overlay}').read()
 for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     print(m)
 " 2>/dev/null) || catalogs=""
-    local missing=0
+    local missing=0 absent=0 never_ready=0
     while IFS= read -r cs; do
         [[ -z "$cs" ]] && continue
-        local state
+        # Absent is a config error — count it and move on, no waiting.
+        # Not-READY may just be timing: step 3 in this same run may have
+        # applied the CatalogSource seconds ago, and the catalog pod pulls
+        # a multi-GB index image before reporting READY.
+        if ! oc get catalogsource "$cs" -n openshift-marketplace >/dev/null 2>&1; then
+            error "  $cs: absent from openshift-marketplace"
+            missing=$((missing + 1))
+            absent=$((absent + 1))
+            continue
+        fi
+        local state waited=0
         state=$(oc get catalogsource "$cs" -n openshift-marketplace \
             -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null) || state=""
+        if [[ "$state" != "READY" ]]; then
+            info "  $cs: not READY yet (state: '${state:-none}') — waiting up to 300s"
+            info "  (the catalog may have been created by step 3 in this run; the"
+            info "   catalog pod pulls a multi-GB index image before READY)"
+            until [[ "$state" == "READY" ]] || [[ $waited -ge 300 ]]; do
+                sleep 10
+                waited=$((waited + 10))
+                state=$(oc get catalogsource "$cs" -n openshift-marketplace \
+                    -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null) || state=""
+            done
+        fi
         if [[ "$state" == "READY" ]]; then
-            info "  $cs: READY"
+            if [[ $waited -gt 0 ]]; then
+                info "  $cs: READY (after ${waited}s)"
+            else
+                info "  $cs: READY"
+            fi
         else
-            error "  $cs: missing or not READY (state: '${state:-absent}')"
+            error "  $cs: never became READY within 300s"
             missing=$((missing + 1))
+            never_ready=$((never_ready + 1))
         fi
     done <<< "$catalogs"
     if [[ $missing -gt 0 ]]; then
-        error "The airgap overlay references catalogs that are not READY on this cluster."
-        error "Check that global.clusterVersion matches the mirrored operator index tags."
+        error "The airgap overlay references catalogs that are either absent"
+        error "from openshift-marketplace or never became READY within 300s"
+        error "(absent: $absent, never READY: $never_ready)."
+        error "Check that global.clusterVersion matches the mirrored operator"
+        error "index tags and that step 3 applied the cs-* CatalogSources"
+        error "from the oc-mirror cluster-resources."
         exit 1
     fi
 
@@ -576,12 +648,6 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     # performs no IDMS redirect) and the default operator catalogs
     # (disabled in step 2; step 3d runs before those subscriptions exist).
     # Fail fast here rather than as a stuck operator after the Pattern CR.
-    local airgap_flag helm_repo operator_source patterns_source
-    airgap_flag=$(read_global_key global.airgap false)
-    if [[ "${airgap_flag,,}" != "true" ]]; then
-        return
-    fi
-
     local mirror_root="${MIRROR_REGISTRY%%/}"
     helm_repo=$(read_global_key main.multiSourceConfig.helmRepoUrl '')
     if [[ -z "$helm_repo" ]]; then
@@ -605,18 +671,18 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     fi
 
     operator_source=$(read_global_key main.gitops.operatorSource '')
-    if [[ -z "$operator_source" ]]; then
-        error "main.gitops.operatorSource is empty while global.airgap is true —"
-        error "the GitOps operator subscription would target redhat-operators,"
-        error "a catalog disabled in airgap. Set it to the mirrored catalog"
+    if [[ -z "$operator_source" || "$operator_source" == "redhat-operators" ]]; then
+        error "main.gitops.operatorSource is empty or still the connected default"
+        error "(redhat-operators) while global.airgap is true — that catalog is"
+        error "disabled in airgap. Set it to the mirrored catalog"
         error "(e.g. cs-redhat-operator-index-v4-22)."
         exit 1
     fi
     patterns_source=$(read_global_key main.patternsOperator.source '')
-    if [[ -z "$patterns_source" ]]; then
-        error "main.patternsOperator.source is empty while global.airgap is true —"
-        error "the patterns-operator subscription would target community-operators,"
-        error "a catalog disabled in airgap. Set it to the mirrored catalog"
+    if [[ -z "$patterns_source" || "$patterns_source" == "community-operators" ]]; then
+        error "main.patternsOperator.source is empty or still the connected default"
+        error "(community-operators) while global.airgap is true — that catalog is"
+        error "disabled in airgap. Set it to the mirrored catalog"
         error "(e.g. cs-community-operator-index-v4-22)."
         exit 1
     fi
@@ -642,14 +708,11 @@ mirror_oci_charts() {
 
     while IFS= read -r chart; do
         [[ -z "$chart" ]] && continue
-        local src_registry="${chart%%/*}"
+        # Both quay.io and ghcr.io sources mirror under MIRROR_REGISTRY with
+        # the same org/repo path (for Quay targets the org path is already
+        # part of MIRROR_REGISTRY itself).
         local path_and_tag="${chart#*/}"
-        local dest
-        if [[ "$src_registry" == "quay.io" ]]; then
-            dest="${MIRROR_REGISTRY}/${path_and_tag}"
-        else
-            dest="${MIRROR_REGISTRY}/${path_and_tag}"
-        fi
+        local dest="${MIRROR_REGISTRY}/${path_and_tag}"
         info "  $chart → $dest"
         oc image mirror --insecure=true "$chart" "$dest" 2>&1 | tail -1 || \
             warn "  Failed (may already exist)"
@@ -657,11 +720,12 @@ mirror_oci_charts() {
 
     # VP utility images (need both :latest and :v1)
     info "Mirroring VP utility images..."
+    # pattern-ui-catalog:stable-v1 deliberately NOT mirrored — Quay rejects
+    # its OCI-index manifest; see the note in airgap/imageset-config-4.22.yaml.
     for img in \
         "quay.io/validatedpatterns/utility-container:latest" \
         "quay.io/validatedpatterns/imperative-container:latest" \
         "quay.io/validatedpatterns/imperative-container:v1" \
-        "quay.io/validatedpatterns/pattern-ui-catalog:stable-v1" \
         "registry.redhat.io/ubi9/ubi-minimal:latest"; do
         local path="${img#*/}"
         local dest="${MIRROR_REGISTRY}/${path}"
@@ -670,23 +734,56 @@ mirror_oci_charts() {
             warn "  Failed to mirror $img"
     done
 
-    # pattern-install chart (all tags if skopeo available)
+    # pattern-install chart (all tags if skopeo available) — HARD DEPENDENCY:
+    # `pattern.sh make install` resolves oci://…/validatedpatterns/pattern-install
+    # from the mirror with no version pin (highest semver tag), so an empty or
+    # incomplete mirror fails the deploy at chart-fetch with nothing pointing
+    # back at the cause. Mirror loudly, then verify the outcome.
+    local pi_dest="${MIRROR_REGISTRY}/validatedpatterns/pattern-install"
     if command -v skopeo >/dev/null 2>&1; then
         info "Mirroring pattern-install chart..."
         local pi_tags
         pi_tags=$(skopeo list-tags "docker://quay.io/validatedpatterns/pattern-install" 2>/dev/null \
             | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+        local pi_total=0 pi_failed=0
         if [[ -n "$pi_tags" ]]; then
             while IFS= read -r tag; do
                 [[ -z "$tag" ]] && continue
-                oc image mirror --insecure=true \
-                    "quay.io/validatedpatterns/pattern-install:${tag}" \
-                    "${MIRROR_REGISTRY}/validatedpatterns/pattern-install:${tag}" 2>/dev/null || true
+                pi_total=$(( pi_total + 1 ))
+                if ! oc image mirror --insecure=true \
+                        "quay.io/validatedpatterns/pattern-install:${tag}" \
+                        "${pi_dest}:${tag}" 2>/dev/null; then
+                    error "  Failed to mirror pattern-install tag: ${tag}"
+                    pi_failed=$(( pi_failed + 1 ))
+                fi
             done <<< "$pi_tags"
-            info "  Mirrored $(echo "$pi_tags" | wc -l | tr -d ' ') tags"
+            info "  Mirrored $(( pi_total - pi_failed ))/${pi_total} tags to ${pi_dest}"
+        else
+            warn "  Could not enumerate pattern-install tags from quay.io — verifying the mirror only"
         fi
+        if [[ $pi_failed -gt 0 ]]; then
+            error "pattern-install: ${pi_failed}/${pi_total} tags failed to mirror to ${pi_dest}."
+            error "'pattern.sh make install' resolves this chart from the mirror"
+            error "(no version pin — highest semver tag) and will fail at chart-fetch."
+            exit 1
+        fi
+        # Verify the destination actually holds at least one tag — the
+        # source-side count above is not proof the mirror is usable.
+        local pi_mirror_tags
+        pi_mirror_tags=$(skopeo list-tags "docker://${pi_dest}" 2>/dev/null \
+            | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+        if [[ -z "$pi_mirror_tags" ]]; then
+            error "pattern-install is not present in the mirror: 'skopeo list-tags"
+            error "docker://${pi_dest}' returned no tags."
+            error "'pattern.sh make install' resolves this chart from the mirror"
+            error "(no version pin — highest semver tag) and will fail at chart-fetch."
+            exit 1
+        fi
+        info "  pattern-install present in mirror ($(echo "$pi_mirror_tags" | wc -l | tr -d ' ') tags)"
     else
-        warn "  skopeo not available — skipping pattern-install tag enumeration"
+        warn "  skopeo not available — cannot verify that pattern-install is mirrored"
+        warn "  to ${pi_dest}. 'pattern.sh make install' resolves this chart from"
+        warn "  the mirror and WILL FAIL at chart-fetch if it is not already there."
     fi
 
     info "OCI mirroring complete"
@@ -744,109 +841,6 @@ fix_manifest_lists() {
                 warn "    Tag-based fallback also failed"
         fi
     done <<< "$failed_images"
-}
-
-# ─── Step 7: Add extra CA certificate to ArgoCD ──────────────────
-add_argocd_ca() {
-    step 7 "Add extra CA certificate to ArgoCD"
-
-    if [[ -z "${EXTRA_CA_CERT:-}" ]]; then
-        # Try to extract from cluster's additionalTrustBundle
-        local cluster_ca
-        cluster_ca=$(oc get cm user-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || true)
-        if [[ -n "$cluster_ca" ]]; then
-            info "Using CA from cluster's additionalTrustBundle"
-            echo "$cluster_ca" > /tmp/mirror-ca.crt
-            EXTRA_CA_CERT="/tmp/mirror-ca.crt"
-        else
-            info "No EXTRA_CA_CERT and no cluster CA bundle — skipping"
-            return
-        fi
-    fi
-
-    if [[ ! -f "$EXTRA_CA_CERT" ]]; then
-        error "CA cert file not found: $EXTRA_CA_CERT"
-        return
-    fi
-
-    local registry_host="${MIRROR_REGISTRY%%:*}"
-
-    # Apply to all ArgoCD namespaces that exist
-    for ns in vp-gitops openshift-gitops; do
-        if ! oc get namespace "$ns" >/dev/null 2>&1; then
-            continue
-        fi
-        oc create configmap argocd-tls-certs-cm -n "$ns" \
-            --from-file="${registry_host}=${EXTRA_CA_CERT}" \
-            --dry-run=client -o yaml | oc apply -f - 2>/dev/null
-        info "CA cert added to argocd-tls-certs-cm in $ns"
-    done
-}
-
-# ─── Step 7b: Configure ArgoCD Helm OCI registry auth ────────────
-configure_argocd_helm_auth() {
-    step "7b" "Configure ArgoCD Helm OCI registry auth"
-
-    # Check if ArgoCD namespace exists
-    local argocd_ns=""
-    for ns in vp-gitops openshift-gitops; do
-        if oc get namespace "$ns" >/dev/null 2>&1; then
-            argocd_ns="$ns"
-            break
-        fi
-    done
-
-    if [[ -z "$argocd_ns" ]]; then
-        warn "No ArgoCD namespace yet — run this step again after Pattern CR is deployed"
-        return
-    fi
-
-    # Create docker config secret from the cluster's pull-secret
-    local pull_secret_json
-    pull_secret_json=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' 2>/dev/null | base64 -d || true)
-
-    if [[ -z "$pull_secret_json" ]]; then
-        warn "Could not read cluster pull-secret — using local pull-secret.json"
-        if [[ -f "${HOME}/pull-secret.json" ]]; then
-            pull_secret_json=$(cat "${HOME}/pull-secret.json")
-        else
-            warn "No pull-secret found — ArgoCD may not be able to pull from private OCI repos"
-            return
-        fi
-    fi
-
-    # Create the helm registry config secret
-    oc create secret generic helm-registry-config -n "$argocd_ns" \
-        --from-literal=config.json="$pull_secret_json" \
-        --dry-run=client -o yaml | oc apply -f - 2>/dev/null
-    info "Helm registry config secret created in $argocd_ns"
-
-    # Patch ArgoCD CR to mount docker config for Helm OCI auth
-    # HELM_REGISTRY_CONFIG tells Helm where to find registry credentials
-    if oc get argocd -n "$argocd_ns" -o name >/dev/null 2>&1; then
-        local argocd_name
-        argocd_name=$(oc get argocd -n "$argocd_ns" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-        if [[ -n "$argocd_name" ]]; then
-            oc patch argocd "$argocd_name" -n "$argocd_ns" --type merge -p '
-spec:
-  repo:
-    env:
-    - name: HELM_REGISTRY_CONFIG
-      value: /tmp/helm-config/config.json
-    volumes:
-    - name: helm-registry-config
-      secret:
-        secretName: helm-registry-config
-    volumeMounts:
-    - name: helm-registry-config
-      mountPath: /tmp/helm-config
-      readOnly: true
-' 2>/dev/null
-            info "ArgoCD $argocd_name patched with Helm OCI registry auth"
-        fi
-    else
-        warn "No ArgoCD CR found yet — will need to patch after Pattern CR creates it"
-    fi
 }
 
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
@@ -1143,10 +1137,6 @@ case "$MODE" in
         validate_prereqs
         create_operator_config
         deploy_pattern_cr
-        info ""
-        info "Waiting 30s for ArgoCD to be created by patterns-operator..."
-        sleep 30
-        add_argocd_ca
         # Helm OCI auth skipped — Quay repos are public (ANONYMOUS_ACCESS: true).
         # Mounting pull-secret as HELM_REGISTRY_CONFIG causes 401 errors.
         exit 0
@@ -1179,7 +1169,16 @@ repoint_default_catalog_subscriptions
 validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
-add_argocd_ca
+# Step 7 removed — the mirror CA reaches the ArgoCD repo-server via the
+# cluster trust bundle (install-time --additional-trust-bundle) and the
+# clustergroup chart's trusted-ca-bundle ConfigMap
+# (config.openshift.io/inject-trusted-cabundle), concatenated by the
+# repo-server init container. The previous argocd-tls-certs-cm patch was a
+# silent no-op in every flow that called it (both ran before the vp-gitops
+# namespace existed) and the validated disconnected runs succeeded without
+# it. Step 7b (Helm OCI auth) was never called: the mirror's chart repos
+# are public (ANONYMOUS_ACCESS) and mounting the pull-secret as
+# HELM_REGISTRY_CONFIG caused 401s.
 enable_routing_via_host
 setup_git_server
 create_operator_config
