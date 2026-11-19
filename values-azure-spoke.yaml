@@ -27,6 +27,8 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: sandboxed-containers-operator.v1.13.1
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -45,6 +47,36 @@ clusterGroup:
   sharedValueFiles:
   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
+
+  extraObjects:
+    # Bridge for the first-sync ordering race (patterns-operator#887): ArgoCD
+    # applies wave-0 resources by kind, so the imperative ServiceAccounts are
+    # attempted before the cluster-admin ClusterRoleBinding that authorises the
+    # controller to create them. Ungated installs self-heal on the next
+    # auto-sync; with sync-wave gating the first operation parks on wave-0
+    # health and deadlocks. This binding applies at wave -1, before any wave-0
+    # kind, which the controller can create from the start (the operator's
+    # instance role already grants rbac.authorization.k8s.io: */*).
+    # Distinct name on purpose — matching the clustergroup chart's own
+    # vp-gitops-cluster-admin-rolebinding would collide in the manifest.
+    # TODO: remove once patterns-operator creates the binding (or the
+    # clustergroup chart moves its own to wave -1) — see patterns-operator#887.
+    argocd-cluster-admin-bootstrap:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: coco-pattern-argocd-cluster-admin-bootstrap
+        annotations:
+          argocd.argoproj.io/sync-wave: "-1"
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: vp-gitops-argocd-application-controller
+          namespace: vp-gitops
+
   applications:
 
     secrets-operator:
@@ -53,6 +85,8 @@ clusterGroup:
       project: external-secrets
       chart: openshift-external-secrets
       chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     sandbox:
       name: sandbox
@@ -60,6 +94,8 @@ clusterGroup:
       project: sandbox
       chart: sandboxed-containers
       chartVersion: 0.2.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
       overrides:
         - name: global.secretStore.backend
           value: vault
@@ -73,18 +109,24 @@ clusterGroup:
       namespace: hello-openshift
       project: workloads
       path: charts/coco-supported/hello-openshift
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
 
     kbs-access-curl:
       name: kbs-access-curl
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access-curl
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
 
     kbs-access-sealed:
       name: kbs-access-sealed
       namespace: kbs-access
       project: workloads
       path: charts/coco-supported/kbs-access-sealed
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
 
   imperative:
     jobs:

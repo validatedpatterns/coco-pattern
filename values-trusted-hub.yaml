@@ -22,6 +22,8 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     eso:
       name: openshift-external-secrets-operator
       namespace: external-secrets-operator
@@ -32,6 +34,8 @@ clusterGroup:
       channel: stable
       installPlanApproval: Manual
       csv: trustee-operator.v1.2.1
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -50,6 +54,69 @@ clusterGroup:
   sharedValueFiles:
   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
+
+  extraObjects:
+    # Bridge for the first-sync ordering race (patterns-operator#887): ArgoCD
+    # applies wave-0 resources by kind, so the imperative ServiceAccounts are
+    # attempted before the cluster-admin ClusterRoleBinding that authorises the
+    # controller to create them. Ungated installs self-heal on the next
+    # auto-sync; with sync-wave gating the first operation parks on wave-0
+    # health and deadlocks. This binding applies at wave -1, before any wave-0
+    # kind, which the controller can create from the start (the operator's
+    # instance role already grants rbac.authorization.k8s.io: */*).
+    # Distinct name on purpose — matching the clustergroup chart's own
+    # vp-gitops-cluster-admin-rolebinding would collide in the manifest.
+    # TODO: remove once patterns-operator creates the binding (or the
+    # clustergroup chart moves its own to wave -1) — see patterns-operator#887.
+    argocd-cluster-admin-bootstrap:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: coco-pattern-argocd-cluster-admin-bootstrap
+        annotations:
+          argocd.argoproj.io/sync-wave: "-1"
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: vp-gitops-argocd-application-controller
+          namespace: vp-gitops
+    wait-for-vault-unsealed:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: wait-for-vault-unsealed
+        annotations:
+          argocd.argoproj.io/hook: Sync
+          argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+          argocd.argoproj.io/sync-wave: "5"
+      spec:
+        backoffLimit: 10
+        activeDeadlineSeconds: 1800
+        template:
+          spec:
+            restartPolicy: OnFailure
+            containers:
+              - name: wait-for-vault
+                image: registry.redhat.io/openshift4/ose-cli:latest
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    echo "Waiting for vault to be unsealed..."
+                    while true; do
+                      if curl -sk https://vault.vault.svc:8200/v1/sys/seal-status | grep -q '"sealed":false'; then
+                        echo "Vault unsealed. Waiting 120s for secrets to load..."
+                        sleep 120
+                        echo "Done. Proceeding."
+                        exit 0
+                      fi
+                      echo "Vault not ready. Retrying in 15s..."
+                      sleep 15
+                    done
+
   applications:
     acm:
       name: acm
@@ -57,6 +124,19 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
+      # Wave 15: after the wave-10 ACM operator subscription (MCH CRD),
+      # before trustee at 20.
+      annotations:
+        argocd.argoproj.io/sync-wave: "15"
+      # The MCH operator creates the multicluster-engine subscription at
+      # runtime from the mce-subscription-spec annotation (rendered from this
+      # value), so it must be born on the right catalog. Connected: the
+      # default redhat-operators. Airgap: the mirrored catalog (the default
+      # catalogs are disabled). Kept as a single tpl-conditional list entry —
+      # an overlay list would replace this one wholesale.
+      overrides:
+        - name: acm.mce_operator.source
+          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'
 
     vault:
       name: vault
@@ -65,6 +145,8 @@ clusterGroup:
       chart: hashicorp-vault
       # Require 0.1.10 or newer within the 0.1.x release series.
       chartVersion: "~0.1.10"
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     secrets-operator:
       name: openshift-external-secrets
@@ -72,6 +154,8 @@ clusterGroup:
       project: external-secrets
       chart: openshift-external-secrets
       chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     trustee:
       name: trustee
@@ -79,6 +163,8 @@ clusterGroup:
       project: trustee
       chart: trustee
       chartVersion: 0.10.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
       extraValueFiles:
         - '/overrides/values-trustee.yaml'
       overrides:
@@ -90,6 +176,8 @@ clusterGroup:
       project: sandbox
       chart: sandboxed-policies
       chartVersion: 0.2.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "20"
       overrides:
         - name: global.coco.azure.tags
           value: "key1=value1,key2=value2"
