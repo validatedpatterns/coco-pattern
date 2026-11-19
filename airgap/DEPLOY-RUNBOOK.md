@@ -15,7 +15,7 @@ in CI on every push and pull request.
 ```text
 ┌──────────────┐     ┌───────────────────┐     ┌─────────────────┐
 │  Upstream    │────▶│  Quay Mirror      │────▶│  OpenShift SNO  │
-│  Registries  │     │  (org: mirror)    │     │  (node-02)      │
+│  Registries  │     │  (org: mirror)    │     │  (SNO)          │
 │  (internet)  │     │                   │     │                 │
 └──────────────┘     └───────────────────┘     └─────────────────┘
                             │                        │
@@ -63,7 +63,9 @@ robots). Key content:
 - OCP release payload (exact installer version, e.g. 4.22.17)
 - Operator catalogs (redhat, certified, community — v4.22)
 - VP Helm charts (clustergroup, trustee, acm, etc.)
-- VP utility images (utility-container, imperative-container, pattern-install)
+- VP utility images (utility-container, imperative-container, pattern-install;
+  the bootstrap's mirroring step verifies pattern-install is present in the
+  mirror and fails fast if not)
 - Workload images (ubi9/httpd-24, ubi9/ubi)
 - Intel DCAP operator + QGS images
 - Kyverno images — `ghcr.io/kyverno/*` plus the hook images
@@ -232,7 +234,7 @@ cd ~/coco-pattern
 
 export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
 export GIT_SERVER=http://<git-host>:8080
-export ENABLE_ROUTINGVIAHOST=true               # required for pod→lab egress
+export ENABLE_ROUTINGVIAHOST=true               # required for pod→off-cluster egress
 
 scripts/airgap-post-install.sh
 
@@ -273,25 +275,33 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
-### C-3: ArgoCD CA (verification)
+### C-3: Verify the ArgoCD mirror-CA trust
 
-Step 7 of `scripts/airgap-post-install.sh` applies the mirror CA to
-`argocd-tls-certs-cm` in `vp-gitops` (and `openshift-gitops` when it
-exists) — no manual patch is needed. Verify it landed:
+The mirror CA reaches ArgoCD through the cluster trust bundle, not through
+any post-install step: the install-time `--additional-trust-bundle` (B-1)
+bakes the mirror CA into the cluster-wide trust bundle, and the
+clustergroup chart renders a `trusted-ca-bundle` ConfigMap in `vp-gitops`
+labelled `config.openshift.io/inject-trusted-cabundle: 'true'`, which
+OpenShift populates from that cluster trust bundle. The repo-server's
+`fetch-ca` init container concatenates it (with the kube root CA) into the
+CA bundle the repo-server uses. No out-of-band CA patch is needed or
+useful — the previous `argocd-tls-certs-cm` patch was a silent no-op (it
+always ran before the `vp-gitops` namespace existed), and the validated
+disconnected runs succeeded without it.
+
+Verify once the pattern is deployed and `vp-gitops` exists:
 
 ```bash
-oc get configmap argocd-tls-certs-cm -n vp-gitops -o jsonpath='{.data}'
-# Expected: a key named <mirror-host> whose value is the CA certificate
-```
+oc get configmap trusted-ca-bundle -n vp-gitops \
+  -o jsonpath='{.metadata.labels.config\.openshift\.io/inject-trusted-cabundle}'
+# Expected: true
 
-The script does **not** roll the ArgoCD deployments. ArgoCD reads the TLS
-ConfigMap at process start, so if the CA landed after the repo-server was
-already running, roll the deployments to pick it up:
-
-```bash
-oc get deployments -n vp-gitops --no-headers -o name | \
-  while read dep; do oc rollout restart "$dep" -n vp-gitops; done
-oc rollout status deployment/vp-gitops-repo-server -n vp-gitops
+# The fetch-ca init container concatenated the injected bundle into the
+# ca-bundles emptyDir, mounted at /etc/pki/tls/certs in the repo-server:
+oc exec -n vp-gitops deploy/vp-gitops-repo-server -- \
+  grep -c BEGIN /etc/pki/tls/certs/ca-bundle.crt
+# Expected: >= 2 (kube root CA + injected cluster trust bundle, which
+# includes the mirror CA)
 ```
 
 Bootstrap secrets are loaded by the pattern deploy (C-2); `make
