@@ -257,9 +257,11 @@ clusterGroup:
         # Inject mirror-registry CA into KBS trust store (required for airgap image pulls)
         - name: kbs.registryCa.enabled
           value: "true"
-        # TDX DCAP collateral — offline attestation without Intel PCS network access
+        # TDX DCAP collateral — connected: Intel PCS (public, no API key).
+        # Airgap: the offline file backend (make collect-dcap-collateral).
+        # The chart tpl-renders override values — global.airgap selects.
         - name: kbs.tdx.collateralService
-          value: "file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json"
+          value: "{{ if $.Values.global.airgap }}file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json{{ else }}https://api.trustedservices.intel.com/sgx/certification/v4/{{ end }}"
         - name: kbs.tdx.collateralMountPath
           value: "/opt/confidential-containers/attestation-service/tdx"
         - name: kbs.tdx.collateralFileName
