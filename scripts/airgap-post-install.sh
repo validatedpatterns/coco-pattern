@@ -1024,7 +1024,7 @@ data:
   # argoproj/argo-cd#3781; without it the root app applies all waves ungated.
   # The connected path sets this declaratively via values-global.yaml
   # (main.gitops.applicationHealthCheckEnabled) once pattern-install renders
-  # it (validatedpatterns/pattern-install-chart#52); this bootstrap writes it
+  # it (validatedpatterns/pattern-install-chart#53); this bootstrap writes it
   # directly because the operator subscription predates any chart render.
   gitops.applicationHealthCheckEnabled: "true"
 EOF

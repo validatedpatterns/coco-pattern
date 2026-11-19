@@ -158,8 +158,11 @@ clusterGroup:
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      # Require 0.1.10 or newer within the 0.1.x release series.
-      chartVersion: "~0.1.10"
+      # Exact pin: chart 0.1.11 deploys vault:2.1.2-ubi — the version the
+      # imageset mirrors. A range (~0.1.10) would resolve to whatever is
+      # newest at deploy time and desync from the mirrored vault image
+      # (0.1.10 deploys 1.21.4-ubi).
+      chartVersion: 0.1.11
       annotations:
         argocd.argoproj.io/sync-wave: "0"
 
