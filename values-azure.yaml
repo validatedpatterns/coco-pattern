@@ -311,7 +311,7 @@ clusterGroup:
         - name: ownerResolution.enabled
           value: "true"
         - name: global.webSearch.enabled
-          value: '{{ .Values.global.webSearch.enabled }}'
+          value: "true"
           forceString: true
       syncPolicy:
         automated:
