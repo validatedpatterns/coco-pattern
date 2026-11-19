@@ -217,6 +217,10 @@ airgap-deploy-pattern: ## Deploy the Pattern CR directly (disconnected; bypasses
 airgap-sync-repos: ## Sync Git working copies to the bare smart-HTTP repos
 	@scripts/airgap-post-install.sh --sync-repos-only
 
+.PHONY: render-gate
+render-gate: ## Render-gate the values chain in both connectivity modes (needs helm; pulls the clustergroup chart unless CLUSTERGROUP_CHART is set)
+	@scripts/verify/render-gate.sh
+
 
 
 
