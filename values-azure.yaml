@@ -22,6 +22,24 @@ clusterGroup:
   - kbs-access
   - encrypted-storage
   - kyverno
+  # SAW uses the existing Vault, ESO and sandboxed-containers Operator above.
+  - openshell-agents
+  - saw-keycloak:
+      operatorGroup: true
+      targetNamespaces:
+        - saw-keycloak
+  - rhdh-operator:
+      operatorGroup: true
+      targetNamespaces: []
+  - rhdh
+  - saw-portal
+  - redhat-ods-operator:
+      operatorGroup: true
+      targetNamespaces: []
+  - openshift-cnv:
+      operatorGroup: true
+      targetNamespaces:
+        - openshift-cnv
   subscriptions:
     # ACM is kept anticipating
     acm:
@@ -47,6 +65,26 @@ clusterGroup:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
+    openshift-virtualization:
+      name: kubevirt-hyperconverged
+      namespace: openshift-cnv
+      channel: stable
+    rhbk:
+      name: rhbk-operator
+      namespace: saw-keycloak
+      channel: stable-v26
+    rhdh:
+      name: rhdh
+      namespace: rhdh-operator
+      channel: fast
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators
+      channel: latest
+    openshift-ai:
+      name: rhods-operator
+      namespace: redhat-ods-operator
+      channel: fast
 
   projects:
   - hub
@@ -233,6 +271,96 @@ clusterGroup:
       project: sandbox
       path: charts/all/coco-kyverno-policies
 
+    # SAW applications use the merged SAW source at a fixed revision. Reuse
+    # the existing Vault and ESO apps above instead of installing another set.
+    openshift-cnv:
+      name: openshift-cnv
+      namespace: openshift-cnv
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/openshift-cnv
+
+    openshell-keycloak:
+      name: openshell-keycloak
+      namespace: saw-keycloak
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/openshell-keycloak
+      overrides:
+        - name: keycloak.userPasswords.externalSecret.enabled
+          value: "true"
+        - name: ownerResolver.enabled
+          value: "true"
+
+    saw-users:
+      name: saw-users
+      namespace: openshell-agents
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/saw-users
+      extraValueFiles:
+        - /overrides/saw-users.yaml
+      overrides:
+        - name: global.repoURL
+          value: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+        - name: global.targetRevision
+          value: f582a1183dc13ee15f8df4349e8467c981a39250
+        - name: ownerResolution.enabled
+          value: "true"
+        - name: global.webSearch.enabled
+          value: '{{ .Values.global.webSearch.enabled }}'
+          forceString: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 20
+
+    openshell-rhdh:
+      name: openshell-rhdh
+      namespace: rhdh
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/openshell-rhdh
+      extraValueFiles:
+        - /overrides/saw-users.yaml
+      overrides:
+        - name: global.repoURL
+          value: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+        - name: global.targetRevision
+          value: f582a1183dc13ee15f8df4349e8467c981a39250
+        # Kata stays unavailable until the live RuntimeClass has an approved
+        # SAW placement and attachable label.
+        - name: portal.deploymentModes
+          value: '{vm}'
+
+    governance-policy:
+      name: governance-policy
+      namespace: openshell-agents
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/governance-policy
+
+    governance-interceptor:
+      name: governance-interceptor
+      namespace: openshell-agents
+      project: workloads
+      repoURL: https://github.com/validatedpatterns-sandbox/secure-agent-workspace.git
+      targetRevision: f582a1183dc13ee15f8df4349e8467c981a39250
+      path: charts/governance-interceptor
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 20
+
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
@@ -257,3 +385,9 @@ clusterGroup:
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
       timeout: 3600
+    - name: saw-portal-vault
+      playbook: ansible/playbooks/saw-portal-vault.yaml
+      timeout: 300
+    - name: saw-ingress-ca
+      playbook: ansible/playbooks/saw-ingress-ca.yaml
+      timeout: 300

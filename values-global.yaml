@@ -15,6 +15,9 @@ global:
   secretStore:
     # Warning: This must be present even if it is set to none.
     backend: vault # none, vault, kubernetes
+  # SAW reads this default when it builds workspace Applications.
+  webSearch:
+    enabled: true
   options:
     useCSV: false
     syncPolicy: Automatic
