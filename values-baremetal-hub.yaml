@@ -114,6 +114,33 @@ clusterGroup:
   - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ else }}connected{{ end }}.yaml'
 
   extraObjects:
+    # Bridge for the first-sync ordering race (patterns-operator#887): ArgoCD
+    # applies wave-0 resources by kind, so the imperative ServiceAccounts are
+    # attempted before the cluster-admin ClusterRoleBinding that authorises the
+    # controller to create them. Ungated installs self-heal on the next
+    # auto-sync; with sync-wave gating the first operation parks on wave-0
+    # health and deadlocks. This binding applies at wave -1, before any wave-0
+    # kind, which the controller can create from the start (the operator's
+    # instance role already grants rbac.authorization.k8s.io: */*).
+    # Distinct name on purpose — matching the clustergroup chart's own
+    # vp-gitops-cluster-admin-rolebinding would collide in the manifest.
+    # TODO: remove once patterns-operator creates the binding (or the
+    # clustergroup chart moves its own to wave -1) — see patterns-operator#887.
+    argocd-cluster-admin-bootstrap:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: coco-pattern-argocd-cluster-admin-bootstrap
+        annotations:
+          argocd.argoproj.io/sync-wave: "-1"
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: vp-gitops-argocd-application-controller
+          namespace: vp-gitops
     wait-for-vault-unsealed:
       apiVersion: batch/v1
       kind: Job
@@ -155,10 +182,19 @@ clusterGroup:
       project: hub
       chart: acm
       chartVersion: 0.1.*
-      # Required for airgap -- set to your mirrored catalog source name
-      # overrides:
-      #   - name: acm.mce_operator.source
-      #     value: "cs-redhat-operator-index-v4-22"
+      # Wave 15: after the wave-10 ACM operator subscription (MCH CRD),
+      # before trustee at 20.
+      annotations:
+        argocd.argoproj.io/sync-wave: "15"
+      # The MCH operator creates the multicluster-engine subscription at
+      # runtime from the mce-subscription-spec annotation (rendered from this
+      # value), so it must be born on the right catalog. Connected: the
+      # default redhat-operators. Airgap: the mirrored catalog (the default
+      # catalogs are disabled). Kept as a single tpl-conditional list entry —
+      # an overlay list would replace this one wholesale.
+      overrides:
+        - name: acm.mce_operator.source
+          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'
 
     vault:
       name: vault
