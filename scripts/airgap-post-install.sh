@@ -222,7 +222,7 @@ print(yaml.dump_all(docs, default_flow_style=False))
     done
 
     # Apply manually maintained ITMS (community-operator-pipeline-prod, intel, hashicorp)
-    # MIRROR_REGISTRY_HOST placeholders are substituted from $MIRROR_REGISTRY at apply
+    # __MIRROR_REGISTRY__ placeholders are substituted from $MIRROR_REGISTRY at apply
     # time (FR-017: canonical identity is the DNS name, so the mirrors follow the env).
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -233,8 +233,8 @@ print(yaml.dump_all(docs, default_flow_style=False))
 import sys, os, yaml
 raw = open('$manual_itms').read()
 mirror = os.environ.get('MIRROR_REGISTRY', '')
-if mirror and 'MIRROR_REGISTRY_HOST:8443' in raw and mirror != 'MIRROR_REGISTRY_HOST:8443':
-    raw = raw.replace('MIRROR_REGISTRY_HOST:8443', mirror)
+if mirror and '__MIRROR_REGISTRY__' in raw and mirror != '__MIRROR_REGISTRY__':
+    raw = raw.replace('__MIRROR_REGISTRY__', mirror)
 docs = list(yaml.safe_load_all(raw))
 for doc in docs:
     if doc and doc.get('kind') == 'ImageTagMirrorSet':
@@ -557,9 +557,9 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     local mirror yaml_mirror
     mirror="${MIRROR_REGISTRY%%/}"
     yaml_mirror=$(read_global_key global.mirrorRegistry '')
-    if [[ -z "$yaml_mirror" || "$yaml_mirror" == *"MIRROR_REGISTRY_HOST"* ]]; then
-        error "global.mirrorRegistry is empty or a placeholder in values-global.yaml."
-        error "Set it to the mirror root INCLUDING the org path (e.g. quay.example:443/mirror)"
+    if [[ -z "$yaml_mirror" || "$yaml_mirror" == *"__MIRROR_REGISTRY__"* ]]; then
+        error "global.mirrorRegistry is empty or a placeholder (__MIRROR_REGISTRY__) in values-global.yaml."
+        error "Set it to the mirror root INCLUDING the org path (e.g. quay.example.com:443/mirror)"
         error "— the workload charts rewrite their images against it in airgap mode."
         exit 1
     fi
@@ -787,8 +787,6 @@ add_argocd_ca() {
 configure_argocd_helm_auth() {
     step "7b" "Configure ArgoCD Helm OCI registry auth"
 
-    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
-
     # Check if ArgoCD namespace exists
     local argocd_ns=""
     for ns in vp-gitops openshift-gitops; do
@@ -976,8 +974,6 @@ SVCEOF
 # ─── Step 10: Create patterns-operator-config ConfigMap ──────────
 create_operator_config() {
     step 10 "Create patterns-operator-config ConfigMap"
-
-    local registry_base="${MIRROR_REGISTRY%%/mirror*}"
 
     # Read gitops channel from values-global.yaml
     local gitops_channel

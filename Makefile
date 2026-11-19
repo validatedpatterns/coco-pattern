@@ -191,7 +191,7 @@ update-kyverno-chart: ## Pull and embed upstream Kyverno Helm chart (requires in
 
 ##@ Disconnected Deployment
 MIRROR_REGISTRY ?= quay.example.com:443/mirror
-IMAGESET_CONFIG ?= airgap/imageset-config.yaml
+IMAGESET_CONFIG ?= airgap/imageset-config-4.22.yaml
 OC_MIRROR_WORKSPACE ?= file://$(HOME)/oc-mirror-workspace
 
 .PHONY: airgap-mirror
@@ -208,6 +208,14 @@ airgap-post-install: ## Post-install bootstrap (after airgap-mirror + labctl app
 .PHONY: airgap-repoint-subs
 airgap-repoint-subs: ## Re-run the default-catalog subscription repoint (safety net; safe any time, e.g. after MCH deploys)
 	@scripts/airgap-post-install.sh --repoint-subs
+
+.PHONY: airgap-deploy-pattern
+airgap-deploy-pattern: ## Deploy the Pattern CR directly (disconnected; bypasses pattern.sh GitHub-URL detection)
+	@scripts/airgap-post-install.sh --deploy-pattern
+
+.PHONY: airgap-sync-repos
+airgap-sync-repos: ## Sync Git working copies to the bare smart-HTTP repos
+	@scripts/airgap-post-install.sh --sync-repos-only
 
 
 
