@@ -44,6 +44,27 @@ warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 step()  { echo -e "\n${GREEN}===${NC} Step $1: $2 ${GREEN}===${NC}"; }
 
+# Read a dotted key path from values-global.yaml with a default.
+# Single implementation for every values read in this script: consistent
+# missing-key and parse-failure handling (both return the default).
+read_global_key() { # $1 = dotted key (e.g. global.clusterVersion), $2 = default
+    local key="${1:?read_global_key: key required}" default="${2:-}"
+    local val
+    val=$(python3 -c "
+import sys, yaml
+try:
+    d = yaml.safe_load(open('${PATTERN_DIR}/values-global.yaml')) or {}
+except Exception:
+    print('${default}'); sys.exit(0)
+for part in '${key}'.split('.'):
+    if not isinstance(d, dict) or part not in d:
+        print('${default}'); sys.exit(0)
+    d = d[part]
+print('' if d is None else d)
+" 2>/dev/null) || val="$default"
+    echo "$val"
+}
+
 # ─── Mode dispatch ───────────────────────────────────────────────
 MODE="full"
 case "${1:-}" in
@@ -371,12 +392,7 @@ repoint_default_catalog_subscriptions() {
     # Derive the oc-mirror catalog suffix from global.clusterVersion
     # (4.22 → v4-22), matching the operator index tags in the imageset.
     local cluster_version catalog_suffix
-    cluster_version=$(python3 -c "
-import yaml
-with open('${PATTERN_DIR}/values-global.yaml') as f:
-    d = yaml.safe_load(f)
-print(d.get('global', {}).get('clusterVersion', ''))
-" 2>/dev/null || true)
+    cluster_version=$(read_global_key global.clusterVersion '')
     if [[ -n "${cluster_version}" ]]; then
         catalog_suffix="v${cluster_version//./-}"
         info "Catalog suffix -${catalog_suffix} (from global.clusterVersion ${cluster_version})"
@@ -429,10 +445,25 @@ for s in d.get('items', []):
 
         while IFS=' ' read -r ns name; do
             [[ -z "${ns:-}" ]] && continue
-            # Skip ArgoCD-owned subscriptions: declarative via the overlay,
-            # and self-heal reverts out-of-band patches on them.
-            if oc get subscription.operators.coreos.com "$name" -n "$ns" \
-                    -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null | grep -q .; then
+            # ArgoCD-owned: clustergroup 0.9.58 defaults resourceTrackingMethod
+            # to annotation, so managed objects carry the tracking-id
+            # annotation; older label tracking sets the instance label.
+            # Check both — a miss patches an ArgoCD-managed subscription out
+            # of band and self-heal reverts it on the next sync.
+            local argocd_owned=""
+            argocd_owned=$(oc get subscription.operators.coreos.com "$name" -n "$ns" -o json 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+m = d.get('metadata') or {}
+labels = m.get('labels') or {}
+annots = m.get('annotations') or {}
+print('yes' if ('argocd.argoproj.io/instance' in labels
+               or 'argocd.argoproj.io/tracking-id' in annots) else '')
+" 2>/dev/null) || argocd_owned=""
+            if [[ -n "$argocd_owned" ]]; then
                 info "  skipping $ns/$name (ArgoCD-owned — declarative via the airgap overlay)"
                 skipped=$((skipped + 1))
                 continue
@@ -450,7 +481,9 @@ for s in d.get('items', []):
     info "Repointed: $repointed, skipped (ArgoCD-owned): $skipped, missing catalogs: $missing_catalog"
 
     # Final check — anything still on a disabled default catalog will never
-    # resolve. Fail loudly instead of leaving it for a stuck operator.
+    # resolve. Hard-fail in --repoint-subs mode (a deliberate re-check);
+    # warn during bootstrap, where entries the loop skipped on purpose and
+    # day-0 subscriptions unrelated to the pattern must not abort the run.
     local stragglers
     stragglers=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
         python3 -c "
@@ -466,8 +499,13 @@ for s in d.get('items', []):
             [[ -z "$s" ]] && continue
             error "  $s"
         done <<< "$stragglers"
-        error "ArgoCD-owned entries are declarative (airgap overlay); others need the repoint fixed."
-        exit 1
+        if [[ "$MODE" == "repoint" ]]; then
+            error "ArgoCD-owned entries are declarative (airgap overlay); others need the repoint fixed."
+            exit 1
+        fi
+        warn "Left on default catalogs during bootstrap (see above) — the pattern"
+        warn "deploy may repoint or replace them; re-run 'make airgap-repoint-subs'"
+        warn "after the pattern deploys to verify."
     fi
     info "No subscriptions remain on disabled default catalogs"
 }
@@ -518,12 +556,7 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     # non-placeholder value and match $MIRROR_REGISTRY (org path included).
     local mirror yaml_mirror
     mirror="${MIRROR_REGISTRY%%/}"
-    yaml_mirror=$(python3 -c "
-import yaml
-with open('${PATTERN_DIR}/values-global.yaml') as f:
-    d = yaml.safe_load(f)
-print(d.get('global', {}).get('mirrorRegistry', '') or '')
-" 2>/dev/null) || yaml_mirror=""
+    yaml_mirror=$(read_global_key global.mirrorRegistry '')
     if [[ -z "$yaml_mirror" || "$yaml_mirror" == *"MIRROR_REGISTRY_HOST"* ]]; then
         error "global.mirrorRegistry is empty or a placeholder in values-global.yaml."
         error "Set it to the mirror root INCLUDING the org path (e.g. quay.example:443/mirror)"
@@ -537,6 +570,57 @@ print(d.get('global', {}).get('mirrorRegistry', '') or '')
         exit 1
     fi
     info "global.mirrorRegistry matches MIRROR_REGISTRY ($mirror)"
+
+    # Disconnected deploy-branch values: the connected defaults are
+    # unreachable in airgap — quay.io for the Helm charts (the repo-server
+    # performs no IDMS redirect) and the default operator catalogs
+    # (disabled in step 2; step 3d runs before those subscriptions exist).
+    # Fail fast here rather than as a stuck operator after the Pattern CR.
+    local airgap_flag helm_repo operator_source patterns_source
+    airgap_flag=$(read_global_key global.airgap false)
+    if [[ "${airgap_flag,,}" != "true" ]]; then
+        return
+    fi
+
+    local mirror_root="${MIRROR_REGISTRY%%/}"
+    helm_repo=$(read_global_key main.multiSourceConfig.helmRepoUrl '')
+    if [[ -z "$helm_repo" ]]; then
+        error "main.multiSourceConfig.helmRepoUrl is empty while global.airgap is true."
+        error "Set it to the mirror's chart path (e.g. ${mirror_root}/validatedpatterns)"
+        error "on the disconnected deploy branch — the ArgoCD repo-server cannot"
+        error "reach quay.io and performs no IDMS redirect."
+        exit 1
+    fi
+    if [[ "$helm_repo" == "quay.io/validatedpatterns" ]]; then
+        error "main.multiSourceConfig.helmRepoUrl is still the connected default"
+        error "(quay.io/validatedpatterns) while global.airgap is true — every"
+        error "chart-type application would fail at the chart-fetch stage."
+        exit 1
+    fi
+    if [[ "$helm_repo" != "${mirror_root}"/* ]]; then
+        error "main.multiSourceConfig.helmRepoUrl ('$helm_repo') is not under"
+        error "MIRROR_REGISTRY ('$mirror_root') — charts would be fetched from a"
+        error "different registry than the one the cluster mirrors."
+        exit 1
+    fi
+
+    operator_source=$(read_global_key main.gitops.operatorSource '')
+    if [[ -z "$operator_source" ]]; then
+        error "main.gitops.operatorSource is empty while global.airgap is true —"
+        error "the GitOps operator subscription would target redhat-operators,"
+        error "a catalog disabled in airgap. Set it to the mirrored catalog"
+        error "(e.g. cs-redhat-operator-index-v4-22)."
+        exit 1
+    fi
+    patterns_source=$(read_global_key main.patternsOperator.source '')
+    if [[ -z "$patterns_source" ]]; then
+        error "main.patternsOperator.source is empty while global.airgap is true —"
+        error "the patterns-operator subscription would target community-operators,"
+        error "a catalog disabled in airgap. Set it to the mirrored catalog"
+        error "(e.g. cs-community-operator-index-v4-22)."
+        exit 1
+    fi
+    info "Airgap values consistent: helmRepoUrl and operator sources point at the mirror"
 }
 
 # ─── Step 5: Mirror OCI Helm charts and utility images ───────────
@@ -897,31 +981,35 @@ create_operator_config() {
 
     # Read gitops channel from values-global.yaml
     local gitops_channel
-    gitops_channel=$(python3 -c "
-import yaml
-with open('${PATTERN_DIR}/values-global.yaml') as f:
-    d = yaml.safe_load(f)
-    print(d.get('main',{}).get('gitops',{}).get('channel','gitops-1.22'))
-" 2>/dev/null || echo "gitops-1.22")
+    gitops_channel=$(read_global_key main.gitops.channel gitops-1.22)
 
     local gitops_source
     # operatorSource may be empty in connected mode — fall back to a
     # clusterVersion-derived mirrored catalog name (same convention as the
     # overlay and step 3d), never a hardcoded minor.
     local cluster_version default_source
-    cluster_version=$(python3 -c "
-import yaml
-with open('${PATTERN_DIR}/values-global.yaml') as f:
-    d = yaml.safe_load(f)
-    print(d.get('global', {}).get('clusterVersion', ''))
-" 2>/dev/null || true)
-    default_source="cs-redhat-operator-index-v${cluster_version//./-}"
-    gitops_source=$(python3 -c "
-import yaml
-with open('${PATTERN_DIR}/values-global.yaml') as f:
-    d = yaml.safe_load(f)
-    print(d.get('main',{}).get('gitops',{}).get('operatorSource','') or '${default_source}')
-" 2>/dev/null || echo "$default_source")
+    cluster_version=$(read_global_key global.clusterVersion '')
+    local catalog_suffix
+    if [[ -n "$cluster_version" ]]; then
+        catalog_suffix="v${cluster_version//./-}"
+    else
+        # Same fallback as step 3d: derive from the CatalogSources oc-mirror
+        # actually created, never a hardcoded minor.
+        catalog_suffix=$(oc get catalogsources -n openshift-marketplace \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
+            | grep -oE 'index-v[0-9]+-[0-9]+' | head -1 | sed 's/.*index-//' || true)
+    fi
+    if [[ -z "$catalog_suffix" ]]; then
+        error "Cannot derive the GitOps catalog source: global.clusterVersion is empty"
+        error "and no cs-*-index-v* CatalogSources exist in openshift-marketplace."
+        exit 1
+    fi
+    default_source="cs-redhat-operator-index-${catalog_suffix}"
+    # Absent key OR present-but-empty both fall back to the derived default
+    # (the old inline read used `... or default`, so an explicit empty string
+    # must not reach the ConfigMap either).
+    gitops_source=$(read_global_key main.gitops.operatorSource '')
+    gitops_source="${gitops_source:-$default_source}"
 
     info "GitOps channel: $gitops_channel (from values-global.yaml)"
     info "GitOps source: $gitops_source"
@@ -964,6 +1052,8 @@ deploy_pattern_cr() {
     step 11 "Deploy Pattern CR"
 
     # Read values from values-global.yaml
+    # Multi-key read in one pass is intentional (emits several assignments) —
+    # not converted to read_global_key.
     local cluster_group repo_url revision helm_repo_url chart_version
     eval "$(python3 -c "
 import yaml
