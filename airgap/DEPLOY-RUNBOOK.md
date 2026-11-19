@@ -297,11 +297,15 @@ oc get configmap trusted-ca-bundle -n vp-gitops \
 # Expected: true
 
 # The fetch-ca init container concatenated the injected bundle into the
-# ca-bundles emptyDir, mounted at /etc/pki/tls/certs in the repo-server:
+# ca-bundles emptyDir, mounted at /etc/pki/tls/certs in the repo-server.
+# Counting BEGIN lines only proves the bundle is non-empty — to prove the
+# MIRROR CA specifically is in it, grep for its subject:
+MIRROR_CA_SUBJECT=$(openssl x509 -in ~/.coco-pattern/registry-ca-cert.pem -noout -subject | sed 's/^subject=//')
+echo "Looking for: $MIRROR_CA_SUBJECT"
 oc exec -n vp-gitops deploy/vp-gitops-repo-server -- \
-  grep -c BEGIN /etc/pki/tls/certs/ca-bundle.crt
-# Expected: >= 2 (kube root CA + injected cluster trust bundle, which
-# includes the mirror CA)
+  grep -c "$MIRROR_CA_SUBJECT" /etc/pki/tls/certs/ca-bundle.crt
+# Expected: >= 1 (0 means the mirror CA never reached the trust bundle —
+# check the --additional-trust-bundle used at ISO build)
 ```
 
 Bootstrap secrets are loaded by the pattern deploy (C-2); `make

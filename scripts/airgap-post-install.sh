@@ -499,7 +499,7 @@ print('yes' if ('argocd.argoproj.io/instance' in labels
         done <<< "$subs"
     done <<< "$map"
 
-    info "Repointed: $repointed, skipped (ArgoCD-owned): $skipped, missing catalogs: $missing_catalog"
+    info "Repointed: $repointed, skipped (ArgoCD-owned or ownership unknown): $skipped, missing catalogs: $missing_catalog"
 
     # Final check — anything still on a disabled default catalog will never
     # resolve. Hard-fail in --repoint-subs mode (a deliberate re-check);
