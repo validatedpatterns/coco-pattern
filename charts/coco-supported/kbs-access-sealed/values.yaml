@@ -2,3 +2,12 @@
 # Override via values-global.yaml or values-baremetal.yaml
 
 image: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+
+global:
+  clusterPlatform: ""  # Cluster platform: "Azure", "AWS", etc. - determines runtime class
+  # Airgap mode comes from values-global.yaml (global.airgap); the default here
+  # is connected so standalone chart rendering uses upstream registries.
+  airgap: false
+  # Mirror root (org-prefixed for Quay targets) — required when airgap is true.
+  # The workload charts rewrite their images against it; see _helpers.tpl.
+  mirrorRegistry: ""

@@ -6,7 +6,11 @@
 #
 # Required env:
 #   KUBECONFIG          — path to cluster kubeconfig
-#   MIRROR_REGISTRY     — registry host:port (e.g. MIRROR_REGISTRY_HOST:8443)
+#   MIRROR_REGISTRY     — mirror root INCLUDING the org path for Quay targets
+#                         (e.g. quay.example:443/mirror). Direct references
+#                         (workload image rewrites, ITMS mirrors, chart pulls)
+#                         all carry the org path; a bare host:port gets 401/404
+#                         on Quay.
 #
 # Optional env:
 #   EXTRA_CA_CERT           — path to CA cert file for the mirror registry
@@ -46,6 +50,7 @@ case "${1:-}" in
     --sync-repos-only)    MODE="sync"; shift ;;
     --deploy-pattern)     MODE="deploy"; shift ;;
     --fix-manifest-lists) MODE="fix-manifests"; shift ;;
+    --repoint-subs)       MODE="repoint"; shift ;;
 esac
 
 # ─── Step 1: Validate prerequisites ─────────────────────────────
@@ -71,7 +76,8 @@ validate_prereqs() {
     fi
 
     if [[ -z "$MIRROR_REGISTRY" ]]; then
-        error "MIRROR_REGISTRY is not set (e.g. MIRROR_REGISTRY_HOST:8443)"
+        error "MIRROR_REGISTRY is not set (mirror root INCLUDING the org path,"
+        error "e.g. quay.example:443/mirror — a bare host:port gets 401/404 on Quay)"
         exit 1
     fi
 
@@ -345,6 +351,193 @@ PYEOF
 # in Step 3b (itms-*.yaml) and from airgap/itms-manual-mirrors.yaml.
 # The old inline ITMS used registry_base with /mirror/ prefix which was
 # incorrect for single-registry (mirror-registry) architecture.
+
+# ─── Step 3d: Repoint default-catalog subscriptions to the mirror catalog ─
+# Safety net for subscriptions created at runtime by operators (e.g. MCH
+# creating the multicluster-engine subscription): they reference the DEFAULT
+# catalog sources, which are disabled in airgap, and never resolve.
+#
+# The pattern's own subscriptions are declarative — sourceless ones follow
+# global.catalogSource, the intel ones and the MCE source are set by
+# overrides/values-baremetal-airgap.yaml and the acm override in
+# values-baremetal.yaml — so ArgoCD-owned subscriptions are skipped here:
+# ArgoCD self-heal would revert an out-of-band patch on the next sync.
+#
+# Idempotent and safe to re-run at any time (e.g. after MCH deploys):
+#   make airgap-repoint-subs
+repoint_default_catalog_subscriptions() {
+    step "3d" "Repoint default-catalog subscriptions to mirrored catalogs"
+
+    # Derive the oc-mirror catalog suffix from global.clusterVersion
+    # (4.22 → v4-22), matching the operator index tags in the imageset.
+    local cluster_version catalog_suffix
+    cluster_version=$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+print(d.get('global', {}).get('clusterVersion', ''))
+" 2>/dev/null || true)
+    if [[ -n "${cluster_version}" ]]; then
+        catalog_suffix="v${cluster_version//./-}"
+        info "Catalog suffix -${catalog_suffix} (from global.clusterVersion ${cluster_version})"
+    else
+        # Fallback: derive from the CatalogSources oc-mirror actually created.
+        catalog_suffix=$(oc get catalogsources -n openshift-marketplace \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null \
+            | grep -oE 'index-v[0-9]+-[0-9]+' | head -1 | sed 's/.*index-//' || true)
+        if [[ -z "${catalog_suffix}" ]]; then
+            error "Cannot derive the catalog suffix: global.clusterVersion is empty"
+            error "and no cs-*-index-v* CatalogSources exist in openshift-marketplace."
+            exit 1
+        fi
+        warn "Catalog suffix -${catalog_suffix} derived from live CatalogSources (clusterVersion empty)"
+    fi
+
+    local map="
+redhat-operators:cs-redhat-operator-index-${catalog_suffix}
+certified-operators:cs-certified-operator-index-${catalog_suffix}
+community-operators:cs-community-operator-index-${catalog_suffix}
+"
+    local repointed=0 skipped=0 missing_catalog=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local def="${def:-}" mirror="${mirror:-}"
+        def="${line%%:*}"
+        mirror="${line##*:}"
+
+        # Only repoint towards a CatalogSource that actually exists —
+        # patching to a missing source leaves the subscription unresolvable
+        # and is worse than leaving it on the disabled default.
+        if ! oc get catalogsource "$mirror" -n openshift-marketplace >/dev/null 2>&1; then
+            error "  target CatalogSource $mirror not found — $def subscriptions left untouched"
+            missing_catalog=$((missing_catalog + 1))
+            continue
+        fi
+
+        # One "namespace name" pair per line — read line by line, NOT
+        # for-loop word splitting (which would feed each token to both
+        # ns and name and patch the wrong objects).
+        local subs
+        subs=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
+            python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for s in d.get('items', []):
+    if s['spec'].get('source') == '$def':
+        print(s['metadata']['namespace'] + ' ' + s['metadata']['name'])
+" 2>/dev/null) || subs=""
+
+        while IFS=' ' read -r ns name; do
+            [[ -z "${ns:-}" ]] && continue
+            # Skip ArgoCD-owned subscriptions: declarative via the overlay,
+            # and self-heal reverts out-of-band patches on them.
+            if oc get subscription.operators.coreos.com "$name" -n "$ns" \
+                    -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/instance}' 2>/dev/null | grep -q .; then
+                info "  skipping $ns/$name (ArgoCD-owned — declarative via the airgap overlay)"
+                skipped=$((skipped + 1))
+                continue
+            fi
+            info "  repointing $ns/$name: $def -> $mirror"
+            if oc patch subscriptions.operators.coreos.com "$name" -n "$ns" --type merge \
+                -p "{\"spec\":{\"source\":\"$mirror\",\"sourceNamespace\":\"openshift-marketplace\"}}"; then
+                repointed=$((repointed + 1))
+            else
+                error "  failed to repoint $ns/$name"
+            fi
+        done <<< "$subs"
+    done <<< "$map"
+
+    info "Repointed: $repointed, skipped (ArgoCD-owned): $skipped, missing catalogs: $missing_catalog"
+
+    # Final check — anything still on a disabled default catalog will never
+    # resolve. Fail loudly instead of leaving it for a stuck operator.
+    local stragglers
+    stragglers=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null |
+        python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for s in d.get('items', []):
+    if s['spec'].get('source') in ('redhat-operators', 'certified-operators', 'community-operators'):
+        print(s['metadata']['namespace'] + '/' + s['metadata']['name'] + ' -> ' + s['spec']['source'])
+" 2>/dev/null) || stragglers=""
+    if [[ -n "$stragglers" ]]; then
+        error "Subscriptions still on disabled default catalogs:"
+        while IFS= read -r s; do
+            [[ -z "$s" ]] && continue
+            error "  $s"
+        done <<< "$stragglers"
+        error "ArgoCD-owned entries are declarative (airgap overlay); others need the repoint fixed."
+        exit 1
+    fi
+    info "No subscriptions remain on disabled default catalogs"
+}
+
+# ─── Step 3e: Validate the airgap overlay's catalog references ───
+# The overlay names mirrored CatalogSources literally (they track the
+# imageset's operator index tags). Fail fast — before the pattern deploys —
+# if any of them is missing, and check the mirror registry consistency while
+# we are at it: a placeholder or mismatched global.mirrorRegistry would only
+# surface as ImagePullBackOff inside the CVMs much later.
+validate_airgap_overlay() {
+    step "3e" "Validate airgap overlay catalog references"
+
+    local overlay="${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
+    if [[ ! -f "$overlay" ]]; then
+        warn "No airgap overlay at $overlay — skipping validation"
+        return
+    fi
+
+    # Every cs-* catalog named in the overlay must exist and be READY.
+    local catalogs
+    catalogs=$(python3 -c "
+import re, sys
+text = open('${overlay}').read()
+for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
+    print(m)
+" 2>/dev/null) || catalogs=""
+    local missing=0
+    while IFS= read -r cs; do
+        [[ -z "$cs" ]] && continue
+        local state
+        state=$(oc get catalogsource "$cs" -n openshift-marketplace \
+            -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null) || state=""
+        if [[ "$state" == "READY" ]]; then
+            info "  $cs: READY"
+        else
+            error "  $cs: missing or not READY (state: '${state:-absent}')"
+            missing=$((missing + 1))
+        fi
+    done <<< "$catalogs"
+    if [[ $missing -gt 0 ]]; then
+        error "The airgap overlay references catalogs that are not READY on this cluster."
+        error "Check that global.clusterVersion matches the mirrored operator index tags."
+        exit 1
+    fi
+
+    # Mirror registry consistency: global.mirrorRegistry must be a real,
+    # non-placeholder value and match $MIRROR_REGISTRY (org path included).
+    local mirror yaml_mirror
+    mirror="${MIRROR_REGISTRY%%/}"
+    yaml_mirror=$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+print(d.get('global', {}).get('mirrorRegistry', '') or '')
+" 2>/dev/null) || yaml_mirror=""
+    if [[ -z "$yaml_mirror" || "$yaml_mirror" == *"MIRROR_REGISTRY_HOST"* ]]; then
+        error "global.mirrorRegistry is empty or a placeholder in values-global.yaml."
+        error "Set it to the mirror root INCLUDING the org path (e.g. quay.example:443/mirror)"
+        error "— the workload charts rewrite their images against it in airgap mode."
+        exit 1
+    fi
+    if [[ "$yaml_mirror" != "$mirror" ]]; then
+        error "global.mirrorRegistry ('$yaml_mirror') != MIRROR_REGISTRY ('$mirror')."
+        error "They must be the same value (org path included) or workloads will pull"
+        error "from a different registry than the one the cluster mirrors."
+        exit 1
+    fi
+    info "global.mirrorRegistry matches MIRROR_REGISTRY ($mirror)"
+}
 
 # ─── Step 5: Mirror OCI Helm charts and utility images ───────────
 mirror_oci_charts() {
@@ -712,12 +905,23 @@ with open('${PATTERN_DIR}/values-global.yaml') as f:
 " 2>/dev/null || echo "gitops-1.22")
 
     local gitops_source
+    # operatorSource may be empty in connected mode — fall back to a
+    # clusterVersion-derived mirrored catalog name (same convention as the
+    # overlay and step 3d), never a hardcoded minor.
+    local cluster_version default_source
+    cluster_version=$(python3 -c "
+import yaml
+with open('${PATTERN_DIR}/values-global.yaml') as f:
+    d = yaml.safe_load(f)
+    print(d.get('global', {}).get('clusterVersion', ''))
+" 2>/dev/null || true)
+    default_source="cs-redhat-operator-index-v${cluster_version//./-}"
     gitops_source=$(python3 -c "
 import yaml
 with open('${PATTERN_DIR}/values-global.yaml') as f:
     d = yaml.safe_load(f)
-    print(d.get('main',{}).get('gitops',{}).get('operatorSource','cs-redhat-operator-index-v4-21'))
-" 2>/dev/null || echo "cs-redhat-operator-index-v4-21")
+    print(d.get('main',{}).get('gitops',{}).get('operatorSource','') or '${default_source}')
+" 2>/dev/null || echo "$default_source")
 
     info "GitOps channel: $gitops_channel (from values-global.yaml)"
     info "GitOps source: $gitops_source"
@@ -732,8 +936,27 @@ data:
   gitops.channel: "${gitops_channel}"
   gitops.catalogSource: "${gitops_source}"
   gitops.sourceNamespace: "openshift-marketplace"
+  # App-of-apps sync-wave gating (Application health check) — see
+  # argoproj/argo-cd#3781; without it the root app applies all waves ungated.
+  # The connected path sets this declaratively via values-global.yaml
+  # (main.gitops.applicationHealthCheckEnabled) once pattern-install renders
+  # it (validatedpatterns/pattern-install-chart#52); this bootstrap writes it
+  # directly because the operator subscription predates any chart render.
+  gitops.applicationHealthCheckEnabled: "true"
 EOF
     info "patterns-operator-config ConfigMap created"
+
+    # Post-apply assertion: the operator only restores the Application health
+    # check when the key is present at its first reconcile — fail loudly here
+    # rather than let the root app apply all waves ungated.
+    local key
+    key=$(oc get configmap patterns-operator-config -n openshift-operators \
+        -o jsonpath='{.data.gitops\.applicationHealthCheckEnabled}' 2>/dev/null || true)
+    if [[ "$key" != "true" ]]; then
+        error "gitops.applicationHealthCheckEnabled is not \"true\" on patterns-operator-config"
+        exit 1
+    fi
+    info "Application health check key verified on patterns-operator-config"
 }
 
 # ─── Step 11: Deploy Pattern CR directly ─────────────────────────
@@ -847,6 +1070,13 @@ case "$MODE" in
         fix_manifest_lists
         exit 0
         ;;
+    repoint)
+        # Standalone safety net — safe to run any time after the bootstrap,
+        # e.g. once MCH has created its runtime subscriptions.
+        validate_prereqs
+        repoint_default_catalog_subscriptions
+        exit 0
+        ;;
 esac
 
 echo "╔══════════════════════════════════════════════════════════════╗"
@@ -859,6 +1089,8 @@ disable_default_catalogs
 create_catalog_sources
 apply_ocmirror_resources
 normalise_mirror_source_policy
+repoint_default_catalog_subscriptions
+validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
 add_argocd_ca
