@@ -40,6 +40,8 @@ clusterGroup:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
     nfd:
       name: nfd
       namespace: openshift-nfd
@@ -97,6 +99,8 @@ clusterGroup:
       project: external-secrets
       chart: openshift-external-secrets
       chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     sandbox:
       name: sandbox

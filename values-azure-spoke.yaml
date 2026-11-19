@@ -33,6 +33,8 @@ clusterGroup:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
 
   projects:
   - hub
