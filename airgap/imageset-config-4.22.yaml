@@ -116,13 +116,21 @@ mirror:
     # Vault — Red Hat certified UBI image from registry.connect.redhat.com
     # (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi by default)
     - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
-    # Kyverno (Helm chart, not OLM — images from ghcr.io)
+    # Kyverno (Helm chart, not OLM). The chart's defaultRegistry is
+    # reg.kyverno.io, but the image paths are identical under ghcr.io —
+    # mirror from ghcr.io and let the manual ITMS (itms-manual-mirrors.yaml)
+    # redirect reg.kyverno.io pulls to the mirror.
     - name: ghcr.io/kyverno/kyverno:v1.17.2
     - name: ghcr.io/kyverno/kyvernopre:v1.17.2
     - name: ghcr.io/kyverno/background-controller:v1.17.2
     - name: ghcr.io/kyverno/cleanup-controller:v1.17.2
     - name: ghcr.io/kyverno/reports-controller:v1.17.2
     - name: ghcr.io/kyverno/kyverno-cli:v1.17.2
+    # webhooksCleanup pre-delete hook (helm.sh/hook: pre-delete) — without it,
+    # deleting the kyverno app hangs on ImagePullBackOff in airgap.
+    - name: registry.k8s.io/kubectl:v1.34.3
+    # helm test hook image (kyverno/readiness-checker) — cheap insurance.
+    - name: ghcr.io/kyverno/readiness-checker:v0.1.0
 
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.58
@@ -133,9 +141,6 @@ mirror:
     - name: quay.io/validatedpatterns/trustee:0.10.2
     - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
     - name: quay.io/validatedpatterns/sandboxed-policies:0.2.0
-
-    # --- Kyverno Helm chart OCI artifact ---
-    - name: ghcr.io/kyverno/charts/kyverno:3.7.2
 
     # --- VP framework utility images ---
     - name: quay.io/validatedpatterns/utility-container:latest

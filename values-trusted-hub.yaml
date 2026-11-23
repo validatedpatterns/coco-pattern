@@ -17,6 +17,7 @@ clusterGroup:
   - cert-manager-operator
   - openshift-sandboxed-containers-operator
   - cert-manager
+  - kyverno
   subscriptions:
     # ACM is kept anticipating
     acm:
@@ -40,6 +41,8 @@ clusterGroup:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
       channel: stable-v1
+      annotations:
+        argocd.argoproj.io/sync-wave: "10"
 
   projects:
   - hub
@@ -143,8 +146,11 @@ clusterGroup:
       namespace: vault
       project: vault
       chart: hashicorp-vault
-      # Require 0.1.10 or newer within the 0.1.x release series.
-      chartVersion: "~0.1.10"
+      # Exact pin: chart 0.1.11 deploys vault:2.1.2-ubi — the version the
+      # imageset mirrors. A range (~0.1.10) would resolve to whatever is
+      # newest at deploy time and desync from the mirrored vault image
+      # (0.1.10 deploys 1.21.4-ubi).
+      chartVersion: 0.1.11
       annotations:
         argocd.argoproj.io/sync-wave: "0"
 
@@ -183,6 +189,34 @@ clusterGroup:
           value: "key1=value1,key2=value2"
         - name: global.coco.azure.rootVolumeSize
           value: "20"
+
+    kyverno:
+      name: kyverno
+      namespace: kyverno
+      project: hub
+      path: charts/vendor/kyverno
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 20
+        syncOptions:
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          jqPathExpressions:
+            - .metadata.labels
+            - .metadata.annotations
+      extraValueFiles:
+        - '/overrides/values-kyverno.yaml'
+      overrides:
+        - name: backgroundController.resources.limits.memory
+          value: "512Mi"
+        - name: backgroundController.resources.requests.memory
+          value: "256Mi"
 
 
 

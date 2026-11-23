@@ -6,12 +6,16 @@ OpenShift cluster using a **Quay registry** as the sole mirror target.
 For a **plain Docker registry** (registry:2) alternative, see
 [Appendix A](#appendix-a-plain-docker-registry-alternative).
 
+Static verification of the values chain in both connectivity modes (the
+connected default and the airgap overlay) is `make render-gate` — it runs
+in CI on every push and pull request.
+
 ## Architecture
 
 ```text
 ┌──────────────┐     ┌───────────────────┐     ┌─────────────────┐
 │  Upstream    │────▶│  Quay Mirror      │────▶│  OpenShift SNO  │
-│  Registries  │     │  (org: mirror)    │     │  (node-02)      │
+│  Registries  │     │  (org: mirror)    │     │  (SNO)          │
 │  (internet)  │     │                   │     │                 │
 └──────────────┘     └───────────────────┘     └─────────────────┘
                             │                        │
@@ -20,7 +24,7 @@ For a **plain Docker registry** (registry:2) alternative, see
                                 │  Server (:8080)│
                                 └────────────────┘
 
-```text
+```
 
 All image content is mirrored to a single Quay org. The cluster pulls
 exclusively from the mirror (default catalogs disabled, IDMS/ITMS
@@ -43,6 +47,15 @@ via a local Git HTTP server.
 
 ### Mirror Content
 
+Populate the mirror from a connected host (the imageset defaults to
+`airgap/imageset-config-4.22.yaml` — no `IMAGESET_CONFIG` override is
+needed for a 4.22 mirror):
+
+```bash
+make airgap-mirror MIRROR_REGISTRY=<mirror-root-including-org>
+# e.g. make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror
+```
+
 The Quay mirror must contain all images the pattern resolves. Verify with
 `skopeo list-tags` against each repo (the REST API is unreliable for org
 robots). Key content:
@@ -50,17 +63,35 @@ robots). Key content:
 - OCP release payload (exact installer version, e.g. 4.22.17)
 - Operator catalogs (redhat, certified, community — v4.22)
 - VP Helm charts (clustergroup, trustee, acm, etc.)
-- VP utility images (utility-container, imperative-container, pattern-install)
+- VP utility images (utility-container, imperative-container, pattern-install;
+  the bootstrap's mirroring step verifies pattern-install is present in the
+  mirror and fails fast if not)
 - Workload images (ubi9/httpd-24, ubi9/ubi)
 - Intel DCAP operator + QGS images
-- Kyverno images (mirrored from ghcr.io under the `kyverno/` path)
+- Kyverno images — `ghcr.io/kyverno/*` plus the hook images
+  `registry.k8s.io/kubectl` and `ghcr.io/kyverno/readiness-checker`
+  (the kyverno chart itself is vendored in-repo at `charts/vendor/kyverno`;
+  no kyverno OCI chart artifact is mirrored)
 - hashicorp/vault (the version the chart resolves, e.g. 2.1.2-ubi)
 
 ### Imageset Pin Check (K16)
 
-Pattern values use range pins (`~0.1.10`, `0.2.*`) resolved at deploy time.
-The imageset must mirror the **newest version within each range** — not the
-range floor. Run a range-check before every deploy:
+Pattern values pin the VP charts with a mix of ranges and exact pins:
+
+| Chart | Pin |
+|---|---|
+| clustergroup | `0.9.58` (exact) |
+| acm | `0.1.*` |
+| hashicorp-vault | `0.1.11` (exact) |
+| trustee | `0.10.*` |
+| sandboxed-containers | `0.2.*` |
+| sandboxed-policies | `0.2.*` |
+| openshift-external-secrets | `0.0.*` |
+
+The range pins resolve to the **newest version within each range** at
+deploy time — not the range floor — so the imageset must mirror that
+newest in-range tag (the exact pins are mirrored as-is). Run a range-check
+before every deploy:
 
 ```bash
 # For each chart pin in values-*.yaml, verify the newest in-range tag
@@ -74,7 +105,7 @@ skopeo list-tags docker://<mirror>/validatedpatterns/<chart> | \
 
 ```bash
 # Mirror registry credentials (robot account)
-export MIRROR_REGISTRY=<quay-host>:443/mirror    # INCLUDES the org path
+export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
 export MIRROR_USER=<robot-username>
 export MIRROR_PASS=<robot-token>
 
@@ -88,7 +119,7 @@ printf '%s' "<api-key>" > ~/.coco-pattern/intel-pcs-api-key
 # DCAP collateral (collected on a connected host, ~30 day freshness)
 # ~/.coco-pattern/dcap-offline/platform_collaterals.json
 
-```text
+```
 
 ### Values-Secret (Convention Location)
 
@@ -114,6 +145,36 @@ scripts/enable-airgap-secrets.sh
 
 ```
 
+### Disconnected value delta (deploy branch)
+
+The committed tree is a working **connected** install; every disconnected
+delta is a **config-only change on the deploy branch**. The disconnected
+deploy branch used in validation differs from the connected one by exactly
+these eight values:
+
+```yaml
+global:
+  airgap: true
+  mirrorRegistry: <mirror-root-including-org>          # e.g. quay.example.com:443/mirror
+main:
+  clusterGroupName: baremetal
+  git:
+    repoURL: http://<git-host>:8080/coco-pattern.git   # served by scripts/git-http-server.py
+    revision: <deploy-branch>
+  patternsOperator:
+    source: cs-community-operator-index-v4-22
+  gitops:
+    operatorSource: cs-redhat-operator-index-v4-22
+  multiSourceConfig:
+    helmRepoUrl: <mirror-root-including-org>/validatedpatterns
+```
+
+- `global.mirrorRegistry` must equal `$MIRROR_REGISTRY` (org path included).
+- Step 3e of `scripts/airgap-post-install.sh` fails fast — before the
+  Pattern CR is applied — if `main.multiSourceConfig.helmRepoUrl`,
+  `main.gitops.operatorSource` or `main.patternsOperator.source` is missing
+  or still the connected default while `global.airgap: true`.
+
 ### Git Server
 
 The pattern source is served via a local Git HTTP server:
@@ -122,7 +183,7 @@ The pattern source is served via a local Git HTTP server:
 # Bare repos under ~/public_html/git/
 # Smart HTTP on :8080 (started by airgap-post-install.sh step 9)
 
-```text
+```
 
 ---
 
@@ -150,7 +211,7 @@ labctl generate \
 openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
 
-```text
+```
 
 ### B-3: Verify
 
@@ -171,13 +232,13 @@ oc get nodes                # Ready
 ```bash
 cd ~/coco-pattern
 
-export MIRROR_REGISTRY=<quay-host>:443/mirror   # INCLUDES the org!
+export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
 export GIT_SERVER=http://<git-host>:8080
-export ENABLE_ROUTINGVIAHOST=true               # required for pod→lab egress
+export ENABLE_ROUTINGVIAHOST=true               # required for pod→off-cluster egress
 
 scripts/airgap-post-install.sh
 
-```text
+```
 
 This applies:
 
@@ -187,6 +248,11 @@ This applies:
 - Configures the Git HTTP server
 - Creates the patterns-operator-config ConfigMap
 - Enables OVN routingViaHost (verified after applying)
+
+Post-deploy safety net: `make airgap-repoint-subs` re-runs the
+default-catalog subscription repoint standalone — safe at any time (e.g.
+after MCH deploys its runtime subscriptions); ArgoCD-owned subscriptions
+are skipped via the tracking-id annotation.
 
 **Verify**: catalog pods Running, routingViaHost=true.
 
@@ -209,75 +275,87 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
-### C-3: ArgoCD CA + Bootstrap (parallel with C-2)
+### C-3: Verify the ArgoCD mirror-CA trust
 
-Run in parallel with the pattern deploy — must fire as soon as ArgoCD
-exists:
+The mirror CA reaches ArgoCD through the cluster trust bundle, not through
+any post-install step: the install-time `--additional-trust-bundle` (B-1)
+bakes the mirror CA into the cluster-wide trust bundle, and the
+clustergroup chart renders a `trusted-ca-bundle` ConfigMap in `vp-gitops`
+labelled `config.openshift.io/inject-trusted-cabundle: 'true'`, which
+OpenShift populates from that cluster trust bundle. The repo-server's
+`fetch-ca` init container concatenates it (with the kube root CA) into the
+CA bundle the repo-server uses. No out-of-band CA patch is needed or
+useful — the previous `argocd-tls-certs-cm` patch was a silent no-op (it
+always ran before the `vp-gitops` namespace existed), and the validated
+disconnected runs succeeded without it.
+
+Verify once the pattern is deployed and `vp-gitops` exists:
 
 ```bash
-# Wait for vp-gitops namespace
-until oc get ns vp-gitops &>/dev/null; do sleep 10; done
+oc get configmap trusted-ca-bundle -n vp-gitops \
+  -o jsonpath='{.metadata.labels.config\.openshift\.io/inject-trusted-cabundle}'
+# Expected: true
 
-# Inject the mirror CA into ArgoCD's TLS trust
-oc patch configmap argocd-tls-certs-cm -n vp-gitops \
-  --type merge -p "{\"data\":{\"<mirror-host>\":\"$(cat ~/.coco-pattern/registry-ca-cert.pem)\"}}"
+# The fetch-ca init container concatenated the injected bundle into the
+# ca-bundles emptyDir, mounted at /etc/pki/tls/certs in the repo-server.
+# Counting BEGIN lines only proves the bundle is non-empty — to prove the
+# MIRROR CA specifically is in it, grep for its subject:
+MIRROR_CA_SUBJECT=$(openssl x509 -in ~/.coco-pattern/registry-ca-cert.pem -noout -subject | sed 's/^subject=//')
+echo "Looking for: $MIRROR_CA_SUBJECT"
+oc exec -n vp-gitops deploy/vp-gitops-repo-server -- \
+  grep -c "$MIRROR_CA_SUBJECT" /etc/pki/tls/certs/ca-bundle.crt
+# Expected: >= 1 (0 means the mirror CA never reached the trust bundle —
+# check the --additional-trust-bundle used at ISO build)
+```
 
-# Roll the deployments to pick up the CA
-oc get deployments -n vp-gitops --no-headers -o name | \
-  while read dep; do oc rollout restart "$dep" -n vp-gitops; done
-oc rollout status deployment/vp-gitops-repo-server -n vp-gitops
-
-# Load bootstrap secrets (if not already done by pattern.sh)
-make load-bootstrap
-
-# Verify: the secret exists, is labeled, and has the correct URL
-oc get secret mirror-registry-helm-oci -n vp-gitops \
-  -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/secret-type}'
-# Expected: repository
-
-```text
+Bootstrap secrets are loaded by the pattern deploy (C-2); `make
+load-bootstrap` is the standalone fallback.
 
 ### C-4: Known Timing Issues
 
-Three issues occur consistently in disconnected deployments. Each has a
-one-line fix:
+Issues seen in disconnected deployments, and their current status:
 
-#### MCE Subscription (30-60 min after C-1)
+#### MCE Subscription — FIXED (declarative)
 
-The MCH operator creates the `multicluster-engine` subscription with
-`source: redhat-operators` (the default catalog, disabled in airgap).
-The MCH then blocks in `Installing`.
+The MCH operator creates the `multicluster-engine` subscription at
+runtime; it used to be born on `redhat-operators` (the default catalog,
+disabled in airgap) and block in `Installing`. The `acm.mce_operator.source`
+override now renders the MCH's `mce-subscription-spec` annotation, so the
+subscription is **born on the mirrored catalog** — no patching needed.
+
+`make airgap-repoint-subs` remains the safety net for any other
+runtime-created subscription that references a default catalog:
 
 ```bash
-oc patch subscriptions.operators.coreos.com multicluster-engine \
-  -n multicluster-engine --type merge \
-  -p '{"spec":{"source":"<mirrored-catalog-name>","sourceNamespace":"openshift-marketplace"}}'
-
+make airgap-repoint-subs
 ```
 
-#### ITMS Org-Prefix (kyverno pods ImagePullBackOff)
+#### ITMS Org-Prefix — FIXED (at apply time)
 
 The manual ITMS mirrors must include the org prefix for Quay targets.
+`airgap/itms-manual-mirrors.yaml` uses the `__MIRROR_REGISTRY__` token,
+substituted from `$MIRROR_REGISTRY` (org path included) when bootstrap
+step 3b applies it — the mirrors always match the registry actually in
+use. Verify:
 
 ```bash
-# Verify: all mirrors should include /<org>/
+# All mirrors should include /<org>/ (when the mirror uses an org)
 oc get itms itms-manual-mirrors -o json | \
   python3 -c "import json,sys; [print(m['source'],'->',m['mirrors']) for m in json.load(sys.stdin)['spec']['imageTagMirrors']]"
+```
 
-```text
+#### Initdata Staleness (CVM workloads in CreateContainerError) — REMAINS
 
-If any mirror is missing the org, patch the ITMS and delete the affected pods.
-
-#### Initdata Staleness (CVM workloads in CreateContainerError)
-
-The `cc_init_data` annotation is immutable at pod creation. Workload pods
-created before the KBS is ready will retry indefinitely with stale initdata.
+The `cc_init_data` annotation is immutable at pod creation. Pods wedged
+only because the trust chain was not provisioned yet (KBS not running,
+reference values not loaded) **self-heal**: the kubelet keeps retrying
+and the pod starts once attestation succeeds. Only stale initdata
+*content* requires pod recreation:
 
 ```bash
 # Prerequisite: KBS Running and attestation returning 200
 oc delete pod -n hello-openshift --all
 oc delete pod -n kbs-access --all
-
 ```
 
 ---
@@ -290,7 +368,7 @@ oc delete pod -n kbs-access --all
 # Waits for vault-0, then loads all secrets from the values-secret file
 ./pattern.sh make load-secrets
 
-```text
+```
 
 ### D-2: PCK Provisioning (parallel with D-1)
 
@@ -310,7 +388,7 @@ oc delete pod -n intel-dcap-operator-system -l app=intel-tdx-dcap-qgs
 make collect-firmware-refvals
 ./pattern.sh make load-secrets   # reload with fresh values
 
-```text
+```
 
 ---
 
@@ -335,8 +413,9 @@ oc get pods -n hello-openshift -o jsonpath='{.items[0].spec.containers[0].image}
 
 ## Appendix A: Plain Docker Registry Alternative
 
-A plain Docker registry (registry:2) can be used instead of Quay. The key
-differences:
+A plain Docker registry (registry:2) can be used instead of Quay. Include
+the org path in `$MIRROR_REGISTRY` if your registry uses one (Quay: yes; a
+plain registry:2: no). The key differences:
 
 | Aspect | Quay | Docker registry |
 |---|---|---|
@@ -350,7 +429,10 @@ differences:
 
 ```bash
 # One-time: generate CA, htpasswd, config, and start the container
-# (see the Phase 0 section of the historical runbook for the full script)
+# (podman run registry:2). Credential helpers in the Makefile:
+#   make cache-registry-ca       # copy the registry CA into ~/.coco-pattern/
+#   make gen-mirror-helm-secret  # save the registry password (for the
+#                                # ArgoCD OCI chart-pull secret)
 
 # The MIRROR_REGISTRY does NOT include an org prefix:
 export MIRROR_REGISTRY=<host>:8443
@@ -361,7 +443,7 @@ export MIRROR_REGISTRY=<host>:8443
 #   PATTERN_DISCONNECTED_HOME: <host>:8443/validatedpatterns
 #   ITMS mirrors: <host>:8443/<path> (no org)
 
-```text
+```
 
 The Docker registry stores all manifest types (including OCI image indexes
 and hybrid manifests that Quay may reject). However, it lacks Quay's

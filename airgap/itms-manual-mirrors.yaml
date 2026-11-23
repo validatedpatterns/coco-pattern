@@ -1,6 +1,9 @@
 # Org-prefixed mirror targets: MIRROR_REGISTRY must include the org path
-# (e.g. quay.example:443/mirror) — the same value scripts/airgap-post-install.sh
-# requires — or every tag-based operand pull 404s.
+# (e.g. quay.example.com:443/mirror) — the same value scripts/airgap-post-install.sh
+# requires — or every tag-based operand pull 404s. The __MIRROR_REGISTRY__ token
+# below is substituted at apply time by scripts/airgap-post-install.sh step 3b from
+# $MIRROR_REGISTRY (org path included, e.g. quay.example.com:443/mirror);
+# a bare host:port gets 401/404 on Quay.
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
@@ -11,13 +14,15 @@ spec:
     # Needed for tag-based pulls of certified operator operand images.
     - source: registry.connect.redhat.com/intel
       mirrors:
-        - MIRROR_REGISTRY_HOST:8443/intel
+        - __MIRROR_REGISTRY__/intel
     - source: registry.connect.redhat.com/hashicorp
       mirrors:
-        - MIRROR_REGISTRY_HOST:8443/hashicorp
+        - __MIRROR_REGISTRY__/hashicorp
     # NOTE: quay.io/community-operator-pipeline-prod removed — oc-mirror 4.22
     # generates ITMS for it in itms-oc-mirror.yaml automatically.
-    # Kyverno chart images: the chart pulls from reg.kyverno.io, not ghcr.io.
+    # Kyverno chart images: the chart's defaultRegistry is reg.kyverno.io, but
+    # the image paths are identical under ghcr.io — the imageset mirrors from
+    # ghcr.io and this rule redirects reg.kyverno.io pulls to the mirror.
     - source: reg.kyverno.io
       mirrors:
-        - MIRROR_REGISTRY_HOST:8443
+        - __MIRROR_REGISTRY__

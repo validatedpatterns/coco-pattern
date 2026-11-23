@@ -136,7 +136,7 @@ check_del2_bootstrap_secret() {
 
 # DEL-2: Chart pull — ArgoCD pulls from authenticated mirror-registry OCI
 check_del2_chart_pull() {
-  local MIRROR="${MIRROR_REGISTRY:-MIRROR_REGISTRY_HOST:8443}"
+  local MIRROR="${MIRROR_REGISTRY:-quay.example.com:443/mirror}"
   if ${DRY_RUN}; then
     info "check_del2_chart_pull [DRY]"
     echo "  Command: argocd repo get ${MIRROR}/validatedpatterns"

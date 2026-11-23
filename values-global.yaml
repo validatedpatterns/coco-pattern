@@ -5,7 +5,7 @@ global:
   singleArgoCD: true
   multiSourceRepoUrl: quay.io/validatedpatterns
   storageProvider: lvm  # Options: hpp, lvm, external
-  clusterVersion: "4.22"  # OCP minor version for operator pins. Options: 4.19, 4.20, 4.21
+  clusterVersion: "4.22"  # OCP minor version for operator pins. 4.22 is the tested version; the 4.19-4.21 overlays exist but are not covered by this branch's validation.
   # Airgap / disconnected master switch. false (default, connected):
   # Intel DCAP zero-touch platform registration (vault/ESO PCS API key),
   # trustee fetches platform collateral directly from Intel PCS.
@@ -65,11 +65,17 @@ main:
     # repoURL: http://JUMP_HOST_IP:8080/coco-pattern.git
     revision: main
   patternsOperator:
-    # Required for airgap -- set to your mirrored catalog source name
+    # Required for airgap -- set to your mirrored catalog source name.
+    # Set on the disconnected deploy branch (see airgap/DEPLOY-RUNBOOK.md);
+    # scripts/airgap-post-install.sh step 3e validates both this and
+    # main.gitops.operatorSource in airgap mode.
     # source: cs-community-operator-index-v4-22
     channel: fast
   gitops:
-    # Required for airgap -- set to your mirrored catalog source name
+    # Required for airgap -- set to your mirrored catalog source name.
+    # Set on the disconnected deploy branch (see airgap/DEPLOY-RUNBOOK.md);
+    # scripts/airgap-post-install.sh step 3e validates both this and
+    # main.patternsOperator.source in airgap mode.
     # operatorSource: cs-redhat-operator-index-v4-22
     # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
     channel: gitops-1.22
@@ -85,9 +91,11 @@ main:
   multiSourceConfig:
     enabled: true
     clusterGroupChartVersion: 0.9.58
-    # VP OCI Helm charts are mirrored to mirror-registry by oc-mirror additionalImages.
-    # Use mirror-registry directly — no Quay dependency for airgap deploys.
-    # REQUIRED in airgap: no IDMS redirect in the ArgoCD repo-server.
+    # VP OCI Helm charts, connected default. REQUIRED to change in airgap:
+    # the ArgoCD repo-server performs no IDMS redirect, so this must point
+    # at the mirror's chart path (e.g. quay.example.com:443/mirror/validatedpatterns)
+    # on the disconnected deploy branch — scripts/airgap-post-install.sh step 3e
+    # fails fast when it is still this value with global.airgap: true.
     helmRepoUrl: quay.io/validatedpatterns
 
 # Common secret store configuration used across multiple charts.
