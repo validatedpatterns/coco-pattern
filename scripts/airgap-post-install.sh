@@ -457,7 +457,7 @@ for s in d.get('items', []):
 
         while IFS=' ' read -r ns name; do
             [[ -z "${ns:-}" ]] && continue
-            # ArgoCD-owned: clustergroup 0.9.58 defaults resourceTrackingMethod
+            # ArgoCD-owned: clustergroup 0.9.60 defaults resourceTrackingMethod
             # to annotation, so managed objects carry the tracking-id
             # annotation; older label tracking sets the instance label.
             # Check both — a miss patches an ArgoCD-managed subscription out
