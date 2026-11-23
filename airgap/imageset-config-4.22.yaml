@@ -133,7 +133,7 @@ mirror:
     - name: ghcr.io/kyverno/readiness-checker:v0.1.0
 
     # --- VP Helm OCI charts ---
-    - name: quay.io/validatedpatterns/clustergroup:0.9.58
+    - name: quay.io/validatedpatterns/clustergroup:0.9.60
     - name: quay.io/validatedpatterns/acm:0.1.27
     # values pin 0.1.11 exactly (chart 0.1.11 deploys vault:2.1.2-ubi)
     - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11

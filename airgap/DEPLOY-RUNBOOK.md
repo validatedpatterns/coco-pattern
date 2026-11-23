@@ -80,7 +80,7 @@ Pattern values pin the VP charts with a mix of ranges and exact pins:
 
 | Chart | Pin |
 |---|---|
-| clustergroup | `0.9.58` (exact) |
+| clustergroup | `0.9.60` (exact) |
 | acm | `0.1.*` |
 | hashicorp-vault | `0.1.11` (exact) |
 | trustee | `0.10.*` |

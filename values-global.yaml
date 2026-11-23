@@ -90,7 +90,7 @@ main:
     applicationHealthCheckEnabled: "true"
   multiSourceConfig:
     enabled: true
-    clusterGroupChartVersion: 0.9.58
+    clusterGroupChartVersion: 0.9.60
     # VP OCI Helm charts, connected default. REQUIRED to change in airgap:
     # the ArgoCD repo-server performs no IDMS redirect, so this must point
     # at the mirror's chart path (e.g. quay.example.com:443/mirror/validatedpatterns)

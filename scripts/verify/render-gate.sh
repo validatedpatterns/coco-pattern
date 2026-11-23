@@ -18,7 +18,8 @@
 #     - the trustee collateral override renders the Intel PCS URL
 #   sync-wave layout (all six cluster groups, connected mode)
 #     - every gating-relevant object renders at its expected wave
-#       (RBAC bridge -1, vault/secrets/kyverno 0, operator subscriptions 10,
+#       (chart cluster-admin CRB -1 on non-spokes, vault/secrets/kyverno 0,
+#       operator subscriptions 10,
 #       acm 15, trustee/policies 20, workloads 30, vault-wait Job 5; spokes/hubs
 #       assert the objects they must NOT have as ABSENT)
 #   workload charts (each, standalone)
@@ -54,7 +55,7 @@ PATTERN_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-CLUSTERGROUP_VERSION="0.9.58"
+CLUSTERGROUP_VERSION="0.9.60"
 GROUP="baremetal"
 PLATFORM="None"                 # SNO: no values-<platform> file is present
 MIRROR_ROOT="${1:-quay.example:443/mirror}"
@@ -84,6 +85,7 @@ render_root() { # $1 = airgap|connected (baremetal chain)
         -f "${PATTERN_DIR}/overrides/values-${GROUP}-${mode}.yaml" \
         --set global.repoURL=https://example.com/coco-pattern.git \
         --set global.targetRevision=render-gate \
+        --set global.vpArgoNamespace=vp-gitops \
         --set global.airgap="$([ "$mode" = airgap ] && echo true || echo false)" \
         --set-string "global.mirrorRegistry=$([ "$mode" = airgap ] && echo "$MIRROR_ROOT" || echo '')" \
         2>/dev/null
@@ -117,6 +119,7 @@ render_group() { # $1 = cluster group; prints the connected-mode render
         "${args[@]}" \
         --set global.repoURL=https://example.com/coco-pattern.git \
         --set global.targetRevision=render-gate \
+        --set global.vpArgoNamespace=vp-gitops \
         --set global.airgap=false \
         --set-string "global.mirrorRegistry=" \
         2>/dev/null
@@ -242,7 +245,10 @@ done <<'EOF'
 # baremetal (single-cluster hub): full stack
 # NOTE: the eso/lvms/cnv subscriptions render WITHOUT a sync-wave annotation
 # ("-") — that is the current, live-validated state, pinned as-is.
-baremetal|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+# The cluster-admin CRB is the chart-rendered vp-gitops-cluster-admin-rolebinding
+# (global.options.clusterRoleBindingSyncWave): -1 on non-spokes, unannotated on
+# spokes (ACM pre-creates it there; upstream reverted -1 for spokes, 61a99b4).
+baremetal|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 baremetal|Job|wait-for-vault-unsealed|5
 baremetal|Application|acm|15
 baremetal|Application|vault|0
@@ -269,7 +275,7 @@ baremetal|Application|hello-openshift|30
 baremetal|Application|kbs-access-curl|30
 baremetal|Application|kbs-access-sealed|30
 # baremetal-hub: same layout as baremetal (manages baremetal spokes)
-baremetal-hub|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+baremetal-hub|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 baremetal-hub|Job|wait-for-vault-unsealed|5
 baremetal-hub|Application|acm|15
 baremetal-hub|Application|vault|0
@@ -295,8 +301,9 @@ baremetal-hub|Application|intel-dcap|20
 baremetal-hub|Application|hello-openshift|30
 baremetal-hub|Application|kbs-access-curl|30
 baremetal-hub|Application|kbs-access-sealed|30
-# baremetal-spoke: workloads only — no acm/vault/trustee stack, no wait Job
-baremetal-spoke|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+# baremetal-spoke: workloads only — no acm/vault/trustee stack, no wait Job;
+# the chart CRB renders WITHOUT a wave (ACM pre-creates it on managed spokes)
+baremetal-spoke|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-
 baremetal-spoke|Job|wait-for-vault-unsealed|ABSENT
 baremetal-spoke|Application|acm|ABSENT
 baremetal-spoke|Application|vault|ABSENT
@@ -317,7 +324,7 @@ baremetal-spoke|Application|hello-openshift|30
 baremetal-spoke|Application|kbs-access-curl|30
 baremetal-spoke|Application|kbs-access-sealed|30
 # azure (single-cluster): full stack
-azure|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+azure|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 azure|Job|wait-for-vault-unsealed|5
 azure|Application|acm|15
 azure|Application|vault|0
@@ -336,8 +343,9 @@ azure|Application|hello-openshift|30
 azure|Application|kbs-access-curl|30
 azure|Application|kbs-access-sealed|30
 # azure-spoke: workloads only — no acm/vault/trustee stack, no policies and
-# no kyverno engine either (unlike baremetal-spoke, which carries kyverno)
-azure-spoke|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+# no kyverno engine either (unlike baremetal-spoke, which carries kyverno);
+# the chart CRB renders WITHOUT a wave (ACM pre-creates it on managed spokes)
+azure-spoke|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-
 azure-spoke|Job|wait-for-vault-unsealed|ABSENT
 azure-spoke|Application|acm|ABSENT
 azure-spoke|Application|vault|ABSENT
@@ -356,7 +364,7 @@ azure-spoke|Application|hello-openshift|30
 azure-spoke|Application|kbs-access-curl|30
 azure-spoke|Application|kbs-access-sealed|30
 # trusted-hub: hub stack (trustee/acm/vault/kyverno), no workloads, no sandbox sub
-trusted-hub|ClusterRoleBinding|coco-pattern-argocd-cluster-admin-bootstrap|-1
+trusted-hub|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 trusted-hub|Job|wait-for-vault-unsealed|5
 trusted-hub|Application|acm|15
 trusted-hub|Application|vault|0
@@ -374,16 +382,16 @@ trusted-hub|Application|kbs-access-curl|ABSENT
 trusted-hub|Application|kbs-access-sealed|ABSENT
 EOF
 
-# ── RBAC bootstrap bridge (patterns-operator#887) ───────────────────
-echo "── RBAC bridge"
+# ── Cluster-admin CRB (chart knob, patterns-operator#887) ────────────
+echo "── cluster-admin CRB"
 for mode in airgap connected; do
     out="$(render_root "$mode")" || { fail "$mode root render errored"; continue; }
-    # All documents mentioning the bridge name (the CRB itself, plus the
+    # All documents mentioning the CRB name (the CRB itself, plus the
     # helm-values ConfigMap which embeds the values indented). The real CRB is
     # distinguished by an UNINDENTED "kind: ClusterRoleBinding" line.
-    block="$(awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/' <<< "$out")"
+    block="$(awk -v RS='---' '/vp-gitops-cluster-admin-rolebinding/' <<< "$out")"
     if [[ -z "$block" ]]; then
-        fail "$mode: RBAC bridge CRB missing from root render"
+        fail "$mode: chart cluster-admin CRB missing from root render"
         continue
     fi
     ok=1
@@ -392,9 +400,16 @@ for mode in airgap connected; do
     grep -q "vp-gitops-argocd-application-controller" <<< "$block" || ok=0
     grep -q 'sync-wave: "-1"' <<< "$block" || ok=0
     if [[ $ok -eq 1 ]]; then
-        pass "$mode: RBAC bridge CRB at wave -1 for the controller SA"
+        pass "$mode: chart cluster-admin CRB at wave -1 for the controller SA"
     else
-        fail "$mode: RBAC bridge CRB malformed (kind/role/subject/wave)"
+        fail "$mode: chart cluster-admin CRB malformed (kind/role/subject/wave)"
+    fi
+    # No duplicate: the pre-0.9.59 hand-rolled bridge must not render anywhere.
+    dup="$(awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/' <<< "$out")"
+    if [[ -n "$dup" ]]; then
+        fail "$mode: hand-rolled bootstrap CRB still rendered (duplicate)"
+    else
+        pass "$mode: no hand-rolled bootstrap CRB duplicate"
     fi
 done
 
