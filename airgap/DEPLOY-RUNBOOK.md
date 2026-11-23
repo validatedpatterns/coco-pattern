@@ -57,7 +57,7 @@ make airgap-mirror MIRROR_REGISTRY=<mirror-root-including-org>
 ```
 
 The Quay mirror must contain all images the pattern resolves. Verify with
-`skopeo list-tags` against each repo (the REST API is unreliable for org
+`skopeo list-tags` against each repository (the REST API is unreliable for org
 robots). Key content:
 
 - OCP release payload (exact installer version, e.g. 4.22.17)
@@ -125,7 +125,7 @@ printf '%s' "<api-key>" > ~/.coco-pattern/intel-pcs-api-key
 
 The values-secret file **must** be at `~/values-secret-<pattern>.yaml`.
 The Ansible secret loader (`find_vp_secrets`) searches home-directory
-conventions and falls back to the repo template — it never reads a
+conventions and falls back to the repository template — it never reads a
 repo-local generated file.
 
 ```bash
@@ -445,6 +445,6 @@ export MIRROR_REGISTRY=<host>:8443
 
 ```
 
-The Docker registry stores all manifest types (including OCI image indexes
+The Docker registry stores all manifest types (including OCI image indices
 and hybrid manifests that Quay may reject). However, it lacks Quay's
 org-based isolation, robot accounts, and API — use Quay where available.

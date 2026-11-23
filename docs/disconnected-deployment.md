@@ -12,7 +12,7 @@ deploy-branch value change), and the bootstrap-time validation in
 The content here had drifted from the repository:
 
 - 4.21-era catalog names (`cs-*-index-v4-21`) that no longer match the
-  mirrored 4.22 operator indexes
+  mirrored 4.22 operator indices
 - references to `airgap/imageset-config.yaml`, a path that does not exist
   (the imageset is `airgap/imageset-config-4.22.yaml`)
 - make targets that did not exist at the time of writing
