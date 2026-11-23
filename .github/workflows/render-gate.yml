@@ -3,6 +3,9 @@ name: Render gate
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   render_gate:
     name: Values-chain render gate (connected + airgap)
