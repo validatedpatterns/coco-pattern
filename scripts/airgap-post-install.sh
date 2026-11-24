@@ -3,26 +3,27 @@
 # Run after oc-mirror completes and before deploying the pattern.
 #
 # Idempotent — safe to re-run. Each step checks current state before acting.
-#
+
 # Required env:
-#   KUBECONFIG          — path to cluster kubeconfig
-#   MIRROR_REGISTRY     — mirror root INCLUDING the org path for Quay targets
-#                         (e.g. quay.example:443/mirror). Direct references
-#                         (workload image rewrites, ITMS mirrors, chart pulls)
-#                         all carry the org path; a bare host:port gets 401/404
-#                         on Quay.
-#
+#   KUBECONFIG      — path to cluster kubeconfig
+
+#   MIRROR_REGISTRY — mirror root INCLUDING the org path for Quay targets
+#                     (e.g. quay.example:443/mirror). Direct references
+#                     (workload image rewrites, ITMS mirrors, chart pulls)
+#                     all carry the org path; a bare host:port gets 401/404
+#                     on Quay.
+
 # Optional env:
 #   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
 #   ENABLE_ROUTINGVIAHOST   — set to "true" to enable OVN routingViaHost (test-lab only)
-#
-# Modes:
-#   (no args)             — run all steps
+
+# Modes (default: no args — run all steps):
 #   --sync-repos-only     — only sync working copies to bare HTTP repos
 #   --deploy-pattern      — deploy the Pattern CR directly (skip pattern.sh)
 #   --fix-manifest-lists  — fix oc-mirror manifest list failures with skopeo
+#   --repoint-subs        — re-run only the step 3d subscription repoint
 
 set -euo pipefail
 
@@ -380,18 +381,10 @@ PYEOF
 # incorrect for single-registry (mirror-registry) architecture.
 
 # ─── Step 3d: Repoint default-catalog subscriptions to the mirror catalog ─
-# Safety net for subscriptions created at runtime by operators (e.g. MCH
-# creating the multicluster-engine subscription): they reference the DEFAULT
-# catalog sources, which are disabled in airgap, and never resolve.
-#
-# The pattern's own subscriptions are declarative — sourceless ones follow
-# global.catalogSource, the intel ones and the MCE source are set by
-# overrides/values-baremetal-airgap.yaml and the acm override in
-# values-baremetal.yaml — so ArgoCD-owned subscriptions are skipped here:
-# ArgoCD self-heal would revert an out-of-band patch on the next sync.
-#
-# Idempotent and safe to re-run at any time (e.g. after MCH deploys):
-#   make airgap-repoint-subs
+# Safety net for runtime-created subscriptions (e.g. MCH's multicluster-engine)
+# referencing the disabled default catalogs. ArgoCD-owned subscriptions are
+# skipped (self-heal would revert an out-of-band patch; they are declarative
+# via the airgap overlay / values-baremetal.yaml). Idempotent: make airgap-repoint-subs
 repoint_default_catalog_subscriptions() {
     step "3d" "Repoint default-catalog subscriptions to mirrored catalogs"
 
@@ -457,15 +450,11 @@ for s in d.get('items', []):
 
         while IFS=' ' read -r ns name; do
             [[ -z "${ns:-}" ]] && continue
-            # ArgoCD-owned: clustergroup 0.9.60 defaults resourceTrackingMethod
-            # to annotation, so managed objects carry the tracking-id
-            # annotation; older label tracking sets the instance label.
-            # Check both — a miss patches an ArgoCD-managed subscription out
-            # of band and self-heal reverts it on the next sync.
-            # Fail CLOSED: if ownership cannot be determined (oc query
-            # failed, invalid JSON), the subscription is skipped — an
-            # out-of-band patch ArgoCD would revert is worse than leaving
-            # it on the disabled default for a later re-run.
+            # ArgoCD-owned: check both the tracking-id annotation (0.9.60
+            # default) and the instance label (older label tracking) — a miss
+            # patches an ArgoCD-managed subscription out of band and self-heal
+            # reverts it. Fail CLOSED on unknown ownership (query/JSON error):
+            # skipping is safer than a patch that would be reverted.
             local argocd_owned=""
             argocd_owned=$(oc get subscription.operators.coreos.com "$name" -n "$ns" -o json 2>/dev/null | python3 -c "
 import json, sys
@@ -502,11 +491,10 @@ print('yes' if ('argocd.argoproj.io/instance' in labels
     info "Repointed: $repointed, skipped (ArgoCD-owned or ownership unknown): $skipped, missing catalogs: $missing_catalog"
 
     # Final check — anything still on a disabled default catalog will never
-    # resolve. Hard-fail in --repoint-subs mode (a deliberate re-check);
-    # warn during bootstrap, where entries the loop skipped on purpose and
-    # day-0 subscriptions unrelated to the pattern must not abort the run.
-    # A failed query is not a pass: hard-fail in --repoint-subs mode, and in
-    # bootstrap mode do NOT print the success line on a query failure.
+    # resolve. Hard-fail in --repoint-subs mode (deliberate re-check); warn
+    # during bootstrap, where entries skipped on purpose and day-0
+    # subscriptions must not abort the run. A failed query is not a pass:
+    # hard-fail in repoint mode, and no success line in bootstrap mode.
     local stragglers_json
     if ! stragglers_json=$(oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null); then
         error "cannot list subscriptions for the final check (oc query failed)"
@@ -543,10 +531,9 @@ for s in d.get('items', []):
 }
 
 # ─── Step 3e: Validate the airgap overlay's catalog references ───
-# The overlay names mirrored CatalogSources literally (they track the
-# imageset's operator index tags). Fail fast — before the pattern deploys —
-# if any of them is missing, and check the mirror registry consistency while
-# we are at it: a placeholder or mismatched global.mirrorRegistry would only
+# The overlay names mirrored CatalogSources literally; fail fast (before
+# the pattern deploys) if any is missing, and check mirror consistency —
+# a placeholder or mismatched global.mirrorRegistry would otherwise only
 # surface as ImagePullBackOff inside the CVMs much later.
 validate_airgap_overlay() {
     step "3e" "Validate airgap overlay catalog references"
@@ -734,11 +721,10 @@ mirror_oci_charts() {
             warn "  Failed to mirror $img"
     done
 
-    # pattern-install chart (all tags if skopeo available) — HARD DEPENDENCY:
-    # `pattern.sh make install` resolves oci://…/validatedpatterns/pattern-install
-    # from the mirror with no version pin (highest semver tag), so an empty or
-    # incomplete mirror fails the deploy at chart-fetch with nothing pointing
-    # back at the cause. Mirror loudly, then verify the outcome.
+    # pattern-install chart — HARD DEPENDENCY: `pattern.sh make install`
+    # resolves it from the mirror with no version pin (highest semver tag),
+    # so an empty or incomplete mirror fails the deploy at chart-fetch with
+    # nothing pointing back at the cause. Mirror loudly, then verify.
     local pi_dest="${MIRROR_REGISTRY}/validatedpatterns/pattern-install"
     if command -v skopeo >/dev/null 2>&1; then
         info "Mirroring pattern-install chart..."
@@ -1016,10 +1002,9 @@ data:
   gitops.sourceNamespace: "openshift-marketplace"
   # App-of-apps sync-wave gating (Application health check) — see
   # argoproj/argo-cd#3781; without it the root app applies all waves ungated.
-  # The connected path sets this declaratively via values-global.yaml
-  # (main.gitops.applicationHealthCheckEnabled) once pattern-install renders
-  # it (validatedpatterns/pattern-install-chart#53); this bootstrap writes it
-  # directly because the operator subscription predates any chart render.
+  # The connected path sets it declaratively (values-global.yaml) once
+  # pattern-install renders it (pattern-install-chart#53); this bootstrap
+  # writes it directly — the operator subscription predates chart renders.
   gitops.applicationHealthCheckEnabled: "true"
 EOF
     info "patterns-operator-config ConfigMap created"
@@ -1169,18 +1154,11 @@ repoint_default_catalog_subscriptions
 validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
-# Step 7 removed — the previous argocd-tls-certs-cm patch was a silent no-op
-# in every flow that called it (both ran before the vp-gitops namespace
-# existed); it is not replaced here. NOTE: the mirror CA only reaches the
-# repo-server after the cluster is told to trust it — install-time
-# --additional-trust-bundle lands in openshift-config/user-ca-bundle, but
-# proxy/cluster.spec.trustedCA stays empty until it is patched to
-# user-ca-bundle, and only then does the clustergroup chart's
-# trusted-ca-bundle ConfigMap (config.openshift.io/inject-trusted-cabundle)
-# receive it. See airgap/DEPLOY-RUNBOOK.md C-3; the patch is still a manual
-# step here (tracked upstream). Step 7b (Helm OCI auth) was never called:
-# the mirror's chart repos are public (ANONYMOUS_ACCESS), and mounting the
-# pull-secret as HELM_REGISTRY_CONFIG caused 401s.
+# Step 7 (argocd-tls-certs-cm) removed — it was a silent no-op (ran before
+# the vp-gitops namespace existed); do not re-add. The mirror CA reaches the
+# repo-server only after the proxy/cluster trustedCA patch — still manual,
+# see DEPLOY-RUNBOOK.md C-3 (#171). Step 7b never ran: mirror chart repos
+# are public (ANONYMOUS_ACCESS); a pull-secret HELM_REGISTRY_CONFIG 401'd.
 enable_routing_via_host
 setup_git_server
 create_operator_config

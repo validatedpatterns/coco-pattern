@@ -7,18 +7,16 @@ global:
   storageProvider: lvm  # Options: hpp, lvm, external
   clusterVersion: "4.22"  # OCP minor version for operator pins. 4.22 is the tested version; the 4.19-4.21 overlays exist but are not covered by this branch's validation.
   # Airgap / disconnected master switch. false (default, connected):
-  # Intel DCAP zero-touch platform registration (vault/ESO PCS API key),
-  # trustee fetches platform collateral directly from Intel PCS.
-  # true (disconnected): loads the airgap overlay (repoints subscriptions
-  # and workload images at the mirror); manual PCK provisioning
-  # (scripts/dcap-pck.py) and file-backed collateral.
+  # Intel DCAP zero-touch registration; trustee collateral from Intel PCS.
+  # true: loads the airgap overlay (repoints subscriptions and workload
+  # images at the mirror); manual PCK provisioning (scripts/dcap-pck.py)
+  # and file-backed collateral.
   airgap: false
   # Mirror root for the workload image rewrite — set on the disconnected
-  # deploy branch (config-only delta), the same value oc-mirror was pointed
-  # at. MUST include the org path for Quay targets (e.g.
-  # quay.example:443/mirror): the CoCo guest VMs pull images directly and
-  # every reference carries it. Empty is fine while connected; the workload
-  # charts fail rendering if this is empty (or a placeholder) in airgap mode.
+  # deploy branch to the value oc-mirror was pointed at. MUST include the
+  # org path for Quay targets (e.g. quay.example:443/mirror): CoCo guest
+  # VMs pull images directly. Empty is fine while connected; the workload
+  # charts fail rendering in airgap mode while it is empty or a placeholder.
   mirrorRegistry: ""
   secretStore:
     # Warning: This must be present even if it is set to none.
@@ -65,28 +63,21 @@ main:
     # repoURL: http://JUMP_HOST_IP:8080/coco-pattern.git
     revision: main
   patternsOperator:
-    # Required for airgap -- set to your mirrored catalog source name.
-    # Set on the disconnected deploy branch (see airgap/DEPLOY-RUNBOOK.md);
-    # scripts/airgap-post-install.sh step 3e validates both this and
-    # main.gitops.operatorSource in airgap mode.
+    # Required for airgap -- set to your mirrored catalog source name on the
+    # disconnected deploy branch (runbook; validated by step 3e).
     # source: cs-community-operator-index-v4-22
     channel: fast
   gitops:
-    # Required for airgap -- set to your mirrored catalog source name.
-    # Set on the disconnected deploy branch (see airgap/DEPLOY-RUNBOOK.md);
-    # scripts/airgap-post-install.sh step 3e validates both this and
-    # main.patternsOperator.source in airgap mode.
+    # Required for airgap -- set to your mirrored catalog source name on the
+    # disconnected deploy branch (runbook; validated by step 3e).
     # operatorSource: cs-redhat-operator-index-v4-22
+
     # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
     channel: gitops-1.22
     # App-of-apps sync-wave gating. ArgoCD 1.8 dropped the Application
-    # health check (argoproj/argo-cd#3781); the patterns-operator can restore
-    # it but defaults it OFF. Without it the root Application treats child
-    # Applications as healthy and applies ALL waves at once, so wave ordering
-    # (e.g. workloads after trustee) is not enforced. Rendered into the
-    # patterns-operator-config ConfigMap by pattern-install >= 0.0.19
-    # (validatedpatterns/pattern-install-chart#53); the disconnected bootstrap
-    # writes it directly (scripts/airgap-post-install.sh step 10).
+    # health check (argoproj/argo-cd#3781); the operator defaults it off,
+    # so ALL waves apply at once. Rendered by pattern-install >= 0.0.19
+    # (#53); the bootstrap writes it directly (step 10).
     applicationHealthCheckEnabled: "true"
   multiSourceConfig:
     enabled: true
@@ -94,8 +85,7 @@ main:
     # VP OCI Helm charts, connected default. REQUIRED to change in airgap:
     # the ArgoCD repo-server performs no IDMS redirect, so this must point
     # at the mirror's chart path (e.g. quay.example.com:443/mirror/validatedpatterns)
-    # on the disconnected deploy branch — scripts/airgap-post-install.sh step 3e
-    # fails fast when it is still this value with global.airgap: true.
+    # on the disconnected deploy branch — step 3e fails fast otherwise.
     helmRepoUrl: quay.io/validatedpatterns
 
 # Common secret store configuration used across multiple charts.

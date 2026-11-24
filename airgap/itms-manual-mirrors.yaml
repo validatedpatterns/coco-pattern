@@ -1,9 +1,8 @@
 # Org-prefixed mirror targets: MIRROR_REGISTRY must include the org path
 # (e.g. quay.example.com:443/mirror) — the same value scripts/airgap-post-install.sh
-# requires — or every tag-based operand pull 404s. The __MIRROR_REGISTRY__ token
-# below is substituted at apply time by scripts/airgap-post-install.sh step 3b from
-# $MIRROR_REGISTRY (org path included, e.g. quay.example.com:443/mirror);
-# a bare host:port gets 401/404 on Quay.
+# requires — or every tag-based operand pull 401/404s on Quay. The
+# __MIRROR_REGISTRY__ token below is substituted at apply time by
+# airgap-post-install.sh step 3b from $MIRROR_REGISTRY.
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:

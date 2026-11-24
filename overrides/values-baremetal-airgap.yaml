@@ -1,25 +1,22 @@
 # Airgap / disconnected overlay — loaded ONLY when global.airgap is true
-# (see the sharedValueFiles entry in values-baremetal.yaml).
-# The connected default (global.airgap: false) loads the inert
+# (see the sharedValueFiles entry in values-baremetal.yaml). The connected
+# default (global.airgap: false) loads the inert
 # values-baremetal-connected.yaml instead.
-#
+
 # SCOPE — this overlay reaches the ROOT clustergroup render: the
 # patterns-operator resolves clusterGroup.sharedValueFiles itself when it
 # builds the root Application (internal/controller/argo.go,
-# commonApplicationSourceHelm → getSharedValueFiles), in addition to the
-# chart forwarding them to child Applications. So the clusterGroup
+# commonApplicationSourceHelm → getSharedValueFiles), so the clusterGroup
 # subscriptions and the app overrides below are all in scope.
-#
-# It does NOT reach the bootstrap operators: the openshift-gitops-operator
-# and patterns-operator subscriptions are created by the patterns-operator
-# BEFORE ArgoCD renders with this overlay. For airgap, their sources must
-# be set directly in values-global.yaml:
+
+# It does NOT reach the bootstrap operators (created before ArgoCD
+# renders): for airgap set their sources directly in values-global.yaml —
 #   main.gitops.operatorSource: cs-redhat-operator-index-v4-22
 #   main.patternsOperator.source: cs-community-operator-index-v4-22
-#
+
 # LIST WARNING: Helm replaces lists when merging — an `overrides:` list here
 # would drop any entry added to the same app in values-baremetal.yaml. This
-# overlay therefore sets ONLY scalars (map values). Mode-dependent list
+# overlay therefore sets ONLY scalars (map values); mode-dependent list
 # entries (e.g. acm.mce_operator.source) are tpl-conditionals in the base
 # file instead.
 global:
