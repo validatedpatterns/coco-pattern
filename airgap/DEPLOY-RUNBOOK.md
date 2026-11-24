@@ -275,10 +275,10 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
-#### C-2a: Make sure the Pattern CR points at the airgap git server
+#### C-2a: Make sure the Pattern CR points at the airgap Git server
 
 `pattern.sh` derives the Pattern CR's `spec.gitSpec.targetRepo` from the
-working copy's git remote. On a deploy host whose clone still has the
+working copy's Git remote. On a deploy host whose clone still has the
 upstream GitHub remote, the rendered CR points at `https://github.com/…`,
 which the disconnected cluster can never clone:
 
@@ -289,7 +289,7 @@ status.errorMessage: … cloning pattern repo … no route to host
 Two ways to get a reachable value:
 
 - **Preferred, untested in the qualification**: run the deploy from a clone
-  whose git remote *is* the HTTP git server (the same URL used in
+  whose Git remote *is* the HTTP Git server (the same URL used in
   `main.git.repoURL`), so the first render is already correct. This follows
   from how `pattern.sh` derives the value, but it was **not** exercised —
   the qualification used the fallback below. The end-to-end fix that
