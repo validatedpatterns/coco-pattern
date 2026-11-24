@@ -5,7 +5,7 @@ global:
   singleArgoCD: true
   multiSourceRepoUrl: quay.io/validatedpatterns
   storageProvider: lvm  # Options: hpp, lvm, external
-  clusterVersion: "4.22"  # OCP minor version for operator pins. 4.22 is the tested version; the 4.19-4.21 overlays exist but are not covered by this branch's validation.
+  clusterVersion: "4.22"  # OCP minor version for operator pins. 4.22 is the default; 5.0 is also supported (overrides/values-5.0.yaml). The 4.19-4.21 overlays exist but are not covered by this branch's validation.
   # Airgap / disconnected master switch. false (default, connected):
   # Intel DCAP zero-touch registration; trustee collateral from Intel PCS.
   # true: loads the airgap overlay (repoints subscriptions and workload

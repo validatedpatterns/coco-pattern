@@ -3,7 +3,9 @@
 # catalog sources, sync-wave layout, chart CRB, workload image rewrite
 # (see the section headers below). Usage: render-gate.sh [mirror-root];
 # needs helm+python3; pulls the clustergroup chart unless CLUSTERGROUP_CHART
-# is a local dir. Pipes: here-strings/fds — `echo|grep` SIGPIPEs (pipefail).
+# is a local dir. CLUSTER_VERSION (default 4.22) selects the
+# overrides/values-<ver> overlay. Pipes: here-strings/fds — `echo|grep`
+# SIGPIPEs (pipefail).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +16,7 @@ trap 'rm -rf "$WORK"' EXIT
 CLUSTERGROUP_VERSION="0.9.60"
 GROUP="baremetal"
 PLATFORM="None"                 # SNO: no values-<platform> file is present
+CLUSTER_VERSION="${CLUSTER_VERSION:-4.22}"  # OCP minor: selects overrides/values-<ver>.yaml
 MIRROR_ROOT="${1:-quay.example:443/mirror}"
 FAILS=0
 
@@ -36,12 +39,13 @@ render_root() { # $1 = airgap|connected (baremetal chain)
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
-        -f "${PATTERN_DIR}/overrides/values-4.22.yaml" \
+        -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml" \
         -f "${PATTERN_DIR}/overrides/values-${GROUP}-${mode}.yaml" \
         --set global.repoURL=https://example.com/coco-pattern.git \
         --set global.targetRevision=render-gate \
         --set global.vpArgoNamespace=vp-gitops \
+        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
         --set global.airgap="$([ "$mode" = airgap ] && echo true || echo false)" \
         --set-string "global.mirrorRegistry=$([ "$mode" = airgap ] && echo "$MIRROR_ROOT" || echo '')" \
         2>/dev/null
@@ -56,15 +60,15 @@ render_group() { # $1 = cluster group; prints the connected-mode render
         baremetal|baremetal-hub|baremetal-spoke)
             args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
                   -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml"
-                  -f "${PATTERN_DIR}/overrides/values-4.22.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml"
                   -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml"
                   -f "${PATTERN_DIR}/overrides/values-baremetal-connected.yaml") ;;
         azure|azure-spoke)
             args=(-f "${PATTERN_DIR}/overrides/values-Azure.yaml"
-                  -f "${PATTERN_DIR}/overrides/values-4.22.yaml") ;;
+                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
         trusted-hub)
             args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
-                  -f "${PATTERN_DIR}/overrides/values-4.22.yaml") ;;
+                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
         *)
             echo "render_group: unknown cluster group '$group'" >&2
             return 1 ;;
@@ -76,6 +80,7 @@ render_group() { # $1 = cluster group; prints the connected-mode render
         --set global.repoURL=https://example.com/coco-pattern.git \
         --set global.targetRevision=render-gate \
         --set global.vpArgoNamespace=vp-gitops \
+        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
         --set global.airgap=false \
         --set-string "global.mirrorRegistry=" \
         2>/dev/null

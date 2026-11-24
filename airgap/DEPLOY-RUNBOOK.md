@@ -49,7 +49,8 @@ via a local Git HTTP server.
 
 Populate the mirror from a connected host (the imageset defaults to
 `airgap/imageset-config-4.22.yaml` — no `IMAGESET_CONFIG` override is
-needed for a 4.22 mirror):
+needed for a 4.22 mirror; a 5.0 mirror uses
+`IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml`):
 
 ```bash
 make airgap-mirror MIRROR_REGISTRY=<mirror-root-including-org>
@@ -73,6 +74,13 @@ robots). Key content:
   (the kyverno chart itself is vendored in-repo at `charts/vendor/kyverno`;
   no kyverno OCI chart artifact is mirrored)
 - hashicorp/vault (the version the chart resolves, e.g. 2.1.2-ubi)
+
+**Intel DCAP channel migration:** the pattern pins the `stable` channel
+(`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode — same bundle
+in the 4.22 and 5.0 catalogs; the old `alpha` channel was removed from the
+5.0 catalog). Intel does not support in-place upgrade from v0.1.0 to
+v0.27.0: on an existing 4.22 install, delete the old subscription,
+OperatorGroup, CSV and CRs before redeploying.
 
 ### Imageset Pin Check (K16)
 

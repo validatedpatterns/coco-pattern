@@ -32,7 +32,9 @@ clusterGroup:
   - intel-dcap
   - intel-dcap-operator-system:
       operatorGroup: true
-      targetNamespaces: []
+      # v0.27.0 supports OwnNamespace only
+      targetNamespaces:
+      - intel-dcap-operator-system
   - nvidia-gpu-operator
   - gpu-workload
   - kyverno
@@ -98,7 +100,8 @@ clusterGroup:
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
       # Airgap: repointed by overrides/values-baremetal-airgap.yaml
-      channel: alpha
+      # stable = v0.27.0, same bundle in the 4.22 and 5.0 catalogs
+      channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
     # GPU operator disabled — NVIDIA bundle image has oc-mirror signature issue.

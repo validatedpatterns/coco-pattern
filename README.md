@@ -32,6 +32,8 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 
 - **8.0** — OSC 1.13 / Trustee 1.2 upgrade. KBS TOML rewrite, RVPS format alignment, operator CSV pins, trustee-chart v0.10.0. Airgap deployment support: single mirror-registry architecture, `oc-mirror` v2, `airgap-post-install.sh` bootstrap, `DEPLOY-RUNBOOK.md` operational guide. Requires OCP 4.22+.
 
+OpenShift 5.0 is also supported: set `global.clusterVersion: "5.0"` (the airgap imageset for 5.0 is `airgap/imageset-config-5.0.yaml`). Note the Intel DCAP subscription now pins the `stable` channel (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode); Intel does not support in-place upgrade from the old `alpha` v0.1.0 — uninstall the old operator before redeploying.
+
 **Key changes from v5:**
 
 - **Operator upgrade:** OSC 1.12 → 1.13, Trustee 1.1 → 1.2. Breaking API changes in KBS configuration and RVPS reference value format.
