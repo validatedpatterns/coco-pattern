@@ -258,6 +258,10 @@ are skipped via the tracking-id annotation.
 
 ### C-2: Deploy the Pattern
 
+> **Read C-2a first.** The Pattern CR must point at the airgap Git server
+> before this command runs; getting it wrong is silent (the install exits 0
+> while the CR keeps an unreachable URL).
+
 ```bash
 export PATTERN_DISCONNECTED_HOME=<quay-host>:443/<org>/validatedpatterns
 
@@ -275,51 +279,67 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
-#### C-2a: Make sure the Pattern CR points at the airgap Git server
+#### C-2a: Point the Pattern CR at the airgap Git server (`TARGET_ORIGIN`)
 
-`pattern.sh` derives the Pattern CR's `spec.gitSpec.targetRepo` from the
-working copy's Git remote. On a deploy host whose clone still has the
-upstream GitHub remote, the rendered CR points at `https://github.com/…`,
-which the disconnected cluster can never clone:
+`pattern.sh` renders the Pattern CR's `spec.gitSpec.targetRepo` from the Git
+remote the deploy clone tracks. A clone that tracks the upstream GitHub
+remote therefore produces a CR the disconnected cluster can never clone:
 
 ```text
 status.errorMessage: … cloning pattern repo … no route to host
 ```
 
-Two ways to get a reachable value:
-
-- **Preferred, untested in the qualification**: run the deploy from a clone
-  whose Git remote *is* the HTTP Git server (the same URL used in
-  `main.git.repoURL`), so the first render is already correct. This follows
-  from how `pattern.sh` derives the value, but it was **not** exercised —
-  the qualification used the fallback below. The end-to-end fix that
-  removes the trap entirely is tracked upstream (see the PR's follow-up
-  issue).
-- **Validated fallback**: patch the CR after the first (failed) install,
-  then re-run the install:
+**Do this before the first `make install`.** Export `TARGET_ORIGIN` with the
+name of the remote that resolves to the HTTP Git server — the same URL used
+in `main.git.repoURL` — so the CR is born correct:
 
 ```bash
-GIT_HTTP_URL=http://<git-host>:8080/coco-pattern.git
+# Remote names vary per clone: `origin` is the HTTP server on the lab deploy
+# host, while `github` tracks upstream. Pick the one whose URL is the HTTP
+# Git server, then export its NAME (not its URL).
+git remote -v
+
+export TARGET_ORIGIN=origin            # the remote that IS the HTTP Git server
+export TARGET_BRANCH=<deploy-branch>
+export PATTERN_DISCONNECTED_HOME=<quay-host>:443/<org>/validatedpatterns
+./pattern.sh make install
+```
+
+Patching the CR after the fact is **not** a durable fix. Verified on a live
+airgap cluster: a later plain `./pattern.sh make install` (no
+`TARGET_ORIGIN`) re-rendered
+`--set main.git.repoURL="https://github.com/…"`, overwrote the patched
+`targetRepo`, and **still exited 0** — its health check only reads ArgoCD
+applications, so the run reports success while silently breaking the CR for
+the next reconcile.
+
+If a CR already exists with the wrong URL, repair it and then re-run *with*
+`TARGET_ORIGIN` exported, so the value survives:
+
+```bash
+GIT_HTTP_URL=http://<git-host>:8080/coco-pattern.git   # the HTTP Git server
 PATTERN_NS=$(oc get pattern -A -o jsonpath='{.items[0].metadata.namespace}')
 PATTERN_NAME=$(oc get pattern -A -o jsonpath='{.items[0].metadata.name}')
 oc patch pattern "$PATTERN_NAME" -n "$PATTERN_NS" --type merge \
   -p "{\"spec\":{\"gitSpec\":{\"targetRepo\":\"$GIT_HTTP_URL\"}}}"
+
+export TARGET_ORIGIN=<remote-name-for-that-URL>
 ./pattern.sh make install
 ```
 
-Note: `make airgap-deploy-pattern` is **not** a substitute here. It skips
-`pattern.sh`'s remote derivation, but on a cluster that already has a
-Pattern CR it is refused by the `only one Pattern resource is allowed`
-admission webhook, and it targets a different namespace than `pattern.sh`
-installs into — so after a C-2 install the patch above is the working
-path.
+`make airgap-deploy-pattern` is **not** a substitute: it skips the remote
+derivation, but on a cluster that already has a Pattern CR it is refused by
+the `only one Pattern resource is allowed` admission webhook, and it targets
+a different namespace than `pattern.sh` installs into. Making the two flows
+compose is tracked upstream (see the PR's follow-up issue).
 
-**Verify**:
+**Verify** (run this after *every* re-run, not just the first):
 
 ```bash
 oc get pattern "$PATTERN_NAME" -n "$PATTERN_NS" \
   -o jsonpath='{.spec.gitSpec.targetRepo}{"\n"}'
-# Expected: the HTTP git server URL, not github.com
+# Expected: the HTTP Git server URL — a github.com URL here means the next
+# reconcile will fail, even if `make install` just reported success
 ```
 
 ### C-3: Point the cluster proxy at the mirror CA, then verify it
@@ -393,6 +413,9 @@ syncs. After applying both C-3 steps, re-run the install and confirm the
 root application recovers:
 
 ```bash
+# TARGET_ORIGIN must stay exported — a plain re-run re-renders the CR's
+# targetRepo from the tracked remote (see C-2a)
+export TARGET_ORIGIN=<remote-name-for-the-HTTP-Git-URL>
 ./pattern.sh make install     # expect exit 0 and "All assertions passed"
 
 oc get application coco-pattern-baremetal -n vp-gitops \
