@@ -288,7 +288,7 @@ the `trusted-ca-bundle` the clustergroup chart renders in `vp-gitops` —
 gets populated with the default system bundle only. Without this step the
 repo-server's first chart fetch fails:
 
-```
+```text
 helm registry login quay.example.com:443 … x509: certificate signed by unknown authority
 ```
 
