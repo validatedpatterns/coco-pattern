@@ -170,6 +170,39 @@ main:
 ```
 
 - `global.mirrorRegistry` must equal `$MIRROR_REGISTRY` (org path included).
+
+#### Workload image rewrite (`<chart>.image` helpers)
+
+CoCo guest VMs pull their images directly — there is no IDMS/ITMS inside the
+CVM, so a `registry.redhat.io/ubi9/...` reference cannot be redirected at
+pull time. In airgap mode the workload charts (hello-openshift,
+kbs-access-curl, kbs-access-sealed) rewrite each image against
+`global.mirrorRegistry` in their `<chart>.image` helper, using the oc-mirror
+source-path convention — the registry hostname is stripped and the mirror
+root prefixed:
+
+```text
+registry.redhat.io/ubi9/httpd-24@sha256:...
+  → quay.example.com:443/mirror/ubi9/httpd-24@sha256:...
+```
+
+The mirror root must include the org path for Quay targets (it is the same
+value oc-mirror was pointed at). Three guards, all asserted by
+`scripts/verify/render-gate.sh`:
+
+- an image already under the mirror root is returned unchanged (otherwise it
+  would be double-prefixed: `.../mirror/mirror/ubi9/...`);
+- the host is only stripped when the first segment actually looks like one
+  (contains `.` or `:`, or is `localhost`) — a hostless reference such as
+  `library/httpd:2.4` keeps its org segment;
+- rendering fails fast when airgap mode is on and the mirror is unset or a
+  placeholder — a missing value would otherwise surface as
+  ImagePullBackOff inside the CVMs minutes later.
+
+The helper is duplicated verbatim in the three path-rendered charts (they
+cannot share a library template); the render gate asserts the copies stay
+identical.
+
 - Step 3e of `scripts/airgap-post-install.sh` fails fast — before the
   Pattern CR is applied — if `main.multiSourceConfig.helmRepoUrl`,
   `main.gitops.operatorSource` or `main.patternsOperator.source` is missing

@@ -1,23 +1,8 @@
 #!/usr/bin/env bash
-# Uncomments the disconnected/airgap-only secrets in a generated
-# values-secret file: registryCaCert, bootstrap_secrets
-# (mirror-registry-helm-oci) and tdxCollateral (offline DCAP collateral).
-# All are commented out by default in values-secret.yaml.template because
-# they only apply to airgap (disconnected mirror) deployments and reference
-# local files (~/.coco-pattern/mirror-registry-ca-cert.pem,
-#  ~/.coco-pattern/mirror-registry-password,
-#  ~/.coco-pattern/dcap-offline/platform_collaterals.json) that don't exist
-# on connected deployments.
-#
-# It also comments OUT intelPcsApiKey (connected-mode zero-touch PCS
-# registration): in airgap mode PCK certificates are managed manually via
-# scripts/dcap-pck.py, and load-secrets would otherwise fail on the
-# connected-only key file.
-#
-# Usage:
-#   ./scripts/enable-airgap-secrets.sh [path-to-values-secret-file]
-#
-# Idempotent: safe to run more than once against the same file.
+# Uncomments the airgap-only secrets in a generated values-secret file
+# (registryCaCert, bootstrap_secrets, tdxCollateral) and comments OUT
+# intelPcsApiKey (airgap manages PCK via scripts/dcap-pck.py). Rationale and
+# file paths: values-secret.yaml.template. Usage: enable-airgap-secrets.sh [path]
 
 set -euo pipefail
 

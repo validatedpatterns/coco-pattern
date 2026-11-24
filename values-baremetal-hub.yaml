@@ -167,12 +167,9 @@ clusterGroup:
       # before trustee at 20.
       annotations:
         argocd.argoproj.io/sync-wave: "15"
-      # The MCH operator creates the multicluster-engine subscription at
-      # runtime from the mce-subscription-spec annotation (rendered from this
-      # value), so it must be born on the right catalog. Connected: the
-      # default redhat-operators. Airgap: the mirrored catalog (the default
-      # catalogs are disabled). Kept as a single tpl-conditional list entry —
-      # an overlay list would replace this one wholesale.
+      # MCE subscription (created at runtime by MCH from this value) must be
+      # born on the right catalog — full rationale: the acm comment in
+      # values-baremetal.yaml.
       overrides:
         - name: acm.mce_operator.source
           value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'

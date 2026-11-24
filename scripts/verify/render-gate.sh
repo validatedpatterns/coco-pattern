@@ -1,53 +1,9 @@
 #!/usr/bin/env bash
-# Render gate for the CoCo pattern values chain — both connectivity modes.
-#
-# Reproduces, without a cluster, the exact values chain the patterns-operator
-# assembles for the ROOT clustergroup Application (values-global.yaml +
-# values-<group>.yaml + the sharedValueFiles it resolves for the platform/
-# storage/version/hardware/airgap axes), then asserts:
-#
-#   airgap mode (baremetal — the live-validated path)
-#     - intel subscriptions render on the mirrored certified catalog
-#     - sourceless subscriptions render on the mirrored redhat catalog
-#     - the acm mce_operator override renders the mirrored catalog
-#     - the trustee collateral override renders the file:// backend
-#   connected mode
-#     - intel subscriptions stay on certified-operators
-#     - sourceless subscriptions stay on redhat-operators (chart default)
-#     - the acm mce_operator override renders redhat-operators (chart default)
-#     - the trustee collateral override renders the Intel PCS URL
-#   sync-wave layout (all six cluster groups, connected mode)
-#     - every gating-relevant object renders at its expected wave
-#       (chart cluster-admin CRB -1 on non-spokes, vault/secrets/kyverno 0,
-#       operator subscriptions 10,
-#       acm 15, trustee/policies 20, workloads 30, vault-wait Job 5; spokes/hubs
-#       assert the objects they must NOT have as ABSENT)
-#   workload charts (each, standalone)
-#     - connected: upstream registry.redhat.io images unchanged
-#     - airgap: images rewritten against global.mirrorRegistry
-#     - airgap rewrite edge cases: an image already under the mirror root
-#       passes through unchanged (no double prefix); a hostless reference
-#       keeps its org segment; a localhost host is stripped like any other
-#     - airgap without a mirror: rendering FAILS (fail-fast, not a silent
-#       ImagePullBackOff in the CVM)
-#     - the three duplicated <chart>.image helpers stay byte-identical
-#       modulo the define name (path-rendered charts cannot share a
-#       library template, so the copies must be kept in sync manually)
-#
-# Usage: scripts/verify/render-gate.sh [mirror-root]
-#   mirror-root defaults to quay.example:443/mirror (placeholder is fine —
-#   nothing is pulled; only the rendered strings are asserted).
-#
-# Requires: helm >= 3.14, python3 (stdlib only); network access to quay.io
-# for the chart pull — or point CLUSTERGROUP_CHART at a local (untarred)
-# clustergroup chart directory to run fully offline (CI pulls, offline
-# runs reuse a cached chart).
-#
-# NOTE on pipes: the script runs under `set -o pipefail` and greps renders
-# that exceed the pipe buffer, so every consumer that can exit early
-# (grep -q, awk exit, head) is fed via a here-string or an extra fd —
-# never through `echo <big-render> | …`, which intermittently dies with
-# SIGPIPE (141) and false-fails the gate.
+# Render gate for the CoCo pattern values chain, both connectivity modes:
+# catalog sources, sync-wave layout, chart CRB, workload image rewrite
+# (see the section headers below). Usage: render-gate.sh [mirror-root];
+# needs helm+python3; pulls the clustergroup chart unless CLUSTERGROUP_CHART
+# is a local dir. Pipes: here-strings/fds — `echo|grep` SIGPIPEs (pipefail).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -243,11 +199,10 @@ while IFS='|' read -r group kind name wave; do
     fi
 done <<'EOF'
 # baremetal (single-cluster hub): full stack
-# NOTE: the eso/lvms/cnv subscriptions render WITHOUT a sync-wave annotation
-# ("-") — that is the current, live-validated state, pinned as-is.
-# The cluster-admin CRB is the chart-rendered vp-gitops-cluster-admin-rolebinding
-# (global.options.clusterRoleBindingSyncWave): -1 on non-spokes, unannotated on
-# spokes (ACM pre-creates it there; upstream reverted -1 for spokes, 61a99b4).
+# NOTE: the eso/lvms/cnv subscriptions render WITHOUT a sync-wave ("-"):
+# live-validated state, pinned as-is. The cluster-admin CRB is the chart's
+# vp-gitops-cluster-admin-rolebinding: -1 on non-spokes, none on spokes
+# (ACM pre-creates it there; upstream reverted -1 for spokes, 61a99b4).
 baremetal|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 baremetal|Job|wait-for-vault-unsealed|5
 baremetal|Application|acm|15
@@ -481,14 +436,13 @@ for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
 done
 
 # ── Workload image helper sync ───────────────────────────────────────
-# hello-openshift, kbs-access-curl and kbs-access-sealed each carry a copy
-# of the <chart>.image helper (path-rendered charts cannot share a library
-# template). Extract each copy (from the {{/* line preceding the "Render a
-# workload container image" comment to end of file), normalise the define
-# name, and require all three to be byte-identical.
+# The three path-rendered charts each carry a copy of the <chart>.image
+# helper (they cannot share a library template). Hash the define body of
+# each copy (define name normalised) and require all three byte-identical;
+# comments are excluded so prose may drift between the copies.
 image_helper_block() { # $1 = chart; prints the normalised helper block
     local f="${PATTERN_DIR}/charts/coco-supported/$1/templates/_helpers.tpl" start
-    start="$(awk '/Render a workload container image/ {print NR - 1; exit}' "$f")"
+    start="$(awk '/^{{- define "[a-z-]*\.image" -}}$/ {print NR; exit}' "$f")"
     if [[ -z "$start" ]]; then
         return 1
     fi
