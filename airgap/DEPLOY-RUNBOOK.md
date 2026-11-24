@@ -275,19 +275,43 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
-### C-3: Verify the ArgoCD mirror-CA trust
+### C-3: Point the cluster proxy at the mirror CA, then verify it
 
-The mirror CA reaches ArgoCD through the cluster trust bundle, not through
-any post-install step: the install-time `--additional-trust-bundle` (B-1)
-bakes the mirror CA into the cluster-wide trust bundle, and the
-clustergroup chart renders a `trusted-ca-bundle` ConfigMap in `vp-gitops`
-labelled `config.openshift.io/inject-trusted-cabundle: 'true'`, which
-OpenShift populates from that cluster trust bundle. The repo-server's
-`fetch-ca` init container concatenates it (with the kube root CA) into the
-CA bundle the repo-server uses. No out-of-band CA patch is needed or
-useful — the previous `argocd-tls-certs-cm` patch was a silent no-op (it
-always ran before the `vp-gitops` namespace existed), and the validated
-disconnected runs succeeded without it.
+Two steps, both required on OCP 4.22, then verification.
+
+**Step 1 — make the install-time bundle the cluster trust anchor.** The
+install-time `--additional-trust-bundle` (B-1) writes the mirror CA into
+`openshift-config/user-ca-bundle`, but that alone does **not** make it the
+cluster trust bundle: `proxy/cluster.spec.trustedCA.name` stays empty, so
+every `config.openshift.io/inject-trusted-cabundle` ConfigMap — including
+the `trusted-ca-bundle` the clustergroup chart renders in `vp-gitops` —
+gets populated with the default system bundle only. Without this step the
+repo-server's first chart fetch fails:
+
+```
+helm registry login quay.example.com:443 … x509: certificate signed by unknown authority
+```
+
+```bash
+oc patch proxy cluster --type merge \
+  -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}'
+```
+
+**Step 2 — roll the repo-server** so the `fetch-ca` init container
+re-concatenates the now-injected bundle (with the kube root CA) into the
+CA bundle the repo-server uses:
+
+```bash
+oc rollout restart deployment/vp-gitops-repo-server -n vp-gitops
+oc rollout status  deployment/vp-gitops-repo-server -n vp-gitops --timeout=5m
+```
+
+Both steps are idempotent. This is a real gap in the bootstrap, not a
+one-off lab quirk: the patch belongs in `scripts/airgap-post-install.sh`,
+tracked upstream (see the PR's follow-up issues). The earlier
+`argocd-tls-certs-cm` patch was a different and genuinely useless thing —
+it always ran before the `vp-gitops` namespace existed — so it stays
+deleted; it is not a substitute for the `proxy/cluster` patch above.
 
 Verify once the pattern is deployed and `vp-gitops` exists:
 
@@ -305,7 +329,8 @@ echo "Looking for: $MIRROR_CA_SUBJECT"
 oc exec -n vp-gitops deploy/vp-gitops-repo-server -- \
   grep -c "$MIRROR_CA_SUBJECT" /etc/pki/tls/certs/ca-bundle.crt
 # Expected: >= 1 (0 means the mirror CA never reached the trust bundle —
-# check the --additional-trust-bundle used at ISO build)
+# check that step 1 was applied and that the --additional-trust-bundle used
+# at ISO build contained the mirror CA)
 ```
 
 Bootstrap secrets are loaded by the pattern deploy (C-2); `make
