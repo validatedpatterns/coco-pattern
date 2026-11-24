@@ -1169,16 +1169,18 @@ repoint_default_catalog_subscriptions
 validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
-# Step 7 removed — the mirror CA reaches the ArgoCD repo-server via the
-# cluster trust bundle (install-time --additional-trust-bundle) and the
-# clustergroup chart's trusted-ca-bundle ConfigMap
-# (config.openshift.io/inject-trusted-cabundle), concatenated by the
-# repo-server init container. The previous argocd-tls-certs-cm patch was a
-# silent no-op in every flow that called it (both ran before the vp-gitops
-# namespace existed) and the validated disconnected runs succeeded without
-# it. Step 7b (Helm OCI auth) was never called: the mirror's chart repos
-# are public (ANONYMOUS_ACCESS) and mounting the pull-secret as
-# HELM_REGISTRY_CONFIG caused 401s.
+# Step 7 removed — the previous argocd-tls-certs-cm patch was a silent no-op
+# in every flow that called it (both ran before the vp-gitops namespace
+# existed); it is not replaced here. NOTE: the mirror CA only reaches the
+# repo-server after the cluster is told to trust it — install-time
+# --additional-trust-bundle lands in openshift-config/user-ca-bundle, but
+# proxy/cluster.spec.trustedCA stays empty until it is patched to
+# user-ca-bundle, and only then does the clustergroup chart's
+# trusted-ca-bundle ConfigMap (config.openshift.io/inject-trusted-cabundle)
+# receive it. See airgap/DEPLOY-RUNBOOK.md C-3; the patch is still a manual
+# step here (tracked upstream). Step 7b (Helm OCI auth) was never called:
+# the mirror's chart repos are public (ANONYMOUS_ACCESS), and mounting the
+# pull-secret as HELM_REGISTRY_CONFIG caused 401s.
 enable_routing_via_host
 setup_git_server
 create_operator_config
