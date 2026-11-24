@@ -275,6 +275,53 @@ This:
 **Verify**: `Bootstrap phase: 1 secret(s) created` in the output.
 If it says 0, the values-secret is not at the convention location.
 
+#### C-2a: Make sure the Pattern CR points at the airgap git server
+
+`pattern.sh` derives the Pattern CR's `spec.gitSpec.targetRepo` from the
+working copy's git remote. On a deploy host whose clone still has the
+upstream GitHub remote, the rendered CR points at `https://github.com/…`,
+which the disconnected cluster can never clone:
+
+```text
+status.errorMessage: … cloning pattern repo … no route to host
+```
+
+Two ways to get a reachable value:
+
+- **Preferred, untested in the qualification**: run the deploy from a clone
+  whose git remote *is* the HTTP git server (the same URL used in
+  `main.git.repoURL`), so the first render is already correct. This follows
+  from how `pattern.sh` derives the value, but it was **not** exercised —
+  the qualification used the fallback below. The end-to-end fix that
+  removes the trap entirely is tracked upstream (see the PR's follow-up
+  issue).
+- **Validated fallback**: patch the CR after the first (failed) install,
+  then re-run the install:
+
+```bash
+GIT_HTTP_URL=http://<git-host>:8080/coco-pattern.git
+PATTERN_NS=$(oc get pattern -A -o jsonpath='{.items[0].metadata.namespace}')
+PATTERN_NAME=$(oc get pattern -A -o jsonpath='{.items[0].metadata.name}')
+oc patch pattern "$PATTERN_NAME" -n "$PATTERN_NS" --type merge \
+  -p "{\"spec\":{\"gitSpec\":{\"targetRepo\":\"$GIT_HTTP_URL\"}}}"
+./pattern.sh make install
+```
+
+Note: `make airgap-deploy-pattern` is **not** a substitute here. It skips
+`pattern.sh`'s remote derivation, but on a cluster that already has a
+Pattern CR it is refused by the `only one Pattern resource is allowed`
+admission webhook, and it targets a different namespace than `pattern.sh`
+installs into — so after a C-2 install the patch above is the working
+path.
+
+**Verify**:
+
+```bash
+oc get pattern "$PATTERN_NAME" -n "$PATTERN_NS" \
+  -o jsonpath='{.spec.gitSpec.targetRepo}{"\n"}'
+# Expected: the HTTP git server URL, not github.com
+```
+
 ### C-3: Point the cluster proxy at the mirror CA, then verify it
 
 Two steps, both required on OCP 4.22, then verification.
@@ -306,7 +353,9 @@ oc rollout restart deployment/vp-gitops-repo-server -n vp-gitops
 oc rollout status  deployment/vp-gitops-repo-server -n vp-gitops --timeout=5m
 ```
 
-Both steps are idempotent. This is a real gap in the bootstrap, not a
+Both steps are safe to repeat: the `proxy` patch is a no-op when the field
+already holds that value, while the `rollout restart` deliberately triggers
+another rollout each time (that is what makes the bundle get picked up). This is a real gap in the bootstrap, not a
 one-off lab quirk: the patch belongs in `scripts/airgap-post-install.sh`,
 tracked upstream (see the PR's follow-up issues). The earlier
 `argocd-tls-certs-cm` patch was a different and genuinely useless thing —
@@ -335,6 +384,26 @@ oc exec -n vp-gitops deploy/vp-gitops-repo-server -- \
 
 Bootstrap secrets are loaded by the pattern deploy (C-2); `make
 load-bootstrap` is the standalone fallback.
+
+#### C-3a: Recover a first sync that failed before the CA was trusted
+
+If the pattern was deployed before C-3 was applied, the root application
+is parked in `ComparisonError` with an x509 error and nothing downstream
+syncs. After applying both C-3 steps, re-run the install and confirm the
+root application recovers:
+
+```bash
+./pattern.sh make install     # expect exit 0 and "All assertions passed"
+
+oc get application coco-pattern-baremetal -n vp-gitops \
+  -o jsonpath='{.status.sync.status}/{.status.health.status}{"\n"}'
+# Expected: Synced/Healthy (or Progressing while waves converge)
+```
+
+If the root app still reports `failed to login to registry … x509`, the
+mirror CA is not in the repo-server bundle — re-check the C-3 grep before
+concluding anything else. A healthy repo-server with an incomplete bundle
+is the failure mode this section exists to prevent.
 
 ### C-4: Known Timing Issues
 
