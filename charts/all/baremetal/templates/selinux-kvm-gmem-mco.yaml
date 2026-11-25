@@ -1,0 +1,38 @@
+{{- if not .Values.global.cluster.hcp }}
+{{- range list "master" "worker" }}
+{{- if and $.Values.tdx.enabled (eq $.Values.global.clusterVersion "5.0") }}
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: {{ . }}
+  name: 99-coco-selinux-kvm-gmem-{{ . }}
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+        - path: /etc/selinux/coco-pattern/kvm-gmem-container-kvm.cil
+          mode: 0644
+          contents:
+            source: data:text/plain;charset=utf-8;base64,{{ b64enc "; Allow pod-spawned QEMU (container_kvm_t) to create and use KVM\n; guest_memfd anon_inodes (kvm_gmem_t) - SELinux check added in\n; OpenShift 5.0 / RHEL 10 kernels; without it TDX kata pods fail\n; with 'Error creating KVM guest_memfd: Permission denied'.\n(allow container_kvm_t kvm_gmem_t (anon_inode (create getattr ioctl map open read write)))\n" }}
+    systemd:
+      units:
+        - name: coco-selinux-kvm-gmem.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Install CoCo pattern SELinux module (KVM guest_memfd for container_kvm_t)
+            ConditionPathExists=/etc/selinux/coco-pattern/kvm-gmem-container-kvm.cil
+            After=local-fs.target
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/sbin/semodule -i /etc/selinux/coco-pattern/kvm-gmem-container-kvm.cil
+            [Install]
+            WantedBy=multi-user.target
+{{- end }}
+{{- end }}
+{{- end }}
