@@ -1246,7 +1246,7 @@ case "$MODE" in
         # variance; routingViaHost alone is render-neutral). Idempotent.
         validate_prereqs
         enable_routing_via_host
-        local current
+        # NOTE: no `local` here — this is the main dispatch, not a function.
         current=$(oc get network.operator cluster \
             -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
         if [[ "$current" == "true" ]]; then
