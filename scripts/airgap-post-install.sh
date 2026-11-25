@@ -24,6 +24,9 @@
 #   --deploy-pattern      — deploy the Pattern CR directly (skip pattern.sh)
 #   --fix-manifest-lists  — fix oc-mirror manifest list failures with skopeo
 #   --repoint-subs        — re-run only the step 3d subscription repoint
+#   --prereq-only         — apply ONLY routingViaHost (5.0 airgap install
+#                           prerequisite; run before install-complete, see
+#                           DEPLOY-RUNBOOK.md B-2)
 
 set -euo pipefail
 
@@ -91,6 +94,7 @@ case "${1:-}" in
     --deploy-pattern)     MODE="deploy"; shift ;;
     --fix-manifest-lists) MODE="fix-manifests"; shift ;;
     --repoint-subs)       MODE="repoint"; shift ;;
+    --prereq-only)        MODE="prereq"; shift ;;
 esac
 
 # ─── Step 1: Validate prerequisites ─────────────────────────────
@@ -921,7 +925,10 @@ configure_cluster_trusted_ca() {
 enable_routing_via_host() {
     step 8 "OVN routingViaHost (test-lab only)"
 
-    if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" ]]; then
+    # --prereq-only implies consent: the whole point of that mode is this
+    # change (5.0 MCO OSImageStream discovery needs pod egress to the mirror
+    # during bootstrap, before install-complete).
+    if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" && "$MODE" != "prereq" ]]; then
         info "Skipped (set ENABLE_ROUTINGVIAHOST=true to enable)"
         return
     fi
@@ -1224,6 +1231,32 @@ case "$MODE" in
         # e.g. once MCH has created its runtime subscriptions.
         validate_prereqs
         repoint_default_catalog_subscriptions
+        exit 0
+        ;;
+    prereq)
+        # 5.0 airgap install prerequisite — run as soon as the cluster API is
+        # reachable and BEFORE `openshift-install agent wait-for
+        # install-complete`. The 5.0 MCO controller discovers OSImageStreams
+        # by inspecting the release image-stream images through the IDMS,
+        # which needs pod-network egress to the mirror; on labs where that
+        # requires OVN routingViaHost, the controllerconfig never completes
+        # without this and the install cannot finish (chicken-and-egg: the
+        # full bootstrap must NOT run yet — any other cluster state landing
+        # before the controller's first render causes the MCO-466 bootstrap
+        # variance; routingViaHost alone is render-neutral). Idempotent.
+        validate_prereqs
+        enable_routing_via_host
+        local current
+        current=$(oc get network.operator cluster \
+            -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
+        if [[ "$current" == "true" ]]; then
+            info "Prerequisite satisfied: routingViaHost=true"
+            info "Next: openshift-install agent wait-for install-complete (must exit 0),"
+            info "then run this script with no mode flag for the full bootstrap."
+        else
+            error "routingViaHost is '${current}' (expected true) — prerequisite failed"
+            exit 1
+        fi
         exit 0
         ;;
 esac

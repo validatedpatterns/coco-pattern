@@ -281,33 +281,28 @@ while the node itself is installed and every image referenced IS in the
 mirror. 4.22 does not hit this: its MCO does no image inspection at
 bootstrap.
 
-Remedy (verified on the 5.0.2 airgap run): once the API is reachable but
-before re-running `wait-for`, apply **only** the routingViaHost step —
-**not** the full bootstrap. Any cluster-state change that lands before the
-machine-config controller's first render (IDMS/ITMS application, trustedCA
-anchor, …) makes the in-cluster rendered config differ from the
-install-time `firstPivotConfig`, and the MCD wedges in bootstrap mode
-(MCO-466 bootstrap variance: the node's currentConfig annotation names a
-MachineConfig that was never created in-cluster). Run the full
-`airgap-post-install.sh` only after `install-complete` succeeds:
+Remedy (verified on the 5.0.2 airgap run): **prereq → install-complete →
+full bootstrap**, in that order:
 
 ```bash
 export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
 cd ~/coco-pattern
-# 1) unblock the MCO controller ONLY (minimal, no other state change):
-MIRROR_REGISTRY=<mirror-root-including-org> \
-GIT_SERVER=http://<git-host>:8080 \
-ENABLE_ROUTINGVIAHOST=true \
-scripts/airgap-post-install.sh   # NOTE: in 5.0+ airgap this is safe to run
-                                 # in full BEFORE first render ONLY if no
-                                 # IDMS/trustedCA lands first — when in
-                                 # doubt, prefer routingViaHost alone
 
-# The MCO controller retries on its own; then finish the install:
+# 1) As soon as the API answers (before install-complete): apply ONLY
+#    routingViaHost — the 5.0 MCO needs pod egress to the mirror during
+#    bootstrap, and nothing else may land before the controller's first
+#    render (any other state change causes the MCO-466 bootstrap variance;
+#    routingViaHost alone is render-neutral):
+MIRROR_REGISTRY=<mirror-root-including-org> \
+scripts/airgap-post-install.sh --prereq-only
+# → must print "Prerequisite satisfied: routingViaHost=true"
+
+# 2) Let the installer finish (exit=0 required; machine-config must not be
+#    Degraded — the MCD exits bootstrap mode on its own, no repairs):
 openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
 
-# 2) full bootstrap (catalogs, IDMS, trustedCA, git server) AFTERWARD:
+# 3) Full bootstrap (catalogs, IDMS, trustedCA, git server) only now:
 MIRROR_REGISTRY=<mirror-root-including-org> \
 GIT_SERVER=http://<git-host>:8080 \
 ENABLE_ROUTINGVIAHOST=true \
@@ -324,7 +319,8 @@ then let the MCD complete its designed bootstrap exit (it renames
 fails (expected — the rendered config now carries the full mirror IDMS),
 touch `/run/machine-config-daemon-force` on the node; the daemon then
 applies the config and reboots once. Both steps are recorded as
-deviations in the phase-2 evidence.
+deviations in the phase-2 evidence — with the `--prereq-only` ordering
+above they should never be needed.
 
 Diagnosis cues that this is egress and not missing mirror content: the
 controller log shows BOTH the source and the mirror failing with
