@@ -26,6 +26,10 @@ spec:
       containers:
         - name: hello-openshift
           image: {{ include "hello-openshift.image" (dict "root" $ "image" .Values.image) }}
+          # Digest-pinned kata-cc images default to IfNotPresent; OCP 5.0 CRI-O
+          # only takes the CoCo guest-pull path when it performs a pull, so
+          # force it (the guest pulls its own image either way).
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           volumeMounts:
