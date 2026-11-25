@@ -65,6 +65,25 @@ print('' if d is None else d)
     echo "$val"
 }
 
+# Resolve the version-pinned airgap overlay path from global.clusterVersion,
+# mirroring the sharedValueFiles tpl in values-baremetal.yaml: 4.22 keeps
+# the historical unsuffixed name (byte-identical render with the qualified
+# 4.22 deploy); other minors append the dashed version (5.0 → -5-0).
+airgap_overlay_path() {
+    local cluster_version suffix
+    cluster_version=$(read_global_key global.clusterVersion '')
+    if [[ -z "$cluster_version" ]]; then
+        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
+        return
+    fi
+    if [[ "$cluster_version" == "4.22" ]]; then
+        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
+    else
+        suffix="${cluster_version//./-}"
+        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap-${suffix}.yaml"
+    fi
+}
+
 # ─── Mode dispatch ───────────────────────────────────────────────
 MODE="full"
 case "${1:-}" in
@@ -538,7 +557,8 @@ for s in d.get('items', []):
 validate_airgap_overlay() {
     step "3e" "Validate airgap overlay catalog references"
 
-    local overlay="${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
+    local overlay
+    overlay=$(airgap_overlay_path)
     if [[ ! -f "$overlay" ]]; then
         warn "No airgap overlay at $overlay — skipping validation"
         return
@@ -662,7 +682,7 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
         error "main.gitops.operatorSource is empty or still the connected default"
         error "(redhat-operators) while global.airgap is true — that catalog is"
         error "disabled in airgap. Set it to the mirrored catalog"
-        error "(e.g. cs-redhat-operator-index-v4-22)."
+        error "(e.g. cs-redhat-operator-index-v5-0 for clusterVersion 5.0)."
         exit 1
     fi
     patterns_source=$(read_global_key main.patternsOperator.source '')
@@ -670,7 +690,7 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
         error "main.patternsOperator.source is empty or still the connected default"
         error "(community-operators) while global.airgap is true — that catalog is"
         error "disabled in airgap. Set it to the mirrored catalog"
-        error "(e.g. cs-community-operator-index-v4-22)."
+        error "(e.g. cs-community-operator-index-v5-0 for clusterVersion 5.0)."
         exit 1
     fi
     info "Airgap values consistent: helmRepoUrl and operator sources point at the mirror"

@@ -1,7 +1,10 @@
-# Airgap / disconnected overlay — loaded ONLY when global.airgap is true
-# (see the sharedValueFiles entry in values-baremetal.yaml). The connected
-# default (global.airgap: false) loads the inert
-# values-baremetal-connected.yaml instead.
+# Airgap / disconnected overlay for OCP 4.22 — loaded ONLY when
+# global.airgap is true AND global.clusterVersion is "4.22" (see the
+# sharedValueFiles entry in values-baremetal.yaml). The connected default
+# (global.airgap: false) loads the inert values-baremetal-connected.yaml
+# instead. 4.22 keeps this unsuffixed filename so its render stays
+# byte-identical with the qualified 4.22 airgap deploy; other minors load
+# values-baremetal-airgap-<minor-dashed>.yaml (e.g. -5-0 for 5.0).
 
 # SCOPE — this overlay reaches the ROOT clustergroup render: the
 # patterns-operator resolves clusterGroup.sharedValueFiles itself when it

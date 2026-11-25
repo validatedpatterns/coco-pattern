@@ -20,6 +20,18 @@ CLUSTER_VERSION="${CLUSTER_VERSION:-4.22}"  # OCP minor: selects overrides/value
 MIRROR_ROOT="${1:-quay.example:443/mirror}"
 FAILS=0
 
+# Dashed minor (4.22 → 4-22) — the oc-mirror CatalogSource tag convention
+# (cs-<index>-operator-index-v<minor>). Derived, never hardcoded, so a new
+# minor only needs its overlays + imageset config to exist.
+VER_DASHED="${CLUSTER_VERSION//./-}"
+REDHAT_CS="cs-redhat-operator-index-v${VER_DASHED}"
+CERTIFIED_CS="cs-certified-operator-index-v${VER_DASHED}"
+# Airgap overlay: 4.22 keeps the historical unsuffixed name (byte-identical
+# render with the qualified 4.22 airgap deploy); other minors append the
+# dashed version, mirroring the sharedValueFiles tpl in values-baremetal.yaml.
+AIRGAP_OVERLAY="values-baremetal-airgap"
+[[ "$CLUSTER_VERSION" != "4.22" ]] && AIRGAP_OVERLAY="values-baremetal-airgap-${VER_DASHED}"
+
 pass() { echo -e "PASS: $*"; }
 fail() { echo -e "FAIL: $*"; FAILS=$((FAILS + 1)); }
 
@@ -34,14 +46,19 @@ else
 fi
 
 render_root() { # $1 = airgap|connected (baremetal chain)
-    local mode="$1"
+    local mode="$1" overlay
+    if [[ "$mode" = airgap ]]; then
+        overlay="$AIRGAP_OVERLAY"
+    else
+        overlay="values-baremetal-connected"
+    fi
     helm template cg "${CHART}" \
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
         -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml" \
-        -f "${PATTERN_DIR}/overrides/values-${GROUP}-${mode}.yaml" \
+        -f "${PATTERN_DIR}/overrides/${overlay}.yaml" \
         --set global.repoURL=https://example.com/coco-pattern.git \
         --set global.targetRevision=render-gate \
         --set global.vpArgoNamespace=vp-gitops \
@@ -125,27 +142,27 @@ PYEOF
 }
 
 # ── Airgap assertions ────────────────────────────────────────────────
-echo "── airgap mode (global.airgap=true, mirror=${MIRROR_ROOT})"
+echo "── airgap mode (global.airgap=true, mirror=${MIRROR_ROOT}, version=${CLUSTER_VERSION})"
 AIRGAP="$(render_root airgap)" || { fail "airgap root render errored"; }
 
 for sub in intel-device-plugins-operator intel-tdx-dcap-operator; do
     src="$(sub_source "$AIRGAP" "$sub")"
-    [[ "$src" == "cs-certified-operator-index-v4-22" ]] \
+    [[ "$src" == "$CERTIFIED_CS" ]] \
         && pass "subscription $sub → $src" \
-        || fail "subscription $sub → '${src}' (expected cs-certified-operator-index-v4-22)"
+        || fail "subscription $sub → '${src}' (expected ${CERTIFIED_CS})"
 done
 
 for sub in openshift-external-secrets-operator trustee-operator sandboxed-containers-operator; do
     src="$(sub_source "$AIRGAP" "$sub")"
-    [[ "$src" == "cs-redhat-operator-index-v4-22" ]] \
+    [[ "$src" == "$REDHAT_CS" ]] \
         && pass "subscription $sub → $src" \
-        || fail "subscription $sub → '${src}' (expected cs-redhat-operator-index-v4-22)"
+        || fail "subscription $sub → '${src}' (expected ${REDHAT_CS})"
 done
 
 val="$(acm_override "$AIRGAP")"
-[[ "$val" == "cs-redhat-operator-index-v4-22" ]] \
+[[ "$val" == "$REDHAT_CS" ]] \
     && pass "acm.mce_operator.source → $val" \
-    || fail "acm.mce_operator.source → '${val}' (expected cs-redhat-operator-index-v4-22)"
+    || fail "acm.mce_operator.source → '${val}' (expected ${REDHAT_CS})"
 
 val="$(collateral_override "$AIRGAP")"
 [[ "$val" == file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json ]] \

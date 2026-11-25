@@ -68,15 +68,17 @@ main:
     revision: main
   patternsOperator:
     # Required for airgap -- set to your mirrored catalog source name on the
-    # disconnected deploy branch (runbook; validated by step 3e).
-    # source: cs-community-operator-index-v4-22
+    # disconnected deploy branch (runbook; validated by step 3e). The tag
+    # tracks global.clusterVersion (4.22 → -v4-22, 5.0 → -v5-0).
+    # source: cs-community-operator-index-v5-0
     channel: fast
   gitops:
     # Required for airgap -- set to your mirrored catalog source name on the
-    # disconnected deploy branch (runbook; validated by step 3e).
-    # operatorSource: cs-redhat-operator-index-v4-22
+    # disconnected deploy branch (runbook; validated by step 3e). The tag
+    # tracks global.clusterVersion (4.22 → -v4-22, 5.0 → -v5-0).
+    # operatorSource: cs-redhat-operator-index-v5-0
 
-    # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
+    # Keep this channel aligned with airgap/imageset-config-<minor>.yaml.
     channel: gitops-1.22
     # App-of-apps sync-wave gating. ArgoCD 1.8 dropped the Application
     # health check (argoproj/argo-cd#3781); the operator defaults it off,

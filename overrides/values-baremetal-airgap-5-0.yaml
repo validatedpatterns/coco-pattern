@@ -1,0 +1,39 @@
+# Airgap / disconnected overlay for OCP 5.0 — loaded ONLY when
+# global.airgap is true AND global.clusterVersion is "5.0" (see the
+# sharedValueFiles entry in values-baremetal.yaml, which resolves this
+# file as values-baremetal-airgap-5-0.yaml). The connected default
+# (global.airgap: false) loads the inert values-baremetal-connected.yaml
+# instead. 4.22 keeps the unsuffixed values-baremetal-airgap.yaml name so
+# its render stays byte-identical with the qualified 4.22 deploy.
+
+# SCOPE — this overlay reaches the ROOT clustergroup render: the
+# patterns-operator resolves clusterGroup.sharedValueFiles itself when it
+# builds the root Application (internal/controller/argo.go,
+# commonApplicationSourceHelm → getSharedValueFiles), so the clusterGroup
+# subscriptions and the app overrides below are all in scope.
+
+# It does NOT reach the bootstrap operators (created before ArgoCD
+# renders): for airgap set their sources directly in values-global.yaml —
+#   main.gitops.operatorSource: cs-redhat-operator-index-v5-0
+#   main.patternsOperator.source: cs-community-operator-index-v5-0
+
+# LIST WARNING: Helm replaces lists when merging — an `overrides:` list here
+# would drop any entry added to the same app in values-baremetal.yaml. This
+# overlay therefore sets ONLY scalars (map values); mode-dependent list
+# entries (e.g. acm.mce_operator.source) are tpl-conditionals in the base
+# file instead.
+global:
+  # Mirrored catalog for the Argo-rendered OLM subscriptions (oc-mirror output).
+  # The names track the operator index tags in airgap/imageset-config-5.0.yaml
+  # (redhat/redhat-operator-index:v5.0 → cs-redhat-operator-index-v5-0);
+  # scripts/airgap-post-install.sh step 3e fails fast
+  # if any catalog referenced here is missing from the cluster.
+  catalogSource: cs-redhat-operator-index-v5-0
+  catalogSourceNamespace: openshift-marketplace
+# Connected default: the certified-operators catalog, disabled in airgap.
+clusterGroup:
+  subscriptions:
+    intel-device-plugins:
+      source: cs-certified-operator-index-v5-0
+    intel-tdx-dcap:
+      source: cs-certified-operator-index-v5-0

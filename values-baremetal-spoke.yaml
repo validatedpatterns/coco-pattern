@@ -61,7 +61,12 @@ clusterGroup:
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
-  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ else }}connected{{ end }}.yaml'
+  # Airgap overlay is version-pinned: 4.22 keeps the historical unsuffixed
+  # name (byte-identical render with the qualified 4.22 airgap deploy);
+  # every other minor appends its dashed version (5.0 → -5-0), matching the
+  # oc-mirror CatalogSource names (cs-*-operator-index-v5-0). An overlay
+  # missing for a version fails fast at render time.
+  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ if ne $.Values.global.clusterVersion "4.22" }}-{{ $.Values.global.clusterVersion | replace "." "-" }}{{ end }}{{ else }}connected{{ end }}.yaml'
 
   # No CRB wave knob here: the cluster-admin CRB is pre-created by the ACM policy
   # on managed spokes, and upstream reverted the -1 default for spokes after
