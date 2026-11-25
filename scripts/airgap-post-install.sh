@@ -849,6 +849,50 @@ fix_manifest_lists() {
     done <<< "$failed_images"
 }
 
+# ─── Step 7: Anchor the cluster trust bundle at user-ca-bundle ───
+# Runbook C-3 (upstream #171): the install-time --additional-trust-bundle
+# writes the mirror CA into openshift-config/user-ca-bundle, but that alone
+# does NOT make it the cluster trust bundle — proxy/cluster.spec.trustedCA
+# stays empty, so every config.openshift.io/inject-trusted-cabundle
+# ConfigMap (including the trusted-ca-bundle the clustergroup chart renders
+# in vp-gitops) is populated with the default system bundle only, and the
+# ArgoCD repo-server's first chart fetch fails:
+#   helm registry login … x509: certificate signed by unknown authority
+# Applying the patch HERE — before the pattern deploys — means injected
+# ConfigMaps are born with the mirror CA already in them, so the runbook's
+# post-deploy "roll the repo-server" step is not needed on fresh installs.
+# Idempotent: a no-op when the field already holds the value.
+configure_cluster_trusted_ca() {
+    step 7 "Anchor cluster trust bundle at user-ca-bundle (runbook C-3)"
+
+    # Airgap-only by design ("connected works by default"): in connected
+    # mode there is no mirror CA to anchor.
+    local airgap_flag
+    airgap_flag=$(read_global_key global.airgap false)
+    if [[ "${airgap_flag,,}" != "true" ]]; then
+        info "global.airgap is not true — skipping (connected mode)"
+        return
+    fi
+
+    if ! oc get configmap user-ca-bundle -n openshift-config >/dev/null 2>&1; then
+        error "configmap user-ca-bundle not found in openshift-config —"
+        error "was the cluster installed with --additional-trust-bundle?"
+        exit 1
+    fi
+
+    local current
+    current=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null) || current=""
+    if [[ "$current" == "user-ca-bundle" ]]; then
+        info "proxy/cluster trustedCA already points at user-ca-bundle"
+        return
+    fi
+
+    oc patch proxy cluster --type merge \
+        -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}' >/dev/null
+    info "proxy/cluster trustedCA set to user-ca-bundle"
+    info "inject-trusted-cabundle ConfigMaps now include the mirror CA"
+}
+
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
 enable_routing_via_host() {
     step 8 "OVN routingViaHost (test-lab only)"
@@ -1174,11 +1218,12 @@ repoint_default_catalog_subscriptions
 validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
-# Step 7 (argocd-tls-certs-cm) removed — it was a silent no-op (ran before
+configure_cluster_trusted_ca
+# The old argocd-tls-certs-cm step (removed) was a silent no-op (ran before
 # the vp-gitops namespace existed); do not re-add. The mirror CA reaches the
-# repo-server only after the proxy/cluster trustedCA patch — still manual,
-# see DEPLOY-RUNBOOK.md C-3 (#171). Step 7b never ran: mirror chart repos
-# are public (ANONYMOUS_ACCESS); a pull-secret HELM_REGISTRY_CONFIG 401'd.
+# repo-server via step 7 above (runbook C-3, upstream #171). Step 7b never
+# ran: mirror chart repos are public (ANONYMOUS_ACCESS); a pull-secret
+# HELM_REGISTRY_CONFIG 401'd.
 enable_routing_via_host
 setup_git_server
 create_operator_config
