@@ -775,8 +775,32 @@ mirror_oci_charts() {
         fi
         # Verify the destination actually holds at least one tag — the
         # source-side count above is not proof the mirror is usable.
+        # Mirror-side skopeo needs explicit creds and --tls-verify=false:
+        # the destination repo may not be anonymous-readable, and the
+        # wrapper skopeo (coco-tools podman container) can neither read
+        # auth files (container-label denials) nor trust the mirror CA
+        # without a mounted cert dir. Creds come from ~/pull-secret.json
+        # (auths["<MIRROR_REGISTRY>"], org path included) — the same
+        # convention as the runbook's skopeo verification.
+        local pi_creds=""
+        if [[ -f "${HOME}/pull-secret.json" ]]; then
+            pi_creds=$(python3 -c "
+import base64, json
+try:
+    auth = json.load(open('${HOME}/pull-secret.json'))['auths']['${MIRROR_REGISTRY}']['auth']
+    print(base64.b64decode(auth).decode())
+except Exception:
+    pass
+" 2>/dev/null || true)
+        fi
+        if [[ -z "$pi_creds" ]]; then
+            warn "  No mirror creds in ~/pull-secret.json for ${MIRROR_REGISTRY} —"
+            warn "  verifying pattern-install anonymously (may fail on private repos)"
+        fi
+        local -a pi_verify=(--tls-verify=false)
+        [[ -n "$pi_creds" ]] && pi_verify+=(--creds "$pi_creds")
         local pi_mirror_tags
-        pi_mirror_tags=$(skopeo list-tags "docker://${pi_dest}" 2>/dev/null \
+        pi_mirror_tags=$(skopeo list-tags "${pi_verify[@]}" "docker://${pi_dest}" 2>/dev/null \
             | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
         if [[ -z "$pi_mirror_tags" ]]; then
             error "pattern-install is not present in the mirror: 'skopeo list-tags"
