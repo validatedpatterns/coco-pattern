@@ -270,6 +270,39 @@ openshift-install agent wait-for install-complete \
 
 ```
 
+**OCP 5.0+: the MCO needs mirror egress DURING bootstrap.** The 5.0
+machine-config controller discovers OSImageStreams by inspecting the
+release image-stream images (`ocp-v5.0-art-dev` digests, resolved through
+the IDMS to the mirror). On labs where pod→off-cluster egress requires
+OVN `routingViaHost` (see C-1 step 8), the controllerconfig never
+completes, `machine-config` goes Degraded, and `wait-for install-complete`
+exits 6 ("failed to initialize the cluster") after its 40-minute window —
+while the node itself is installed and every image referenced IS in the
+mirror. 4.22 does not hit this: its MCO does no image inspection at
+bootstrap.
+
+Remedy (verified on the 5.0.2 airgap run): once the API is reachable but
+before re-running `wait-for`, apply the scripted bootstrap — at minimum
+its routingViaHost step:
+
+```bash
+export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
+cd ~/coco-pattern
+MIRROR_REGISTRY=<mirror-root-including-org> \
+GIT_SERVER=http://<git-host>:8080 \
+ENABLE_ROUTINGVIAHOST=true \
+scripts/airgap-post-install.sh
+
+# The MCO controller retries on its own; then finish the install:
+openshift-install agent wait-for install-complete \
+  --dir <output-dir>/<version>_build
+```
+
+Diagnosis cues that this is egress and not missing mirror content: the
+controller log shows BOTH the source and the mirror failing with
+`dial tcp <mirror-ip>:443: i/o timeout` (TCP-level, from pods), while the
+same digests resolve from the deploy host via skopeo.
+
 ### B-3: Verify
 
 ```bash
