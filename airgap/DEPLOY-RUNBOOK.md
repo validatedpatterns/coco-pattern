@@ -75,6 +75,13 @@ robots). Key content:
   no kyverno OCI chart artifact is mirrored)
 - hashicorp/vault (the version the chart resolves, e.g. 2.1.2-ubi)
 
+**OCP 5.0 platform channel:** 5.0.2 is published only in `candidate-5.0`
+(`stable-5.0`/`fast-5.0` graphs are at 5.0.1), so
+`imageset-config-5.0.yaml` pins the platform to `candidate-5.0` with
+min=max=5.0.2. Re-point the channel to `stable-5.0` once 5.0.2 is
+promoted. The 4.22-stream oc-mirror binary resolves 5.0 platform pins
+without issue (verified by dry-run).
+
 **Intel DCAP channel migration:** the pattern pins the `stable` channel
 (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode — same bundle
 in the 4.22 and 5.0 catalogs; the old `alpha` channel was removed from the
