@@ -165,24 +165,33 @@ scripts/enable-airgap-secrets.sh
 The committed tree is a working **connected** install; every disconnected
 delta is a **config-only change on the deploy branch**. The disconnected
 deploy branch used in validation differs from the connected one by exactly
-these eight values:
+these values:
 
 ```yaml
 global:
   airgap: true
   mirrorRegistry: <mirror-root-including-org>          # e.g. quay.example.com:443/mirror
+  clusterVersion: "<minor>"                            # e.g. "5.0" — selects the version overlay
 main:
   clusterGroupName: baremetal
   git:
     repoURL: http://<git-host>:8080/coco-pattern.git   # served by scripts/git-http-server.py
     revision: <deploy-branch>
   patternsOperator:
-    source: cs-community-operator-index-v4-22
+    source: cs-community-operator-index-v<minor-dashed>   # 4.22 → v4-22, 5.0 → v5-0
   gitops:
-    operatorSource: cs-redhat-operator-index-v4-22
+    operatorSource: cs-redhat-operator-index-v<minor-dashed>
   multiSourceConfig:
     helmRepoUrl: <mirror-root-including-org>/validatedpatterns
 ```
+
+The mirrored catalog names are version-derived (see the sharedValueFiles
+tpl in `values-baremetal.yaml`): the airgap overlay is
+`overrides/values-baremetal-airgap-<minor-dashed>.yaml` (`5.0` →
+`values-baremetal-airgap-5-0.yaml`); 4.22 alone keeps the unsuffixed
+`values-baremetal-airgap.yaml` for render byte-compatibility with the
+qualified 4.22 deploy. A new minor needs its overlay file and its
+`airgap/imageset-config-<minor>.yaml`.
 
 - `global.mirrorRegistry` must equal `$MIRROR_REGISTRY` (org path included).
 
