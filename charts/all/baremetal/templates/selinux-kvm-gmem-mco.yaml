@@ -1,6 +1,6 @@
 {{- if not .Values.global.cluster.hcp }}
 {{- range list "master" "worker" }}
-{{- if and $.Values.tdx.enabled (eq $.Values.global.clusterVersion "5.0") }}
+{{- if and $.Values.tdx.enabled (eq $.Values.global.clusterVersion "5.0") (ne (default "rhel-10" $.Values.global.cluster.osStream) "rhel-9") }}
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
