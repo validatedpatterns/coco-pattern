@@ -282,21 +282,49 @@ mirror. 4.22 does not hit this: its MCO does no image inspection at
 bootstrap.
 
 Remedy (verified on the 5.0.2 airgap run): once the API is reachable but
-before re-running `wait-for`, apply the scripted bootstrap — at minimum
-its routingViaHost step:
+before re-running `wait-for`, apply **only** the routingViaHost step —
+**not** the full bootstrap. Any cluster-state change that lands before the
+machine-config controller's first render (IDMS/ITMS application, trustedCA
+anchor, …) makes the in-cluster rendered config differ from the
+install-time `firstPivotConfig`, and the MCD wedges in bootstrap mode
+(MCO-466 bootstrap variance: the node's currentConfig annotation names a
+MachineConfig that was never created in-cluster). Run the full
+`airgap-post-install.sh` only after `install-complete` succeeds:
 
 ```bash
 export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
 cd ~/coco-pattern
+# 1) unblock the MCO controller ONLY (minimal, no other state change):
 MIRROR_REGISTRY=<mirror-root-including-org> \
 GIT_SERVER=http://<git-host>:8080 \
 ENABLE_ROUTINGVIAHOST=true \
-scripts/airgap-post-install.sh
+scripts/airgap-post-install.sh   # NOTE: in 5.0+ airgap this is safe to run
+                                 # in full BEFORE first render ONLY if no
+                                 # IDMS/trustedCA lands first — when in
+                                 # doubt, prefer routingViaHost alone
 
 # The MCO controller retries on its own; then finish the install:
 openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
+
+# 2) full bootstrap (catalogs, IDMS, trustedCA, git server) AFTERWARD:
+MIRROR_REGISTRY=<mirror-root-including-org> \
+GIT_SERVER=http://<git-host>:8080 \
+ENABLE_ROUTINGVIAHOST=true \
+scripts/airgap-post-install.sh
 ```
+
+If the MCD is already wedged (node annotation references a missing
+install-time rendered config, `currentconfig` absent on disk), the daemon
+cannot self-heal — restarts do not help. Recovery is a node daemon-state
+repair: point the node's `machineconfiguration.openshift.io/currentConfig`
+and `desiredConfig` annotations at the pool's existing rendered config,
+then let the MCD complete its designed bootstrap exit (it renames
+`node-annotations.json` itself). If the follow-on on-disk drift check
+fails (expected — the rendered config now carries the full mirror IDMS),
+touch `/run/machine-config-daemon-force` on the node; the daemon then
+applies the config and reboots once. Both steps are recorded as
+deviations in the phase-2 evidence.
 
 Diagnosis cues that this is egress and not missing mirror content: the
 controller log shows BOTH the source and the mirror failing with
