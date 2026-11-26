@@ -24,9 +24,6 @@
 #   --deploy-pattern      — deploy the Pattern CR directly (skip pattern.sh)
 #   --fix-manifest-lists  — fix oc-mirror manifest list failures with skopeo
 #   --repoint-subs        — re-run only the step 3d subscription repoint
-#   --prereq-only         — apply ONLY routingViaHost (5.0 airgap install
-#                           prerequisite; run before install-complete, see
-#                           DEPLOY-RUNBOOK.md B-2)
 
 set -euo pipefail
 
@@ -89,8 +86,8 @@ airgap_overlay_path() {
 
 # ─── Mode dispatch ───────────────────────────────────────────────
 # Fail closed on argument errors BEFORE any cluster I/O: an unrecognised
-# or mistyped flag (e.g. --prereq-onyl) must abort, never fall through to
-# the full bootstrap or another mode. A mode flag takes no operands.
+# or mistyped flag must abort, never fall through to the full bootstrap
+# or another mode. A mode flag takes no operands.
 MODE="full"
 case "${1:-}" in
     "")                    ;;
@@ -98,26 +95,30 @@ case "${1:-}" in
     --deploy-pattern)      MODE="deploy"; shift ;;
     --fix-manifest-lists)  MODE="fix-manifests"; shift ;;
     --repoint-subs)        MODE="repoint"; shift ;;
-    --prereq-only)         MODE="prereq"; shift ;;
     *)
         error "Unknown argument: '${1}'"
-        error "Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs|--prereq-only]"
+        error "Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs]"
         exit 2
         ;;
 esac
 if [[ $# -gt 0 ]]; then
     error "Unexpected argument(s) after the mode flag: '$*'"
-    error "A mode flag takes no operands. Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs|--prereq-only]"
+    error "A mode flag takes no operands. Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs]"
     exit 2
 fi
 
 # ─── Step 1: Validate prerequisites ─────────────────────────────
-# Cluster access only — the minimal requirement for modes that talk to the
-# cluster but need neither the git server, python tooling, nor a mirror
-# registry string (--prereq-only runs on a half-installed cluster where
-# those bootstrap dependencies may not exist yet).
-validate_cluster_access() {
-    command -v oc >/dev/null 2>&1 || { error "Missing required command: oc"; exit 1; }
+validate_prereqs() {
+    step 1 "Validate prerequisites"
+
+    local missing=()
+    for cmd in oc git python3; do
+        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        error "Missing required commands: ${missing[*]}"
+        exit 1
+    fi
 
     if [[ -z "${KUBECONFIG:-}" ]]; then
         error "KUBECONFIG is not set"
@@ -128,32 +129,16 @@ validate_cluster_access() {
         exit 1
     fi
 
-    if ! oc whoami >/dev/null 2>&1; then
-        error "Cannot connect to cluster. Check KUBECONFIG."
-        exit 1
-    fi
-}
-
-validate_prereqs() {
-    step 1 "Validate prerequisites"
-
-    validate_cluster_access
-
-    local missing=()
-    for cmd in git python3; do
-        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
-    done
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        error "Missing required commands: ${missing[*]}"
-        exit 1
-    fi
-
     if [[ -z "$MIRROR_REGISTRY" ]]; then
         error "MIRROR_REGISTRY is not set (mirror root INCLUDING the org path,"
         error "e.g. quay.example:443/mirror — a bare host:port gets 401/404 on Quay)"
         exit 1
     fi
 
+    if ! oc whoami >/dev/null 2>&1; then
+        error "Cannot connect to cluster. Check KUBECONFIG."
+        exit 1
+    fi
     info "Cluster: $(oc whoami --show-server 2>/dev/null)"
     info "Mirror:  $MIRROR_REGISTRY"
 }
@@ -1227,100 +1212,25 @@ configure_cluster_trusted_ca() {
 
 
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
-# Read the current routingViaHost value. A FAILED oc query (API outage,
-# bad kubeconfig) must not look like "field unset" — that would let the
-# patch run blind — so it prints READ_FAILED and callers abort. A field
-# that is merely ABSENT prints empty (patch allowed): oc's jsonpath errors
-# identically on both, so the object is read as JSON and the key grepped.
-# No python here: --prereq-only must not depend on it.
-read_routing_via_host() {
-    local json val
-    if ! json=$(oc get network.operator cluster -o json 2>/dev/null); then
-        echo "READ_FAILED"
-        return
-    fi
-    val=$(grep -o '"routingViaHost": *[a-z]*' <<<"$json" | head -1 \
-        | sed 's/.*: *//')
-    echo "${val:-}"
-}
-
-# Fail-closed validation that routingViaHost is the right remedy for THIS
-# cluster, before anything is patched. Checks (each a hard failure, and a
-# failed read counts as a failure — not as a pass):
-#   1. the default network is OVN-Kubernetes — the knob is OVN-only;
-#   2. (prereq mode only) server version is 5.x — the --prereq-only
-#      prerequisite exists for the 5.0 MCO image-stream discovery, so a
-#      4.x cluster is the wrong target for THAT mode. The full-bootstrap
-#      step 8 knob (ENABLE_ROUTINGVIAHOST=true, test-lab only) stays
-#      available on 4.x — the qualified 4.22 airgap deploy used it.
-# Prints the version and platform (informational) so the log records them.
-validate_routing_prereq_target() {
-    local cv
-    if ! cv=$(oc get clusterversion version \
-        -o jsonpath='{.status.desired.version}' 2>/dev/null) || [[ -z "$cv" ]]; then
-        error "Cannot read the cluster version (oc get clusterversion failed) —"
-        error "refusing to patch routingViaHost on an unknown target."
-        exit 1
-    fi
-    if [[ "$MODE" == "prereq" && "$cv" != 5.* ]]; then
-        error "routingViaHost prerequisite targets OpenShift 5.x, this cluster runs ${cv}."
-        error "4.x installs do not need it (no MCO image-stream discovery at"
-        error "bootstrap) — see DEPLOY-RUNBOOK.md B-2."
-        exit 1
-    fi
-
-    local nettype
-    if ! nettype=$(oc get network.operator cluster \
-        -o jsonpath='{.spec.defaultNetwork.networkType}' 2>/dev/null) || [[ -z "$nettype" ]]; then
-        error "Cannot read the cluster network type (oc get network.operator failed) —"
-        error "refusing to patch routingViaHost on an unknown target."
-        exit 1
-    fi
-    if [[ "$nettype" != "OVNKubernetes" ]]; then
-        error "routingViaHost is an OVN-Kubernetes knob, but this cluster's"
-        error "default network is '${nettype}'."
-        exit 1
-    fi
-
-    local platform
-    platform=$(oc get infrastructure cluster \
-        -o jsonpath='{.status.platform}' 2>/dev/null) || platform="unknown"
-    info "Target: OCP ${cv}, ${nettype}, platform ${platform:-unknown}"
-}
-
 enable_routing_via_host() {
     step 8 "OVN routingViaHost (test-lab only)"
 
-    # --prereq-only implies consent: the whole point of that mode is this
-    # change (5.0 MCO OSImageStream discovery needs pod egress to the mirror
-    # during bootstrap, before install-complete).
-    if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" && "$MODE" != "prereq" ]]; then
+    if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" ]]; then
         info "Skipped (set ENABLE_ROUTINGVIAHOST=true to enable)"
         return
     fi
 
-    # Validate the target BEFORE patching — fail closed on version/network
-    # mismatch or on a failed read (only when we are about to change it).
     local current
-    current=$(read_routing_via_host)
-    if [[ "$current" == "READ_FAILED" ]]; then
-        error "Cannot read the current routingViaHost value (oc get failed) —"
-        error "refusing to patch blind."
-        exit 1
-    fi
+    current=$(oc get network.operator cluster \
+        -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
     if [[ "$current" == "true" ]]; then
         info "Already enabled — skipping"
         return
     fi
 
-    validate_routing_prereq_target
-
     warn "Enabling routingViaHost — this may cause a brief network disruption"
-    if ! oc patch network.operator cluster --type merge \
-        -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'; then
-        error "oc patch network.operator failed — routingViaHost NOT enabled."
-        exit 1
-    fi
+    oc patch network.operator cluster --type merge \
+        -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'
     info "routingViaHost enabled"
 }
 
@@ -1608,51 +1518,6 @@ case "$MODE" in
         # e.g. once MCH has created its runtime subscriptions.
         validate_prereqs
         repoint_default_catalog_subscriptions
-        exit 0
-        ;;
-    prereq)
-        # 5.0 airgap install prerequisite — run as soon as the cluster API is
-        # reachable and BEFORE `openshift-install agent wait-for
-        # install-complete`. The 5.0 MCO controller discovers OSImageStreams
-        # by inspecting the release image-stream images through the IDMS,
-        # which needs pod-network egress to the mirror; on labs where that
-        # requires OVN routingViaHost, the controllerconfig never completes
-        # without this and the install cannot finish (chicken-and-egg: the
-        # full bootstrap must NOT run yet — any other cluster state landing
-        # before the controller's first render causes the MCO-466 bootstrap
-        # variance; routingViaHost alone is render-neutral). Idempotent and
-        # fail-closed: cluster access only (no git/python/mirror string),
-        # target validated (OCP 5.x + OVN-Kubernetes) before patching, every
-        # read failure aborts, and an already-true value is a no-op.
-        validate_cluster_access
-        validate_routing_prereq_target
-        current=$(read_routing_via_host)
-        if [[ "$current" == "READ_FAILED" ]]; then
-            error "Cannot read the current routingViaHost value (oc get failed) —"
-            error "prerequisite NOT verified; refusing to continue."
-            exit 1
-        fi
-        if [[ "$current" != "true" ]]; then
-            warn "Enabling routingViaHost — this may cause a brief network disruption"
-            if ! oc patch network.operator cluster --type merge \
-                -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'; then
-                error "oc patch network.operator failed — routingViaHost NOT enabled."
-                exit 1
-            fi
-            info "routingViaHost enabled"
-        else
-            info "routingViaHost already true — no change (idempotent)"
-        fi
-        # Verify the end state — do not report success on the patch alone.
-        current=$(read_routing_via_host)
-        if [[ "$current" == "true" ]]; then
-            info "Prerequisite satisfied: routingViaHost=true"
-            info "Next: openshift-install agent wait-for install-complete (must exit 0),"
-            info "then run this script with no mode flag for the full bootstrap."
-        else
-            error "routingViaHost is '${current}' (expected true) — prerequisite failed"
-            exit 1
-        fi
         exit 0
         ;;
 esac

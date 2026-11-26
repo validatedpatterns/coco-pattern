@@ -32,8 +32,8 @@ jobs:
         env:
           CLUSTER_VERSION: ${{ matrix.cluster-version }}
 
-  prereq_tests:
-    name: airgap-post-install --prereq-only tests
+  mocked_oc_tests:
+    name: airgap-post-install mocked-oc tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -43,7 +43,6 @@ jobs:
         run: |
           bash -n scripts/airgap-post-install.sh
           bash -n scripts/verify/render-gate.sh
-          bash -n tests/test-airgap-post-install-prereq.sh
           bash -n tests/test-airgap-trusted-ca.sh
           bash -n tests/test-airgap-mirror-verify.sh
 
@@ -51,11 +50,9 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           shellcheck scripts/airgap-post-install.sh scripts/verify/render-gate.sh \
-            tests/test-airgap-post-install-prereq.sh tests/test-airgap-trusted-ca.sh \
-            tests/test-airgap-mirror-verify.sh
+            tests/test-airgap-trusted-ca.sh tests/test-airgap-mirror-verify.sh
 
-      - name: Mocked-oc tests (prereq + trusted-CA + mirror verify)
+      - name: Mocked-oc tests (trusted-CA + mirror verify)
         run: |
-          bash tests/test-airgap-post-install-prereq.sh
           bash tests/test-airgap-trusted-ca.sh
           bash tests/test-airgap-mirror-verify.sh

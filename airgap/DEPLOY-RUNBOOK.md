@@ -310,74 +310,19 @@ only on 4.22 (single stream).
 
 ### B-2: Boot and Install
 
-**Executable order (OCP 5.0): boot → wait for the API → routing
-prerequisite → `install-complete` → full bootstrap (C-1).** On 4.22 the
-prerequisite is not needed — go straight from boot to
-`install-complete`, then C-1.
-
-**OCP 5.0: the MCO needs mirror egress DURING bootstrap.** The 5.0
-machine-config controller discovers OSImageStreams by inspecting the
-release image-stream images (`ocp-v5.0-art-dev` digests, resolved through
-the IDMS to the mirror). On labs where pod→off-cluster egress requires
-OVN `routingViaHost` (see C-1 step 8), the controllerconfig never
-completes, `machine-config` goes Degraded, and `wait-for install-complete`
-exits 6 ("failed to initialize the cluster") after its 40-minute window —
-while the node itself is installed and every image referenced IS in the
-mirror. 4.22 does not hit this: its MCO does no image inspection at
-bootstrap.
-
-Remedy (verified on the 5.0.2 airgap run) — the four steps in this exact
-order:
-
 ```bash
-# 1) Boot the ISO via iDRAC/virtual media (one-time boot), then wait for
-#    the cluster API to answer:
-export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
-until oc get clusterversion >/dev/null 2>&1; do sleep 30; done
-cd ~/coco-pattern
-
-# 2) Routing prerequisite — BEFORE install-complete and before anything
-#    else lands (the 5.0 MCO needs pod egress to the mirror during
-#    bootstrap, and no other cluster state may precede the controller's
-#    first render — MCO-466 bootstrap variance; routingViaHost alone is
-#    render-neutral). The flag is fail-closed: wrong version, non-OVN
-#    network, failed reads and failed patches all abort:
-scripts/airgap-post-install.sh --prereq-only
-# → must print "Prerequisite satisfied: routingViaHost=true"
-#
-# NOTE: "the API answers" does not imply the Network CR exists yet — a
-# young cluster can reject the network.operator read/write with
-# "no matches for kind" or NotFound. That is a RETRY, not a failure:
-# wait ~30 s and re-run --prereq-only (the qualification run needed one
-# retry). Only a real error message from the flag (wrong version, non-OVN,
-# failed patch) is a stop condition.
-
-# 3) Let the installer finish (exit=0 required; machine-config must not
-#    be Degraded — the MCD exits bootstrap mode on its own, no repairs):
+# Mount the ISO via iDRAC/virtual media, one-time boot
+# Wait for install (~35 min):
 openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
 
-# 4) Full bootstrap (catalogs, IDMS, trustedCA, git server) — C-1:
-#    [C-1: Airgap Post-Install](#c-1-airgap-post-install)
 ```
 
-**If the MCD is already wedged** (node annotation references a missing
-install-time rendered config, `currentconfig` absent on disk), the daemon
-cannot self-heal and restarts do not help. This state means the
-prerequisite above was not applied in time. Do NOT hand-patch node
-annotations or daemon state files (`currentConfig`/`desiredConfig`
-pointing, `/run/machine-config-daemon-force`) — that repair is
-unsupported and was recorded as a deviation when it was last used.
-Instead: confirm the diagnosis below, then **reinstall the node** (the
-sanctioned path — the install is ~35 min) with the prerequisite applied
-at step 2. For sustained problems, escalate to Red Hat support with the
-`machine-config` controller/MCD logs and the node's
-`machineconfiguration.openshift.io/*` annotations.
-
-Diagnosis cues that this is egress and not missing mirror content: the
-controller log shows BOTH the source and the mirror failing with
-`dial tcp <mirror-ip>:443: i/o timeout` (TCP-level, from pods), while the
-same digests resolve from the deploy host via skopeo.
+**Known limitation (OCP 5.0, disconnected):** the installer must be
+allowed to run to `install-complete` before the airgap bootstrap (C-1)
+runs. Lab-specific prerequisites some installs need mid-bootstrap (e.g.
+OVN `routingViaHost` for pod egress to the mirror) are out of scope for
+the pattern — apply them with your own tooling if your lab requires them.
 
 ### B-3: Verify
 
