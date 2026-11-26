@@ -578,19 +578,17 @@ for s in d.get('items', []):
     fi
 }
 
-# ─── Step 3e: Validate the airgap overlay's catalog references ───
-# The overlay names mirrored CatalogSources literally; fail fast (before
-# the pattern deploys) if any is missing, and check mirror consistency —
-# a placeholder or mismatched global.mirrorRegistry would otherwise only
-# surface as ImagePullBackOff inside the CVMs much later.
-validate_airgap_overlay() {
-    step "3e" "Validate airgap overlay catalog references"
-
-    # This whole step is airgap-only by design ("connected works by
-    # default"): unless global.airgap is true the function is inert, so a
-    # connected run never aborts on airgap-only conditions (mirrored
-    # catalogs absent, mirrorRegistry empty, connected-default sources).
-    local airgap_flag helm_repo operator_source patterns_source
+# ─── Local preflight: airgap values consistency (no cluster I/O) ───
+# All LOCAL config checks from the old step 3e, run BEFORE any cluster
+# write: a bad values file (missing overlay for the configured version,
+# placeholder mirrorRegistry, connected-default operator sources) must
+# abort the bootstrap before it disables catalogs or patches anything —
+# leaving a half-reconfigured cluster behind on a config typo.
+# Airgap-only by design ("connected works by default"): unless
+# global.airgap is true the function is inert, so a connected run never
+# aborts on airgap-only conditions.
+preflight_local_config() {
+    local airgap_flag
     airgap_flag=$(read_global_key global.airgap false)
     if [[ "${airgap_flag,,}" != "true" ]]; then
         return
@@ -608,6 +606,24 @@ validate_airgap_overlay() {
         error "global.clusterVersion or add the overlay."
         exit 1
     fi
+    preflight_values_consistency
+}
+
+# ─── Step 3e: Validate the airgap overlay's catalog references ───
+# The overlay names mirrored CatalogSources literally; fail fast (before
+# the pattern deploys) if any is missing. Runs AFTER step 3/3b applied
+# the oc-mirror CatalogSources (not-READY may be plain timing).
+validate_airgap_overlay() {
+    step "3e" "Validate airgap overlay catalog references"
+
+    local airgap_flag
+    airgap_flag=$(read_global_key global.airgap false)
+    if [[ "${airgap_flag,,}" != "true" ]]; then
+        return
+    fi
+
+    local overlay
+    overlay=$(airgap_overlay_path)
 
     # Every cs-* catalog named in the overlay must exist and be READY.
     local catalogs
@@ -665,7 +681,11 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
         error "from the oc-mirror cluster-resources."
         exit 1
     fi
+}
 
+# Local values-consistency checks (no cluster I/O) — called by
+# preflight_local_config before the first cluster write.
+preflight_values_consistency() {
     # Mirror registry consistency: global.mirrorRegistry must be a real,
     # non-placeholder value and match $MIRROR_REGISTRY (org path included).
     local mirror yaml_mirror
@@ -691,6 +711,7 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
     # (disabled in step 2; step 3d runs before those subscriptions exist).
     # Fail fast here rather than as a stuck operator after the Pattern CR.
     local mirror_root="${MIRROR_REGISTRY%%/}"
+    local helm_repo operator_source patterns_source
     helm_repo=$(read_global_key main.multiSourceConfig.helmRepoUrl '')
     if [[ -z "$helm_repo" ]]; then
         error "main.multiSourceConfig.helmRepoUrl is empty while global.airgap is true."
@@ -845,12 +866,18 @@ mirror_oci_charts() {
             pi_ca="${HOME}/.coco-pattern/registry-ca-cert.pem"
         fi
         if [[ -n "$pi_ca" ]]; then
-            local pi_host
+            # Flat cert dir: an explicit skopeo --cert-dir sets
+            # SystemContext.DockerCertPath, which containers/image uses
+            # UNCHANGED (dockerCertDir() returns it as-is; the
+            # <cert-dir>/<host>/ per-registry layout applies only to the
+            # default /etc/containers/certs.d discovery). ca.crt therefore
+            # goes directly in the directory passed to --cert-dir.
+            # TLS verification is explicitly ON in this branch — the CA is
+            # configured, so there is no reason to tolerate a silent
+            # --tls-verify=false fallback.
             pi_certdir="$(mktemp -d)"
-            pi_host="${MIRROR_REGISTRY%%/*}"
-            mkdir -p "${pi_certdir}/${pi_host}"
-            cp "$pi_ca" "${pi_certdir}/${pi_host}/ca.crt"
-            pi_verify+=(--cert-dir "$pi_certdir")
+            cp "$pi_ca" "${pi_certdir}/ca.crt"
+            pi_verify+=(--cert-dir "$pi_certdir" --tls-verify=true)
         else
             warn "  No mirror CA (${MIRROR_CA_FILE:-unset}, ~/.coco-pattern/"
             warn "  registry-ca-cert.pem absent) — falling back to --tls-verify=false"
@@ -858,6 +885,11 @@ mirror_oci_charts() {
         fi
         local pi_errfile
         pi_errfile="$(mktemp)"
+        pi_cleanup() { # temp files on every exit path from this block
+            rm -f "$pi_errfile"
+            [[ -n "${pi_certdir:-}" && -d "${pi_certdir:-}" ]] && rm -rf "$pi_certdir"
+            return 0
+        }
         local pi_mirror_tags pi_rc
         pi_mirror_tags=$(skopeo list-tags "${pi_verify[@]}" "docker://${pi_dest}" 2>"$pi_errfile") \
             && pi_rc=0 || pi_rc=$?
@@ -865,29 +897,37 @@ mirror_oci_charts() {
             error "skopeo list-tags against the mirror FAILED (auth, TLS or"
             error "connectivity — this is NOT an empty-mirror verdict):"
             sed 's/^/    /' "$pi_errfile" >&2 || true
-            rm -f "$pi_errfile"
+            pi_cleanup
             error "Check the mirror credentials (SKOPEO_AUTHFILE), the CA"
             error "(MIRROR_CA_FILE) and connectivity to ${pi_dest}."
             exit 1
         fi
-        rm -f "$pi_errfile"
-        pi_mirror_tags=$(python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' \
-            <<<"$pi_mirror_tags" 2>/dev/null || true)
+        # Parse the tag list; unparseable JSON is a skopeo/registry defect and
+        # must not be misreported as an empty mirror.
+        if ! pi_mirror_tags=$(python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' \
+                <<<"$pi_mirror_tags" 2>/dev/null); then
+            error "skopeo returned unparseable tag JSON for docker://${pi_dest}"
+            error "(python json.load failed) — this is a skopeo/registry defect,"
+            error "not an empty mirror."
+            pi_cleanup
+            exit 1
+        fi
         if [[ -z "$pi_mirror_tags" ]]; then
             error "pattern-install is not present in the mirror: 'skopeo list-tags"
             error "docker://${pi_dest}' succeeded but returned no tags."
             error "'pattern.sh make install' resolves this chart from the mirror"
             error "(no version pin — highest semver tag) and will fail at chart-fetch."
+            pi_cleanup
             exit 1
         fi
         info "  pattern-install present in mirror ($(grep -c . <<<"$pi_mirror_tags") tags)"
+        pi_cleanup
     else
         warn "  skopeo not available — cannot verify that pattern-install is mirrored"
         warn "  to ${pi_dest}. 'pattern.sh make install' resolves this chart from"
         warn "  the mirror and WILL FAIL at chart-fetch if it is not already there."
     fi
 
-    [[ -n "$pi_certdir" && -d "$pi_certdir" ]] && rm -rf "$pi_certdir"
     info "OCI mirroring complete"
 }
 
@@ -957,10 +997,72 @@ fix_manifest_lists() {
 # Applying the patch HERE — before the pattern deploys — means injected
 # ConfigMaps are born with the mirror CA already in them.
 # Fail-closed by design: a failed read aborts (never treated as empty), a
-# different non-empty trust anchor is preserved (never clobbered), the CA
-# data is validated before it is trusted, and "pointer updated" is
-# distinguished from "bundle reconciled" before the bootstrap continues.
-# Idempotent: a no-op when the field already holds the value.
+# different non-empty trust anchor is preserved (never clobbered — the
+# write is conditional on the resourceVersion we read), the CA data is
+# validated by openssl certificate-by-certificate before it is trusted,
+# and "pointer updated" is distinguished from "bundle reconciled" before
+# the bootstrap continues. Idempotent: a no-op when the field already
+# holds the value.
+
+# Split a PEM bundle into certificates and print each one's SHA256
+# fingerprint (lowercase hex, no colons), one per line. Fails (rc 1, no
+# output) when the bundle contains no certificate or a block openssl
+# refuses to parse — used to validate the user bundle BEFORE it is
+# trusted, and to match injected bundles by COMPLETE certificate
+# fingerprints (a shared base64 body line can appear in unrelated
+# certificates; a fingerprint cannot).
+cert_fingerprints() { # $1 = PEM bundle text
+    local pem="$1" work f fp n=0
+    work="$(mktemp -d)"
+    printf '%s\n' "$pem" > "${work}/bundle.pem"
+    # One file per -----BEGIN CERTIFICATE----- block (-z drops the empty
+    # prefix chunk when the bundle starts with a marker; leading
+    # non-certificate text lands in its own chunk and is skipped below).
+    if ! csplit -z -s -f "${work}/cert-" -b "%03d.pem" "${work}/bundle.pem" \
+            '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1; then
+        rm -rf "$work"
+        return 1
+    fi
+    for f in "${work}"/cert-*.pem; do
+        grep -q -e "-----BEGIN CERTIFICATE-----" "$f" 2>/dev/null || continue
+        n=$(( n + 1 ))
+        if ! fp=$(openssl x509 -noout -fingerprint -sha256 -in "$f" 2>/dev/null); then
+            rm -rf "$work"
+            return 1
+        fi
+        printf '%s\n' "${fp#*=}" | tr -d ':' | tr 'A-F' 'a-f'
+    done
+    rm -rf "$work"
+    [[ $n -gt 0 ]] || return 1
+}
+
+# Read a dotted field from `oc get <resource> cluster -o json`. oc's
+# jsonpath output ERRORS on a missing field, which is indistinguishable
+# from an API failure at the call site (a genuinely absent field is the
+# NORMAL state on a fresh cluster); reading the object as JSON and
+# parsing locally keeps "unset" and "unreadable" distinct. Prints
+# READ_FAILED when the oc query itself fails.
+read_cluster_field() { # $1 = dotted JSON path from the object root, $2 = resource (default: proxy)
+    local res="${2:-proxy}" json val
+    if ! json=$(oc get "$res" cluster -o json 2>/dev/null); then
+        echo "READ_FAILED"
+        return
+    fi
+    if ! val=$(printf '%s' "$json" | python3 -c '
+import json, sys
+cur = json.load(sys.stdin)
+for part in sys.argv[1].split("."):
+    if not isinstance(cur, dict) or part not in cur:
+        print(""); sys.exit(0)
+    cur = cur[part]
+print("" if cur is None else cur)
+' "$1" 2>/dev/null); then
+        echo "READ_FAILED"
+        return
+    fi
+    printf '%s\n' "$val"
+}
+
 configure_cluster_trusted_ca() {
     step 7 "Anchor cluster trust bundle at user-ca-bundle (runbook C-3)"
 
@@ -973,9 +1075,15 @@ configure_cluster_trusted_ca() {
         return
     fi
 
-    # Validate the bundle BEFORE pointing anything at it: an empty or
-    # non-PEM ca-bundle.crt would empty every injected trust bundle on
-    # the cluster the moment the pointer lands.
+    # openssl is required: the bundle is validated certificate-by-
+    # certificate before it is trusted cluster-wide (a grep for
+    # BEGIN CERTIFICATE lets arbitrary non-certificate data through).
+    if ! command -v openssl >/dev/null 2>&1; then
+        error "openssl is required to validate the user CA bundle —"
+        error "refusing to point the cluster trust anchor at an unvalidated one."
+        exit 1
+    fi
+
     local ca_data
     if ! ca_data=$(oc get configmap user-ca-bundle -n openshift-config \
             -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null); then
@@ -989,16 +1097,18 @@ configure_cluster_trusted_ca() {
         error "point the cluster trust anchor at an empty bundle."
         exit 1
     fi
-    if ! grep -q "BEGIN CERTIFICATE" <<<"$ca_data"; then
-        error "user-ca-bundle's ca-bundle.crt contains no PEM certificates —"
-        error "refusing to trust it cluster-wide."
+    local ca_fps
+    if ! ca_fps=$(cert_fingerprints "$ca_data"); then
+        error "user-ca-bundle's ca-bundle.crt does not parse as certificates"
+        error "(openssl rejected a block) — refusing to trust it cluster-wide."
         exit 1
     fi
 
     # Preserve an existing, different trust anchor: clobbering it would
     # silently drop whatever CA the cluster already trusts.
     local current
-    if ! current=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null); then
+    current=$(read_cluster_field spec.trustedCA.name)
+    if [[ "$current" == "READ_FAILED" ]]; then
         error "Cannot read proxy/cluster spec.trustedCA.name (oc get failed) —"
         error "refusing to patch blind."
         exit 1
@@ -1015,76 +1125,97 @@ configure_cluster_trusted_ca() {
     if [[ "$current" == "user-ca-bundle" ]]; then
         info "proxy/cluster trustedCA already points at user-ca-bundle"
     else
-        if ! oc patch proxy cluster --type merge \
-            -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}'; then
-            error "oc patch proxy/cluster failed — trustedCA NOT set."
+        # Conditional write: JSON-patch "test" on the resourceVersion we
+        # just read, so a concurrent trust-anchor change between read and
+        # write FAILS the patch instead of being overwritten.
+        local rv
+        rv=$(read_cluster_field metadata.resourceVersion)
+        if [[ "$rv" == "READ_FAILED" || -z "$rv" ]]; then
+            error "Cannot read proxy/cluster metadata.resourceVersion —"
+            error "refusing to write without a conflict precondition."
             exit 1
         fi
-        # Verify the write landed; propagate the read error if it did not.
-        local readback
-        if ! readback=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null); then
-            error "Cannot read back proxy/cluster trustedCA after patch — aborting."
-            exit 1
+        if ! oc patch proxy cluster --type json -p "[{\"op\":\"test\",\"path\":\"/metadata/resourceVersion\",\"value\":\"${rv}\"},{\"op\":\"add\",\"path\":\"/spec/trustedCA\",\"value\":{\"name\":\"user-ca-bundle\"}}]"; then
+            # Either a concurrent change or a genuine API error: re-read
+            # and decide instead of retrying the write.
+            local after
+            after=$(read_cluster_field spec.trustedCA.name)
+            if [[ "$after" == "user-ca-bundle" ]]; then
+                info "trustedCA was set to user-ca-bundle concurrently — nothing to do"
+            else
+                error "The proxy/cluster trustedCA patch failed. If the value is"
+                error "now '${after:-still not set}' another writer changed the"
+                error "anchor while we were patching — refusing to overwrite it."
+                error "Resolve the conflict manually and re-run."
+                exit 1
+            fi
+        else
+            # Verify the write landed; propagate the read error if it did not.
+            local readback
+            readback=$(read_cluster_field spec.trustedCA.name)
+            if [[ "$readback" == "READ_FAILED" ]]; then
+                error "Cannot read back proxy/cluster trustedCA after patch — aborting."
+                exit 1
+            fi
+            if [[ "$readback" != "user-ca-bundle" ]]; then
+                error "proxy/cluster trustedCA readback is '${readback}' (expected"
+                error "user-ca-bundle) — something reverted the patch. Aborting."
+                exit 1
+            fi
+            info "proxy/cluster trustedCA pointer set to user-ca-bundle"
         fi
-        if [[ "$readback" != "user-ca-bundle" ]]; then
-            error "proxy/cluster trustedCA readback is '${readback}' (expected"
-            error "user-ca-bundle) — something reverted the patch. Aborting."
-            exit 1
-        fi
-        info "proxy/cluster trustedCA pointer set to user-ca-bundle"
     fi
 
     # "Pointer updated" is not "bundle reconciled": the injection into
     # config.openshift.io/inject-trusted-cabundle ConfigMaps is
     # asynchronous. When labeled ConfigMaps exist, at least one must carry
-    # the user CA before the bootstrap continues (the pattern deploy would
-    # otherwise race a stale bundle). When none exist yet (fresh install,
+    # EVERY user-bundle certificate (matched by fingerprint) before the
+    # bootstrap continues; when none exist yet (fresh install,
     # pre-pattern), the pointer alone is sufficient — ConfigMaps rendered
-    # later are born with the bundle.
-    local cert_line
-    cert_line=$(awk '/BEGIN CERTIFICATE/{flag=1;next} /END CERTIFICATE/{exit} flag{print length($0), $0}' <<<"$ca_data" \
-        | sort -rn | head -1 | cut -d' ' -f2-)
-    if [[ -z "$cert_line" ]]; then
-        error "Could not extract a certificate body line from user-ca-bundle —"
-        error "refusing to verify reconciliation against an unusable marker."
-        exit 1
-    fi
-    local labeled_cms
-    if ! labeled_cms=$(oc get configmaps -A \
-            -l config.openshift.io/inject-trusted-cabundle=true -o name 2>/dev/null); then
-        error "Cannot list inject-trusted-cabundle ConfigMaps (oc get failed) —"
-        error "cannot verify bundle reconciliation. Aborting."
-        exit 1
-    fi
-    if [[ -z "$labeled_cms" ]]; then
-        warn "No inject-trusted-cabundle ConfigMaps on the cluster yet —"
-        warn "the pointer is set; ConfigMaps rendered by the pattern deploy"
-        warn "are born with the mirror CA in them."
-        return
-    fi
-    local waited=0 injected_ns="" cm ref ns name cmdata
-    while [[ $waited -lt 180 ]]; do
-        while IFS= read -r cm; do
-            [[ -z "$cm" ]] && continue
-            ref="${cm#configmap/}"
-            ns="${ref%%/*}"
-            name="${ref#*/}"
-            # Capture then grep (not oc|grep): grep -q exits early and
-            # SIGPIPEs oc under pipefail, turning a match into a miss.
-            cmdata=$(oc get configmap "$name" -n "$ns" \
-                -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null) || continue
-            if grep -qF -- "$cert_line" <<< "$cmdata"; then
-                injected_ns="${ns}/${name}"
-                break
-            fi
-        done <<< "$labeled_cms"
-        if [[ -n "$injected_ns" ]]; then
-            info "Bundle reconciled: ${injected_ns} carries the user CA"
-            info "inject-trusted-cabundle ConfigMaps now include the mirror CA"
-            return
+    # later are born with the bundle. Wall-clock deadline (SECONDS counts
+    # oc call time too, unlike a sleep counter) and the candidate list is
+    # re-fetched every round so ConfigMaps created while waiting are seen.
+    # The deadline and poll interval are tunable for slow labs and tests.
+    local labeled_cms deadline=$(( SECONDS + ${CA_RECONCILE_TIMEOUT_SECONDS:-180} ))
+    local line ns name cmdata cm_fps fp matched examined
+    while (( SECONDS < deadline )); do
+        # Structured listing (namespace + name per line): `-o name` prints
+        # only `configmap/<name>` with no namespace, even with -A.
+        if ! labeled_cms=$(oc get configmaps -A \
+                -l config.openshift.io/inject-trusted-cabundle=true \
+                -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null); then
+            error "Cannot list inject-trusted-cabundle ConfigMaps (oc get failed) —"
+            error "cannot verify bundle reconciliation. Aborting."
+            exit 1
         fi
-        sleep 15
-        waited=$((waited + 15))
+        if [[ -n "$labeled_cms" ]]; then
+            examined=0
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                read -r ns name <<< "$line"
+                # Bound the oc calls per round; an operator namespace
+                # typically has a handful of injected ConfigMaps.
+                examined=$(( examined + 1 ))
+                if [[ $examined -gt 40 ]]; then
+                    warn "  more than 40 injected ConfigMaps — sampling the first 40 this round"
+                    break
+                fi
+                cmdata=$(oc get configmap "$name" -n "$ns" \
+                        -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null) || continue
+                cm_fps=$(cert_fingerprints "$cmdata" 2>/dev/null) || continue
+                matched=1
+                while IFS= read -r fp; do
+                    [[ -z "$fp" ]] && continue
+                    grep -qxF "$fp" <<< "$cm_fps" || { matched=0; break; }
+                done <<< "$ca_fps"
+                if [[ "$matched" == "1" ]]; then
+                    info "Bundle reconciled: ${ns}/${name} carries every user-CA certificate"
+                    info "inject-trusted-cabundle ConfigMaps now include the mirror CA"
+                    return
+                fi
+            done <<< "$labeled_cms"
+        fi
+        sleep "${CA_RECONCILE_POLL_SECONDS:-15}"
     done
     error "trustedCA pointer is set, but no inject-trusted-cabundle ConfigMap"
     error "picked up the user CA within 180s — the injection may be wedged"
@@ -1093,6 +1224,7 @@ configure_cluster_trusted_ca() {
     error "chart fetch (x509: unknown authority)."
     exit 1
 }
+
 
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
 # Read the current routingViaHost value. A FAILED oc query (API outage,
@@ -1531,6 +1663,11 @@ echo "╚═══════════════════════�
 echo ""
 
 validate_prereqs
+# Local config preflight BEFORE any cluster write: a missing airgap
+# overlay for the configured version, a placeholder mirrorRegistry or a
+# connected-default operator source must abort here, not after the
+# bootstrap has disabled catalogs and patched mirror rules.
+preflight_local_config
 disable_default_catalogs
 create_catalog_sources
 apply_ocmirror_resources
