@@ -31,6 +31,11 @@ CERTIFIED_CS="cs-certified-operator-index-v${VER_DASHED}"
 # dashed version, mirroring the sharedValueFiles tpl in values-baremetal.yaml.
 AIRGAP_OVERLAY="values-baremetal-airgap"
 [[ "$CLUSTER_VERSION" != "4.22" ]] && AIRGAP_OVERLAY="values-baremetal-airgap-${VER_DASHED}"
+# Version overlay for the baremetal chain: 5.0 diverts to
+# values-5.0-baremetal.yaml (namespaces-list replacement for the DCAP
+# OperatorGroup — see that file), mirroring the sharedValueFiles tpl.
+VERSION_OVERLAY="values-${CLUSTER_VERSION}"
+[[ "$CLUSTER_VERSION" == "5.0" ]] && VERSION_OVERLAY="values-5.0-baremetal"
 
 pass() { echo -e "PASS: $*"; }
 fail() { echo -e "FAIL: $*"; FAILS=$((FAILS + 1)); }
@@ -56,7 +61,7 @@ render_root() { # $1 = airgap|connected (baremetal chain)
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
-        -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml" \
+        -f "${PATTERN_DIR}/overrides/${VERSION_OVERLAY}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml" \
         -f "${PATTERN_DIR}/overrides/${overlay}.yaml" \
         --set global.repoURL=https://example.com/coco-pattern.git \
@@ -196,6 +201,180 @@ val="$(collateral_override "$CONNECTED")"
 [[ "$val" == https://api.trustedservices.intel.com/sgx/certification/v4/ ]] \
     && pass "kbs.tdx.collateralService → Intel PCS" \
     || fail "kbs.tdx.collateralService → '${val}' (expected Intel PCS URL)"
+
+# ── DCAP: channel, OperatorGroup, imageset consistency ──────────────
+# The Intel DCAP operator is version-divergent: 4.22 pins the alpha channel
+# (v0.1.0, AllNamespaces OperatorGroup — what imageset-config-4.22.yaml
+# mirrors), 5.0 pins stable (v0.27.0, OwnNamespace-only — what
+# imageset-config-5.0.yaml mirrors). Assert all three stay consistent:
+# what the render requests, what the OperatorGroup allows, and what the
+# corresponding imageset actually mirrors.
+echo "── Intel DCAP channel / OperatorGroup / imageset consistency (version ${CLUSTER_VERSION})"
+sub_channel() { # $1 = rendered manifest, $2 = subscription name
+    awk -v wanted="$2" '
+        /^  name: / { cur = $2 }
+        /^  channel: / { if (cur == wanted) { print $2; exit } }' <<< "$1"
+}
+
+expected_channel="alpha"
+expected_og="AllNamespaces"
+[[ "$CLUSTER_VERSION" == "5.0" ]] && { expected_channel="stable"; expected_og="OwnNamespace"; }
+
+for mode_label in AIRGAP CONNECTED; do
+    chan="$(sub_channel "${!mode_label}" intel-tdx-dcap-operator)"
+    [[ "$chan" == "$expected_channel" ]] \
+        && pass "$mode_label: intel-tdx-dcap-operator channel → $chan" \
+        || fail "$mode_label: intel-tdx-dcap-operator channel '${chan}' (expected ${expected_channel})"
+done
+
+og_block="$(awk -v RS='---' '/kind: OperatorGroup/ && /intel-dcap-operator-system-operator-group/' <<< "$CONNECTED")"
+if [[ "$expected_og" == "OwnNamespace" ]]; then
+    grep -q 'targetNamespaces:' <<< "$og_block" \
+        && grep -q '  - intel-dcap-operator-system$' <<< "$og_block" \
+        && pass "DCAP OperatorGroup → OwnNamespace (targetNamespaces pinned)" \
+        || fail "DCAP OperatorGroup: expected OwnNamespace with targetNamespaces [intel-dcap-operator-system]"
+else
+    # AllNamespaces renders the OperatorGroup WITHOUT a spec at all
+    grep -q '^spec:' <<< "$og_block" \
+        && fail "DCAP OperatorGroup: expected AllNamespaces (no spec) on ${CLUSTER_VERSION}" \
+        || pass "DCAP OperatorGroup → AllNamespaces (no spec)"
+fi
+
+imageset_channel="$(python3 - "${PATTERN_DIR}/airgap/imageset-config-${CLUSTER_VERSION}.yaml" <<'PYEOF'
+import sys, yaml
+cfg = yaml.safe_load(open(sys.argv[1]))
+for catalog in cfg["mirror"]["operators"]:
+    for pkg in catalog.get("packages", []):
+        if pkg.get("name") == "intel-tdx-dcap-operator":
+            print(pkg["channels"][0]["name"])
+            sys.exit(0)
+print("MISSING")
+PYEOF
+)"
+[[ "$imageset_channel" == "$expected_channel" ]] \
+    && pass "imageset-config-${CLUSTER_VERSION}.yaml mirrors DCAP channel '$imageset_channel' (matches the render)" \
+    || fail "imageset-config-${CLUSTER_VERSION}.yaml DCAP channel '${imageset_channel}' != rendered '${expected_channel}' — a fresh disconnected install cannot resolve the subscription"
+
+# ── Resolved value-file chain in the root render ─────────────────────
+# The sharedValueFiles tpl resolution is pinned end-to-end: the child
+# Applications in the root render must carry exactly the overlay paths the
+# chain resolves to for this version (rendered as $patternref/... paths).
+# Here-strings, not echo|grep: grep -q exits early and SIGPIPEs an upstream
+# echo under pipefail (see header).
+echo "── resolved overlay chain (version ${CLUSTER_VERSION})"
+if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
+    refs=("values-5.0-baremetal.yaml")
+else
+    refs=("values-${CLUSTER_VERSION}.yaml")
+fi
+refs+=("values-storage-lvm.yaml" "values-hw-intel-tdx.yaml")
+for ref in "${refs[@]}"; do
+    grep -q "\$patternref/overrides/${ref}" <<< "$AIRGAP" \
+        && pass "airgap root render valueFiles include overrides/${ref}" \
+        || fail "airgap root render valueFiles missing overrides/${ref}"
+    grep -q "\$patternref/overrides/${ref}" <<< "$CONNECTED" \
+        && pass "connected root render valueFiles include overrides/${ref}" \
+        || fail "connected root render valueFiles missing overrides/${ref}"
+done
+# Mode overlay: airgap render ↔ AIRGAP_OVERLAY, connected ↔ connected
+grep -q "\$patternref/overrides/${AIRGAP_OVERLAY}.yaml" <<< "$AIRGAP" \
+    && pass "airgap root render valueFiles include overrides/${AIRGAP_OVERLAY}.yaml" \
+    || fail "airgap root render valueFiles missing overrides/${AIRGAP_OVERLAY}.yaml"
+grep -q "\$patternref/overrides/values-baremetal-connected.yaml" <<< "$CONNECTED" \
+    && pass "connected root render valueFiles include overrides/values-baremetal-connected.yaml" \
+    || fail "connected root render valueFiles missing overrides/values-baremetal-connected.yaml"
+if [[ "$CLUSTER_VERSION" != "5.0" ]]; then
+    grep -q "values-5.0-baremetal" <<< "$AIRGAP" \
+        && fail "non-5.0 render must not reference values-5.0-baremetal.yaml" \
+        || pass "non-5.0 render does not reference the 5.0-only overlay"
+fi
+
+# ── Namespace-list drift guard (5.0 overlay vs base) ─────────────────
+# Helm replaces lists wholesale, so overrides/values-5.0-baremetal.yaml
+# carries a full copy of the values-baremetal.yaml namespaces list (with
+# the DCAP OperatorGroup entry flipped to OwnNamespace). Assert the two
+# lists are identical apart from that one entry — a base-list edit without
+# the 5.0 copy (or vice versa) fails here.
+echo "── namespaces-list parity: values-5.0-baremetal.yaml vs values-baremetal.yaml"
+parity="$(python3 - "${PATTERN_DIR}" <<'PYEOF'
+import sys, yaml
+base = yaml.safe_load(open(f"{sys.argv[1]}/values-baremetal.yaml"))["clusterGroup"]["namespaces"]
+ovr = yaml.safe_load(open(f"{sys.argv[1]}/overrides/values-5.0-baremetal.yaml"))["clusterGroup"]["namespaces"]
+if len(base) != len(ovr):
+    print(f"LENGTH base={len(base)} overlay={len(ovr)}")
+    sys.exit(0)
+for i, (b, o) in enumerate(zip(base, ovr)):
+    if b == o:
+        continue
+    if isinstance(b, dict) and isinstance(o, dict) and list(b) == list(o) == ["intel-dcap-operator-system"]:
+        continue  # the one sanctioned difference: the DCAP OperatorGroup entry
+    print(f"ENTRY {i}: base={b!r} overlay={o!r}")
+    sys.exit(0)
+print("OK")
+PYEOF
+)"
+[[ "$parity" == "OK" ]] \
+    && pass "namespaces lists identical apart from the DCAP OperatorGroup entry" \
+    || fail "namespaces drift between values-baremetal.yaml and values-5.0-baremetal.yaml: $parity"
+
+# ── Version-specific workload behaviour ──────────────────────────────
+# 5.0 only: the CRI-O guest-pull defect forces imagePullPolicy: Always on
+# the digest-pinned kata-cc workload containers; 4.22 keeps the default.
+echo "── workload imagePullPolicy (version ${CLUSTER_VERSION})"
+for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
+    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
+        --set global.coco.runtimeClassName=kata-cc \
+        --set-string "global.clusterVersion=${CLUSTER_VERSION}" 2>/dev/null)" \
+        || { fail "$chart ${CLUSTER_VERSION} render errored"; continue; }
+    n="$(grep -c 'imagePullPolicy: Always' <<< "$out" || true)"
+    if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
+        [[ "$n" -gt 0 ]] \
+            && pass "$chart: imagePullPolicy Always on ${CLUSTER_VERSION} (CRI-O guest-pull defect)" \
+            || fail "$chart: imagePullPolicy Always missing on ${CLUSTER_VERSION}"
+    else
+        [[ "$n" -eq 0 ]] \
+            && pass "$chart: default pull policy on ${CLUSTER_VERSION}" \
+            || fail "$chart: imagePullPolicy Always must not render on ${CLUSTER_VERSION}"
+    fi
+done
+
+# 5.0 only: NFD operand image is CSV-provided (openshift5 org, digest) —
+# the 4.x tag pin must NOT render; 4.22 keeps the pinned tag.
+nfd_img="$(helm template nfd "${PATTERN_DIR}/charts/all/baremetal" \
+    -f "${PATTERN_DIR}/values-global.yaml" \
+    --set-string "global.clusterVersion=${CLUSTER_VERSION}" 2>/dev/null \
+    | grep 'image: registry.redhat.io/openshift4/ose-node-feature-discovery' || true)"
+if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
+    [[ -z "$nfd_img" ]] \
+        && pass "NFD operand unpinned on 5.0 (CSV digest from the openshift5 org)" \
+        || fail "NFD operand still tag-pinned on 5.0: $nfd_img"
+else
+    [[ "$nfd_img" == *"ose-node-feature-discovery-rhel9:v${CLUSTER_VERSION}"* ]] \
+        && pass "NFD operand tag-pinned on ${CLUSTER_VERSION}" \
+        || fail "NFD operand pin wrong on ${CLUSTER_VERSION}: $nfd_img"
+fi
+
+# SELinux kvm_gmem MachineConfig: 5.0/rhel-10 only (present), 5.0/rhel-9
+# and every 4.x must not render it.
+selinux_count() { # $1 = osStream, prints match count
+    helm template sel "${PATTERN_DIR}/charts/all/baremetal" \
+        -f "${PATTERN_DIR}/values-global.yaml" \
+        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
+        --set "global.cluster.osStream=$1" 2>/dev/null \
+        | grep -c 'name: 99-coco-selinux-kvm-gmem' || true
+}
+if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
+    [[ "$(selinux_count rhel-10)" -gt 0 ]] \
+        && pass "SELinux kvm_gmem MachineConfig present on 5.0/rhel-10" \
+        || fail "SELinux kvm_gmem MachineConfig missing on 5.0/rhel-10"
+    [[ "$(selinux_count rhel-9)" -eq 0 ]] \
+        && pass "SELinux kvm_gmem MachineConfig absent on 5.0/rhel-9" \
+        || fail "SELinux kvm_gmem MachineConfig must not render on 5.0/rhel-9"
+else
+    [[ "$(selinux_count rhel-10)" -eq 0 ]] \
+        && pass "SELinux kvm_gmem MachineConfig absent on ${CLUSTER_VERSION}" \
+        || fail "SELinux kvm_gmem MachineConfig must not render on ${CLUSTER_VERSION}"
+fi
 
 # ── Sync-wave layout: every cluster group (connected mode) ───────────
 echo "── sync-wave layout (all cluster groups, connected mode)"

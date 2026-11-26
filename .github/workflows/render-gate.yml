@@ -8,8 +8,16 @@ permissions:
 
 jobs:
   render_gate:
-    name: Values-chain render gate (connected + airgap)
+    name: Values-chain render gate (${{ matrix.cluster-version }}, connected + airgap)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both qualified minors: 4.22 (the qualified baseline — its leg
+        # asserts the DCAP alpha channel matches imageset-config-4.22.yaml
+        # and that the 4.22 render keeps upstream defaults) and 5.0 (DCAP
+        # stable + OwnNamespace, per imageset-config-5.0.yaml).
+        cluster-version: ['4.22', '5.0']
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -21,3 +29,30 @@ jobs:
 
       - name: Run the render gate
         run: bash scripts/verify/render-gate.sh quay.example:443/mirror
+        env:
+          CLUSTER_VERSION: ${{ matrix.cluster-version }}
+
+  prereq_tests:
+    name: airgap-post-install --prereq-only tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: bash -n (syntax)
+        run: |
+          bash -n scripts/airgap-post-install.sh
+          bash -n scripts/verify/render-gate.sh
+          bash -n tests/test-airgap-post-install-prereq.sh
+          bash -n tests/test-airgap-trusted-ca.sh
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck scripts/airgap-post-install.sh scripts/verify/render-gate.sh \
+            tests/test-airgap-post-install-prereq.sh tests/test-airgap-trusted-ca.sh
+
+      - name: Mocked-oc tests (prereq + trusted-CA)
+        run: |
+          bash tests/test-airgap-post-install-prereq.sh
+          bash tests/test-airgap-trusted-ca.sh
