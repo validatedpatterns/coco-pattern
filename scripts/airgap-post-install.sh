@@ -88,27 +88,36 @@ airgap_overlay_path() {
 }
 
 # ─── Mode dispatch ───────────────────────────────────────────────
+# Fail closed on argument errors BEFORE any cluster I/O: an unrecognised
+# or mistyped flag (e.g. --prereq-onyl) must abort, never fall through to
+# the full bootstrap or another mode. A mode flag takes no operands.
 MODE="full"
 case "${1:-}" in
-    --sync-repos-only)    MODE="sync"; shift ;;
-    --deploy-pattern)     MODE="deploy"; shift ;;
-    --fix-manifest-lists) MODE="fix-manifests"; shift ;;
-    --repoint-subs)       MODE="repoint"; shift ;;
-    --prereq-only)        MODE="prereq"; shift ;;
+    "")                    ;;
+    --sync-repos-only)     MODE="sync"; shift ;;
+    --deploy-pattern)      MODE="deploy"; shift ;;
+    --fix-manifest-lists)  MODE="fix-manifests"; shift ;;
+    --repoint-subs)        MODE="repoint"; shift ;;
+    --prereq-only)         MODE="prereq"; shift ;;
+    *)
+        error "Unknown argument: '${1}'"
+        error "Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs|--prereq-only]"
+        exit 2
+        ;;
 esac
+if [[ $# -gt 0 ]]; then
+    error "Unexpected argument(s) after the mode flag: '$*'"
+    error "A mode flag takes no operands. Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs|--prereq-only]"
+    exit 2
+fi
 
 # ─── Step 1: Validate prerequisites ─────────────────────────────
-validate_prereqs() {
-    step 1 "Validate prerequisites"
-
-    local missing=()
-    for cmd in oc git python3; do
-        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
-    done
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        error "Missing required commands: ${missing[*]}"
-        exit 1
-    fi
+# Cluster access only — the minimal requirement for modes that talk to the
+# cluster but need neither the git server, python tooling, nor a mirror
+# registry string (--prereq-only runs on a half-installed cluster where
+# those bootstrap dependencies may not exist yet).
+validate_cluster_access() {
+    command -v oc >/dev/null 2>&1 || { error "Missing required command: oc"; exit 1; }
 
     if [[ -z "${KUBECONFIG:-}" ]]; then
         error "KUBECONFIG is not set"
@@ -119,16 +128,32 @@ validate_prereqs() {
         exit 1
     fi
 
+    if ! oc whoami >/dev/null 2>&1; then
+        error "Cannot connect to cluster. Check KUBECONFIG."
+        exit 1
+    fi
+}
+
+validate_prereqs() {
+    step 1 "Validate prerequisites"
+
+    validate_cluster_access
+
+    local missing=()
+    for cmd in git python3; do
+        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        error "Missing required commands: ${missing[*]}"
+        exit 1
+    fi
+
     if [[ -z "$MIRROR_REGISTRY" ]]; then
         error "MIRROR_REGISTRY is not set (mirror root INCLUDING the org path,"
         error "e.g. quay.example:443/mirror — a bare host:port gets 401/404 on Quay)"
         exit 1
     fi
 
-    if ! oc whoami >/dev/null 2>&1; then
-        error "Cannot connect to cluster. Check KUBECONFIG."
-        exit 1
-    fi
     info "Cluster: $(oc whoami --show-server 2>/dev/null)"
     info "Mirror:  $MIRROR_REGISTRY"
 }
@@ -561,13 +586,6 @@ for s in d.get('items', []):
 validate_airgap_overlay() {
     step "3e" "Validate airgap overlay catalog references"
 
-    local overlay
-    overlay=$(airgap_overlay_path)
-    if [[ ! -f "$overlay" ]]; then
-        warn "No airgap overlay at $overlay — skipping validation"
-        return
-    fi
-
     # This whole step is airgap-only by design ("connected works by
     # default"): unless global.airgap is true the function is inert, so a
     # connected run never aborts on airgap-only conditions (mirrored
@@ -576,6 +594,19 @@ validate_airgap_overlay() {
     airgap_flag=$(read_global_key global.airgap false)
     if [[ "${airgap_flag,,}" != "true" ]]; then
         return
+    fi
+
+    local overlay
+    overlay=$(airgap_overlay_path)
+    if [[ ! -f "$overlay" ]]; then
+        # Preflight, not warn-and-skip: in airgap mode a missing overlay
+        # means the render chain would fail (or fall back to defaults that
+        # point at unreachable connected catalogs) — fail before deploy.
+        error "No airgap overlay at $overlay for the configured"
+        error "global.clusterVersion — the sharedValueFiles chain in"
+        error "values-baremetal.yaml resolves to that file. Fix"
+        error "global.clusterVersion or add the overlay."
+        exit 1
     fi
 
     # Every cs-* catalog named in the overlay must exist and be READY.
@@ -704,10 +735,18 @@ for m in sorted(set(re.findall(r'cs-[a-z-]+-index-v[0-9-]+', text))):
 mirror_oci_charts() {
     step 5 "Mirror OCI Helm charts and utility images"
 
-    local imageset="${PATTERN_DIR}/airgap/imageset-config-4.22.yaml"
+    # Version-derived imageset: the chart/artifact list must match what the
+    # corresponding oc-mirror run mirrored (e.g. the 5.0 imageset pins the
+    # 5.0 NFD operand digest). Derive the file from global.clusterVersion
+    # rather than silently taking the 4.22 one.
+    local cluster_version imageset
+    cluster_version=$(read_global_key global.clusterVersion '4.22')
+    imageset="${PATTERN_DIR}/airgap/imageset-config-${cluster_version}.yaml"
     if [[ ! -f "$imageset" ]]; then
-        warn "No ImageSetConfiguration found at $imageset — skipping"
-        return
+        error "No ImageSetConfiguration at $imageset for clusterVersion"
+        error "${cluster_version} — the OCI chart/utility mirroring below and"
+        error "the oc-mirror run must use the same imageset."
+        exit 1
     fi
 
     # OCI Helm charts (oc-mirror additionalImages can't handle these)
@@ -779,47 +818,76 @@ mirror_oci_charts() {
         fi
         # Verify the destination actually holds at least one tag — the
         # source-side count above is not proof the mirror is usable.
-        # Mirror-side skopeo needs explicit creds and --tls-verify=false:
-        # the destination repo may not be anonymous-readable, and the
-        # wrapper skopeo (coco-tools podman container) can neither read
-        # auth files (container-label denials) nor trust the mirror CA
-        # without a mounted cert dir. Creds come from ~/pull-secret.json
-        # (auths["<MIRROR_REGISTRY>"], org path included) — the same
-        # convention as the runbook's skopeo verification.
-        local pi_creds=""
-        if [[ -f "${HOME}/pull-secret.json" ]]; then
-            pi_creds=$(python3 -c "
-import base64, json
-try:
-    auth = json.load(open('${HOME}/pull-secret.json'))['auths']['${MIRROR_REGISTRY}']['auth']
-    print(base64.b64decode(auth).decode())
-except Exception:
-    pass
-" 2>/dev/null || true)
+        # Credentials NEVER appear on the command line (argv is readable
+        # via /proc/<pid>/cmdline): skopeo gets a docker-config auth file
+        # (SKOPEO_AUTHFILE, default ~/pull-secret.json when present — the
+        # mirror entry is selected by host). TLS: when MIRROR_CA_FILE is
+        # set (default ~/.coco-pattern/registry-ca-cert.pem when present,
+        # the runbook's mirror CA) it is trusted via a generated cert-dir;
+        # without a CA the check degrades to --tls-verify=false, matching
+        # the oc image mirror calls above. auth/TLS/connection failures
+        # are reported distinctly from an empty-but-readable tag list.
+        local pi_authfile="${SKOPEO_AUTHFILE:-}"
+        local pi_certdir=""
+        local -a pi_verify=()
+        if [[ -z "$pi_authfile" && -f "${HOME}/pull-secret.json" ]]; then
+            pi_authfile="${HOME}/pull-secret.json"
         fi
-        if [[ -z "$pi_creds" ]]; then
-            warn "  No mirror creds in ~/pull-secret.json for ${MIRROR_REGISTRY} —"
-            warn "  verifying pattern-install anonymously (may fail on private repos)"
+        if [[ -n "$pi_authfile" ]]; then
+            pi_verify+=(--authfile "$pi_authfile")
+        else
+            warn "  No auth file for the mirror (SKOPEO_AUTHFILE unset,"
+            warn "  ~/pull-secret.json absent) — verifying pattern-install"
+            warn "  anonymously (fails on private repos)"
         fi
-        local -a pi_verify=(--tls-verify=false)
-        [[ -n "$pi_creds" ]] && pi_verify+=(--creds "$pi_creds")
-        local pi_mirror_tags
-        pi_mirror_tags=$(skopeo list-tags "${pi_verify[@]}" "docker://${pi_dest}" 2>/dev/null \
-            | python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' 2>/dev/null || true)
+        local pi_ca="${MIRROR_CA_FILE:-}"
+        if [[ -z "$pi_ca" && -f "${HOME}/.coco-pattern/registry-ca-cert.pem" ]]; then
+            pi_ca="${HOME}/.coco-pattern/registry-ca-cert.pem"
+        fi
+        if [[ -n "$pi_ca" ]]; then
+            local pi_host
+            pi_certdir="$(mktemp -d)"
+            pi_host="${MIRROR_REGISTRY%%/*}"
+            mkdir -p "${pi_certdir}/${pi_host}"
+            cp "$pi_ca" "${pi_certdir}/${pi_host}/ca.crt"
+            pi_verify+=(--cert-dir "$pi_certdir")
+        else
+            warn "  No mirror CA (${MIRROR_CA_FILE:-unset}, ~/.coco-pattern/"
+            warn "  registry-ca-cert.pem absent) — falling back to --tls-verify=false"
+            pi_verify+=(--tls-verify=false)
+        fi
+        local pi_errfile
+        pi_errfile="$(mktemp)"
+        local pi_mirror_tags pi_rc
+        pi_mirror_tags=$(skopeo list-tags "${pi_verify[@]}" "docker://${pi_dest}" 2>"$pi_errfile") \
+            && pi_rc=0 || pi_rc=$?
+        if [[ $pi_rc -ne 0 ]]; then
+            error "skopeo list-tags against the mirror FAILED (auth, TLS or"
+            error "connectivity — this is NOT an empty-mirror verdict):"
+            sed 's/^/    /' "$pi_errfile" >&2 || true
+            rm -f "$pi_errfile"
+            error "Check the mirror credentials (SKOPEO_AUTHFILE), the CA"
+            error "(MIRROR_CA_FILE) and connectivity to ${pi_dest}."
+            exit 1
+        fi
+        rm -f "$pi_errfile"
+        pi_mirror_tags=$(python3 -c 'import json,sys; [print(t) for t in json.load(sys.stdin).get("Tags",[])]' \
+            <<<"$pi_mirror_tags" 2>/dev/null || true)
         if [[ -z "$pi_mirror_tags" ]]; then
             error "pattern-install is not present in the mirror: 'skopeo list-tags"
-            error "docker://${pi_dest}' returned no tags."
+            error "docker://${pi_dest}' succeeded but returned no tags."
             error "'pattern.sh make install' resolves this chart from the mirror"
             error "(no version pin — highest semver tag) and will fail at chart-fetch."
             exit 1
         fi
-        info "  pattern-install present in mirror ($(echo "$pi_mirror_tags" | wc -l | tr -d ' ') tags)"
+        info "  pattern-install present in mirror ($(grep -c . <<<"$pi_mirror_tags") tags)"
     else
         warn "  skopeo not available — cannot verify that pattern-install is mirrored"
         warn "  to ${pi_dest}. 'pattern.sh make install' resolves this chart from"
         warn "  the mirror and WILL FAIL at chart-fetch if it is not already there."
     fi
 
+    [[ -n "$pi_certdir" && -d "$pi_certdir" ]] && rm -rf "$pi_certdir"
     info "OCI mirroring complete"
 }
 
@@ -887,8 +955,11 @@ fix_manifest_lists() {
 # ArgoCD repo-server's first chart fetch fails:
 #   helm registry login … x509: certificate signed by unknown authority
 # Applying the patch HERE — before the pattern deploys — means injected
-# ConfigMaps are born with the mirror CA already in them, so the runbook's
-# post-deploy "roll the repo-server" step is not needed on fresh installs.
+# ConfigMaps are born with the mirror CA already in them.
+# Fail-closed by design: a failed read aborts (never treated as empty), a
+# different non-empty trust anchor is preserved (never clobbered), the CA
+# data is validated before it is trusted, and "pointer updated" is
+# distinguished from "bundle reconciled" before the bootstrap continues.
 # Idempotent: a no-op when the field already holds the value.
 configure_cluster_trusted_ca() {
     step 7 "Anchor cluster trust bundle at user-ca-bundle (runbook C-3)"
@@ -902,26 +973,189 @@ configure_cluster_trusted_ca() {
         return
     fi
 
-    if ! oc get configmap user-ca-bundle -n openshift-config >/dev/null 2>&1; then
-        error "configmap user-ca-bundle not found in openshift-config —"
-        error "was the cluster installed with --additional-trust-bundle?"
+    # Validate the bundle BEFORE pointing anything at it: an empty or
+    # non-PEM ca-bundle.crt would empty every injected trust bundle on
+    # the cluster the moment the pointer lands.
+    local ca_data
+    if ! ca_data=$(oc get configmap user-ca-bundle -n openshift-config \
+            -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null); then
+        error "Cannot read configmap user-ca-bundle in openshift-config"
+        error "(oc get failed — check cluster access). Refusing to continue."
+        exit 1
+    fi
+    if [[ -z "$ca_data" ]]; then
+        error "configmap user-ca-bundle has no ca-bundle.crt data — was the"
+        error "cluster installed with --additional-trust-bundle? Refusing to"
+        error "point the cluster trust anchor at an empty bundle."
+        exit 1
+    fi
+    if ! grep -q "BEGIN CERTIFICATE" <<<"$ca_data"; then
+        error "user-ca-bundle's ca-bundle.crt contains no PEM certificates —"
+        error "refusing to trust it cluster-wide."
         exit 1
     fi
 
+    # Preserve an existing, different trust anchor: clobbering it would
+    # silently drop whatever CA the cluster already trusts.
     local current
-    current=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null) || current=""
-    if [[ "$current" == "user-ca-bundle" ]]; then
-        info "proxy/cluster trustedCA already points at user-ca-bundle"
-        return
+    if ! current=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null); then
+        error "Cannot read proxy/cluster spec.trustedCA.name (oc get failed) —"
+        error "refusing to patch blind."
+        exit 1
+    fi
+    if [[ -n "$current" && "$current" != "user-ca-bundle" ]]; then
+        error "proxy/cluster trustedCA.name is '${current}' — this cluster"
+        error "already anchors at a different bundle. Pointing it at"
+        error "user-ca-bundle would silently drop that anchor. Merge the"
+        error "mirror CA into '${current}' (or clear the pointer deliberately)"
+        error "and re-run."
+        exit 1
     fi
 
-    oc patch proxy cluster --type merge \
-        -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}' >/dev/null
-    info "proxy/cluster trustedCA set to user-ca-bundle"
-    info "inject-trusted-cabundle ConfigMaps now include the mirror CA"
+    if [[ "$current" == "user-ca-bundle" ]]; then
+        info "proxy/cluster trustedCA already points at user-ca-bundle"
+    else
+        if ! oc patch proxy cluster --type merge \
+            -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}'; then
+            error "oc patch proxy/cluster failed — trustedCA NOT set."
+            exit 1
+        fi
+        # Verify the write landed; propagate the read error if it did not.
+        local readback
+        if ! readback=$(oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null); then
+            error "Cannot read back proxy/cluster trustedCA after patch — aborting."
+            exit 1
+        fi
+        if [[ "$readback" != "user-ca-bundle" ]]; then
+            error "proxy/cluster trustedCA readback is '${readback}' (expected"
+            error "user-ca-bundle) — something reverted the patch. Aborting."
+            exit 1
+        fi
+        info "proxy/cluster trustedCA pointer set to user-ca-bundle"
+    fi
+
+    # "Pointer updated" is not "bundle reconciled": the injection into
+    # config.openshift.io/inject-trusted-cabundle ConfigMaps is
+    # asynchronous. When labeled ConfigMaps exist, at least one must carry
+    # the user CA before the bootstrap continues (the pattern deploy would
+    # otherwise race a stale bundle). When none exist yet (fresh install,
+    # pre-pattern), the pointer alone is sufficient — ConfigMaps rendered
+    # later are born with the bundle.
+    local cert_line
+    cert_line=$(awk '/BEGIN CERTIFICATE/{flag=1;next} /END CERTIFICATE/{exit} flag{print length($0), $0}' <<<"$ca_data" \
+        | sort -rn | head -1 | cut -d' ' -f2-)
+    if [[ -z "$cert_line" ]]; then
+        error "Could not extract a certificate body line from user-ca-bundle —"
+        error "refusing to verify reconciliation against an unusable marker."
+        exit 1
+    fi
+    local labeled_cms
+    if ! labeled_cms=$(oc get configmaps -A \
+            -l config.openshift.io/inject-trusted-cabundle=true -o name 2>/dev/null); then
+        error "Cannot list inject-trusted-cabundle ConfigMaps (oc get failed) —"
+        error "cannot verify bundle reconciliation. Aborting."
+        exit 1
+    fi
+    if [[ -z "$labeled_cms" ]]; then
+        warn "No inject-trusted-cabundle ConfigMaps on the cluster yet —"
+        warn "the pointer is set; ConfigMaps rendered by the pattern deploy"
+        warn "are born with the mirror CA in them."
+        return
+    fi
+    local waited=0 injected_ns="" cm ref ns name cmdata
+    while [[ $waited -lt 180 ]]; do
+        while IFS= read -r cm; do
+            [[ -z "$cm" ]] && continue
+            ref="${cm#configmap/}"
+            ns="${ref%%/*}"
+            name="${ref#*/}"
+            # Capture then grep (not oc|grep): grep -q exits early and
+            # SIGPIPEs oc under pipefail, turning a match into a miss.
+            cmdata=$(oc get configmap "$name" -n "$ns" \
+                -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null) || continue
+            if grep -qF -- "$cert_line" <<< "$cmdata"; then
+                injected_ns="${ns}/${name}"
+                break
+            fi
+        done <<< "$labeled_cms"
+        if [[ -n "$injected_ns" ]]; then
+            info "Bundle reconciled: ${injected_ns} carries the user CA"
+            info "inject-trusted-cabundle ConfigMaps now include the mirror CA"
+            return
+        fi
+        sleep 15
+        waited=$((waited + 15))
+    done
+    error "trustedCA pointer is set, but no inject-trusted-cabundle ConfigMap"
+    error "picked up the user CA within 180s — the injection may be wedged"
+    error "(check 'oc get clusteroperators' for degraded config components)."
+    error "Continuing would risk the ArgoCD repo-server failing its first"
+    error "chart fetch (x509: unknown authority)."
+    exit 1
 }
 
 # ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
+# Read the current routingViaHost value. A FAILED oc query (API outage,
+# bad kubeconfig) must not look like "field unset" — that would let the
+# patch run blind — so it prints READ_FAILED and callers abort. A field
+# that is merely ABSENT prints empty (patch allowed): oc's jsonpath errors
+# identically on both, so the object is read as JSON and the key grepped.
+# No python here: --prereq-only must not depend on it.
+read_routing_via_host() {
+    local json val
+    if ! json=$(oc get network.operator cluster -o json 2>/dev/null); then
+        echo "READ_FAILED"
+        return
+    fi
+    val=$(grep -o '"routingViaHost": *[a-z]*' <<<"$json" | head -1 \
+        | sed 's/.*: *//')
+    echo "${val:-}"
+}
+
+# Fail-closed validation that routingViaHost is the right remedy for THIS
+# cluster, before anything is patched. Checks (each a hard failure, and a
+# failed read counts as a failure — not as a pass):
+#   1. the default network is OVN-Kubernetes — the knob is OVN-only;
+#   2. (prereq mode only) server version is 5.x — the --prereq-only
+#      prerequisite exists for the 5.0 MCO image-stream discovery, so a
+#      4.x cluster is the wrong target for THAT mode. The full-bootstrap
+#      step 8 knob (ENABLE_ROUTINGVIAHOST=true, test-lab only) stays
+#      available on 4.x — the qualified 4.22 airgap deploy used it.
+# Prints the version and platform (informational) so the log records them.
+validate_routing_prereq_target() {
+    local cv
+    if ! cv=$(oc get clusterversion version \
+        -o jsonpath='{.status.desired.version}' 2>/dev/null) || [[ -z "$cv" ]]; then
+        error "Cannot read the cluster version (oc get clusterversion failed) —"
+        error "refusing to patch routingViaHost on an unknown target."
+        exit 1
+    fi
+    if [[ "$MODE" == "prereq" && "$cv" != 5.* ]]; then
+        error "routingViaHost prerequisite targets OpenShift 5.x, this cluster runs ${cv}."
+        error "4.x installs do not need it (no MCO image-stream discovery at"
+        error "bootstrap) — see DEPLOY-RUNBOOK.md B-2."
+        exit 1
+    fi
+
+    local nettype
+    if ! nettype=$(oc get network.operator cluster \
+        -o jsonpath='{.spec.defaultNetwork.networkType}' 2>/dev/null) || [[ -z "$nettype" ]]; then
+        error "Cannot read the cluster network type (oc get network.operator failed) —"
+        error "refusing to patch routingViaHost on an unknown target."
+        exit 1
+    fi
+    if [[ "$nettype" != "OVNKubernetes" ]]; then
+        error "routingViaHost is an OVN-Kubernetes knob, but this cluster's"
+        error "default network is '${nettype}'."
+        exit 1
+    fi
+
+    local platform
+    platform=$(oc get infrastructure cluster \
+        -o jsonpath='{.status.platform}' 2>/dev/null) || platform="unknown"
+    info "Target: OCP ${cv}, ${nettype}, platform ${platform:-unknown}"
+}
+
 enable_routing_via_host() {
     step 8 "OVN routingViaHost (test-lab only)"
 
@@ -933,17 +1167,28 @@ enable_routing_via_host() {
         return
     fi
 
+    # Validate the target BEFORE patching — fail closed on version/network
+    # mismatch or on a failed read (only when we are about to change it).
     local current
-    current=$(oc get network.operator cluster \
-        -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
+    current=$(read_routing_via_host)
+    if [[ "$current" == "READ_FAILED" ]]; then
+        error "Cannot read the current routingViaHost value (oc get failed) —"
+        error "refusing to patch blind."
+        exit 1
+    fi
     if [[ "$current" == "true" ]]; then
         info "Already enabled — skipping"
         return
     fi
 
+    validate_routing_prereq_target
+
     warn "Enabling routingViaHost — this may cause a brief network disruption"
-    oc patch network.operator cluster --type merge \
-        -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'
+    if ! oc patch network.operator cluster --type merge \
+        -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'; then
+        error "oc patch network.operator failed — routingViaHost NOT enabled."
+        exit 1
+    fi
     info "routingViaHost enabled"
 }
 
@@ -1243,12 +1488,31 @@ case "$MODE" in
         # without this and the install cannot finish (chicken-and-egg: the
         # full bootstrap must NOT run yet — any other cluster state landing
         # before the controller's first render causes the MCO-466 bootstrap
-        # variance; routingViaHost alone is render-neutral). Idempotent.
-        validate_prereqs
-        enable_routing_via_host
-        # NOTE: no `local` here — this is the main dispatch, not a function.
-        current=$(oc get network.operator cluster \
-            -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
+        # variance; routingViaHost alone is render-neutral). Idempotent and
+        # fail-closed: cluster access only (no git/python/mirror string),
+        # target validated (OCP 5.x + OVN-Kubernetes) before patching, every
+        # read failure aborts, and an already-true value is a no-op.
+        validate_cluster_access
+        validate_routing_prereq_target
+        current=$(read_routing_via_host)
+        if [[ "$current" == "READ_FAILED" ]]; then
+            error "Cannot read the current routingViaHost value (oc get failed) —"
+            error "prerequisite NOT verified; refusing to continue."
+            exit 1
+        fi
+        if [[ "$current" != "true" ]]; then
+            warn "Enabling routingViaHost — this may cause a brief network disruption"
+            if ! oc patch network.operator cluster --type merge \
+                -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'; then
+                error "oc patch network.operator failed — routingViaHost NOT enabled."
+                exit 1
+            fi
+            info "routingViaHost enabled"
+        else
+            info "routingViaHost already true — no change (idempotent)"
+        fi
+        # Verify the end state — do not report success on the patch alone.
+        current=$(read_routing_via_host)
         if [[ "$current" == "true" ]]; then
             info "Prerequisite satisfied: routingViaHost=true"
             info "Next: openshift-install agent wait-for install-complete (must exit 0),"
