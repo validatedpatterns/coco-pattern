@@ -331,6 +331,13 @@ labctl generate \
 qualified configuration (see the payload stream pin note above). Omit it
 only on 4.22 (single stream).
 
+**Minimum `labctl`:** the flag ships with the companion `apac-lab-scripts`
+change on branch `feat/os-image-stream` (tip `3e1d8ac`, "feat(generate):
+pin the RHCOS image stream via --os-image-stream"); no released `labctl`
+carries it yet. An older `labctl` rejects the command outright —
+`Error: No such option: --os-image-stream` (exit 2, nothing generated) —
+so upgrade to that branch/commit before running B-1.
+
 ### B-2: Boot and Install
 
 ```bash
@@ -341,11 +348,37 @@ openshift-install agent wait-for install-complete \
 
 ```
 
-**Known limitation (OCP 5.0, disconnected):** the installer must be
-allowed to run to `install-complete` before the airgap bootstrap (C-1)
-runs. Lab-specific prerequisites some installs need mid-bootstrap (e.g.
-OVN `routingViaHost` for pod egress to the mirror) are out of scope for
-the pattern — apply them with your own tooling if your lab requires them.
+**Pre-install requirement (OCP 5.0, disconnected): pods must be able to
+reach the mirror during bootstrap.** On 5.0 the Machine Config Operator's
+`OSImageStream` discovery pulls from the registry while the cluster is
+still bootstrapping, i.e. **before** `install-complete`. The pattern does
+not automate that egress, and C-1 (`ENABLE_ROUTINGVIAHOST`) runs *after*
+the install — it cannot rescue a bootstrap that is already stalled, and
+nothing in this repository can: there is no post-hoc remedy for an
+install that never completes.
+
+Choose one, before starting B-2:
+
+- **(a) Satisfy pod→mirror egress before the install**, with your own
+  platform tooling (whatever your environment uses for bootstrap-time pod
+  egress to the mirror: a proxy, a mirror host routed into the pod
+  network, or an equivalent of `routingViaHost` applied during bootstrap).
+  This is the supported path for a 5.0 disconnected install that needs it.
+- **(b) Treat such an install as unsupported by this pattern** — install
+  on a topology where bootstrap pod egress already exists, or on 4.22,
+  where the requirement does not arise. Do not start a 5.0 disconnected
+  install on a network that forbids it and expect C-1 to fix it later.
+
+Symptom you are hitting it (the install will not recover on its own):
+
+- `oc get clusteroperators machine-config` → `Degraded=True`
+- MCO logs report `OSImageStream` inspection timeouts against the
+  registry
+- the machine-config daemon stays stuck in the bootstrap phase and
+  `openshift-install agent wait-for install-complete` never returns
+
+If you see these, the install is already lost: destroy it, fix pod→mirror
+egress per (a), and reinstall.
 
 ### B-3: Verify
 
@@ -368,7 +401,7 @@ cd ~/coco-pattern
 
 export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
 export GIT_SERVER=http://<git-host>:8080
-export ENABLE_ROUTINGVIAHOST=true               # required for pod→off-cluster egress
+export ENABLE_ROUTINGVIAHOST=true               # pattern pods → off-cluster egress (post-install; bootstrap egress is B-2)
 
 scripts/airgap-post-install.sh
 
