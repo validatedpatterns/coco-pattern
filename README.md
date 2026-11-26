@@ -32,7 +32,7 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 
 - **8.0** — OSC 1.13 / Trustee 1.2 upgrade. KBS TOML rewrite, RVPS format alignment, operator CSV pins, trustee-chart v0.10.0. Airgap deployment support: single mirror-registry architecture, `oc-mirror` v2, `airgap-post-install.sh` bootstrap, `DEPLOY-RUNBOOK.md` operational guide. Requires OCP 4.22+.
 
-OpenShift 5.0 is also supported on a narrower scope — **bare-metal Intel TDX, OCP 5.0.2, RHCOS 9 payload** (qualified disconnected; connected is unverified). To deploy: set `global.clusterVersion: "5.0"`, mirror with `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml`, and install with the installer's `--os-image-stream rhel-9` (the qualified deploy runs the RHCOS 9 payload). Changing `clusterVersion` alone is not sufficient — see the qualified-scope section in `airgap/DEPLOY-RUNBOOK.md` (RHEL 10 payloads and all other topologies are unverified on 5.0). Version-specific behaviour: the Intel DCAP subscription pins `stable` on 5.0 (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode) while 4.22 keeps `alpha`; when moving a cluster to 5.0, Intel does not support an in-place upgrade from the `alpha` v0.1.0 bundle — uninstall the old operator before redeploying.
+OpenShift 5.0 is also supported on a narrower scope — **bare-metal Intel TDX, OCP 5.0.2, RHCOS 9 payload**, both connectivity modes. Live qualification ran on the feature content merged into the `deploy/ocp5-airgap-20261125` and `deploy/ocp5-connected-20261125` branches (up to `34a5e85` / `00fc5a7`); nothing after that — including the current `feat/ocp5-compatibility` head — has been live-run, and is verified by `make render-gate` (4.22 + 5.0) and the mocked `oc`/`skopeo` suites only. To deploy: set `global.clusterVersion: "5.0"`, mirror with `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml`, and install with the installer's `--os-image-stream rhel-9` (the qualified deploy runs the RHCOS 9 payload). Changing `clusterVersion` alone is not sufficient — see the qualified-scope section in `airgap/DEPLOY-RUNBOOK.md` (RHEL 10 payloads and all other topologies are unverified on 5.0). Version-specific behaviour: the Intel DCAP subscription pins `stable` on 5.0 (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode) while 4.22 keeps `alpha`; when moving a cluster to 5.0, Intel does not support an in-place upgrade from the `alpha` v0.1.0 bundle — uninstall the old operator before redeploying.
 
 **Key changes from v5:**
 
@@ -41,7 +41,7 @@ OpenShift 5.0 is also supported on a narrower scope — **bare-metal Intel TDX, 
 - **Chart architecture:** trustee-chart moved to OCI Helm artifact (`quay.io/validatedpatterns/trustee:0.10.0`). Kyverno chart vendored under `charts/vendor/`. External charts (sandboxed-containers, sandboxed-policies) remain OCI.
 - **TDX MachineConfig:** QGS socket port `socket_port=0` now deployed via MachineConfig drop-in (replaces manual `sed` workaround).
 - **DCAP collateral:** `collect-dcap-collateral.sh` uses `pcsclient.py fetch -p E5` with `jq` fixup for QeIdentity (Red Hat OSC 1.13 disconnected TDX procedure).
-- **TDX PCK lifecycle:** Make targets export platform data, generate PCK cache material on a connected low-side host, and import it into the disconnected high-side cluster. See [the air-gap runbook](airgap/DEPLOY-RUNBOOK.md#phase-e-dcap-and-tdx-attestation).
+- **TDX PCK lifecycle:** Make targets export platform data, generate PCK cache material on a connected low-side host, and import it into the disconnected high-side cluster. See [D-2: PCK Provisioning](airgap/DEPLOY-RUNBOOK.md#d-2-pck-provisioning-parallel-with-d-1) in the air-gap runbook.
 - **Experimental:** KubeVirt TDX confidential VMs (`charts/all/kubevirtconfidential/`, `charts/all/kubevirtvm/`). Disabled by default. Requires Intel TDX hardware and KubeVirt post-v1.8.4 for full QGS attestation. See chart readmes for details.
 
 ### Previous versions
@@ -56,19 +56,19 @@ OpenShift 5.0 is also supported on a narrower scope — **bare-metal Intel TDX, 
 
 ### Airgap (disconnected) deployment
 
-For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/DEPLOY-RUNBOOK.md) for the full operational procedure. The runbook covers:
+For air-gapped bare metal environments, see [`airgap/DEPLOY-RUNBOOK.md`](airgap/DEPLOY-RUNBOOK.md) for the full operational procedure. The runbook sections are:
 
-- Phase 0: One-time jump host setup (mirror registry, Git HTTP server, CA certificates)
-- Phase A–B: Mirror wipe and `oc-mirror` v2 re-mirror
-- Phase C: Agent-based OCP install
-- Phase D: Pattern bootstrap (`airgap-post-install.sh`)
-- Phase E: Intel DCAP collateral and TDX attestation
-- Phase F: Verification and pass/fail checklist
+- Prerequisites — mirror content (the mirroring itself is Phase A in the runbook's duration table), imageset pin check, credentials and CA, values-secret, disconnected value delta, Git server
+- Phase B: Cluster Install — B-1 generate the ISO (with the 5.0 payload pin), B-2 boot and install, B-3 verify
+- Phase C: Pattern Deploy — C-1 airgap post-install bootstrap, C-2 deploy the Pattern CR (C-2a Git-server pointer), C-3 cluster proxy / mirror CA anchor, C-4 known timing issues
+- Phase D: Secrets and Attestation — D-1 Vault secrets, D-2 PCK provisioning, D-3 firmware reference values
+- Verification — pass/fail checklist for a completed deploy
+- Appendix A: Plain Docker Registry Alternative — the same procedure against `registry:2`
 
 **Prerequisites for airgap:**
 
 - A low-side host with Intel PCS access for mirroring, collateral collection, and PCK generation. A connected bastion with access to both Intel PCS and the target cluster can run the combined PCK target.
-- `docker.io/library/registry:2` container running as the mirror registry (setup documented in Phase 0)
+- A registry to serve as the mirror — a Quay org (default) or a `docker.io/library/registry:2` container (Appendix A)
 - `scripts/git-http-server.py` serving pattern repos over smart HTTP (required by the patterns-operator's go-git client)
 - All operator images, OCI Helm charts, and workload images mirrored via `airgap/imageset-config-4.22.yaml`
 

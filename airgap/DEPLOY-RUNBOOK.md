@@ -17,12 +17,29 @@ Intel TDX: 15/15 applications Synced+Healthy, CoCo TDX attestation
 Affirming.
 
 **OCP 5.0** is qualified on a narrower scope — **bare-metal Intel TDX,
-OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`). The
-qualification record is the `deploy/ocp5-airgap-20261125` deploy branch
-on the pattern fork (the committed cluster state of the qualified run);
-the hardening fixes on `feat/ocp5-compatibility` post-date that record
-and re-qualify through the render gate and the mocked-`oc` suites in
-`tests/`. Two hard requirements:
+OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`), both
+connectivity modes.
+
+What was live-qualified, and what was not:
+
+- The live runs are recorded as committed cluster state on the deploy
+  branches `deploy/ocp5-airgap-20261125` (disconnected) and
+  `deploy/ocp5-connected-20261125` (connected). Those branches merge the
+  feature content up to `34a5e85` and `00fc5a7` respectively.
+- No feature-branch commit after those was live-run — including the
+  pre-refinement head `f4b9e5f` (backup ref
+  `backup/pr174-pre-refinement-20261126-1247`) and the current head of
+  `feat/ocp5-compatibility`. Those are verified by `make render-gate` at
+  `CLUSTER_VERSION=4.22` and `5.0` plus the mocked `oc`/`skopeo` suites
+  in `tests/` only. The 4.22 render output is byte-identical to
+  `main`, so the 4.22 path carries no new risk; the 5.0 path of the
+  current head is render-verified, **not** hardware-qualified.
+- A 5.0 deploy of the current head should therefore be treated as
+  pending a live run: the code paths it exercises (trust-anchor write,
+  mirror verification, 5.0 overlays) are covered by the gate and the
+  mocks, not by a cluster.
+
+Two hard requirements:
 
 - The installer must run the RHCOS 9 payload (`--os-image-stream rhel-9`
   at `labctl generate`, B-1 — matching the qualified 5.0.2 deploy); the
