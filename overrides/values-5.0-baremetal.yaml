@@ -1,0 +1,71 @@
+# OCP 5.0 version-specific overlay for the baremetal AND baremetal-hub
+# cluster groups — loaded via sharedValueFiles when global.clusterVersion
+# is "5.0" (the chain entry in values-baremetal.yaml / values-baremetal-hub.yaml
+# resolves this file as values-5.0-baremetal.yaml). Other groups and 4.x
+# versions keep loading the shared overrides/values-<ver>.yaml.
+#
+# WHY this file exists (and why it repeats the namespaces list): the Intel
+# DCAP operator is channel- and install-mode-different on 5.0 —
+# intel-tdx-dcap-operator v0.27.0 is the only bundle in the 5.0 certified
+# catalog and supports the OwnNamespace install mode only, so its
+# OperatorGroup must carry spec.targetNamespaces=[intel-dcap-operator-system].
+# Helm replaces lists wholesale when merging values files, and the
+# clustergroup chart (0.9.60) does not tpl the namespaces values, so a single
+# list entry cannot be flipped per version from an overlay — the whole
+# namespaces list must be replaced here. Keep this list in sync with
+# values-baremetal.yaml entry-for-entry apart from the
+# intel-dcap-operator-system OperatorGroup: the render gate
+# (scripts/verify/render-gate.sh, CLUSTER_VERSION=5.0) fails if it drifts.
+#
+# SCOPE — this overlay reaches the ROOT clustergroup render and every child
+# application that lists it as a value file. It does NOT reach the bootstrap
+# operators (created before ArgoCD renders).
+#
+# NOTE — global.cluster.osStream (node OS generation) deliberately does NOT
+# live here: overlays merge AFTER values-global.yaml, so a value here could
+# not be overridden from the deploy branch. Set it in values-global.yaml to
+# match the installer's osImageStream (the qualified 5.0.2 deploy used
+# rhel-9); when unset, charts/all/baremetal defaults it to rhel-10.
+
+clusterGroup:
+  # Full replacement of the values-baremetal.yaml namespaces list — see the
+  # header comment. ONLY the intel-dcap-operator-system OperatorGroup entry
+  # differs from the base list (OwnNamespace instead of AllNamespaces).
+  namespaces:
+  - open-cluster-management
+  - vault
+  - external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
+  - external-secrets
+  - openshift-sandboxed-containers-operator
+  - trustee-operator-system
+  - cert-manager-operator
+  - cert-manager
+  - hello-openshift
+  - kbs-access
+  - openshift-cnv
+  - openshift-storage
+  - openshift-nfd
+  - baremetal
+  - intel-dcap
+  - intel-dcap-operator-system:
+      operatorGroup: true
+      # v0.27.0 (the 5.0 catalog bundle) supports OwnNamespace only
+      targetNamespaces:
+      - intel-dcap-operator-system
+  - nvidia-gpu-operator
+  - gpu-workload
+  - kyverno
+  - kubevirt-vms
+
+  subscriptions:
+    # Channel split from stable-4.22 in the 5.0 catalog
+    lvm-operator:
+      channel: stable-5.0
+    # The alpha channel is removed from the 5.0 certified catalog; stable
+    # is its default and only channel (CSV v0.27.0). 4.22 keeps alpha —
+    # airgap/imageset-config-4.22.yaml mirrors alpha only, and Intel does
+    # not support an in-place upgrade from the alpha v0.1.0 bundle.
+    intel-tdx-dcap:
+      channel: stable
