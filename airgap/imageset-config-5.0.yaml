@@ -84,15 +84,8 @@ mirror:
       packages:
         # GPU operator DISABLED — matches values-baremetal.yaml (the
         # gpu-operator subscription is commented out there: NVIDIA bundle
-        # oc-mirror signature issue; nvcr.io copy timeouts; nothing in T1
-        # consumes it). Tranche 2 re-enables at v26.7 per the T022 trigger
-        # logic (pawelpros), with its own mirror update.
-
-        # - name: gpu-operator-certified
-        #   channels:
-        #     - name: v26.3
-        #       minVersion: "26.3.0"
-        #       maxVersion: "26.3.0"
+        # oc-mirror signature issue; nvcr.io copy timeouts). Re-enabling
+        # needs its own mirror update and a values change together.
 
         # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
         # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
@@ -110,9 +103,9 @@ mirror:
   # Community operators
     - catalog: registry.redhat.io/redhat/community-operator-index:v5.0
       packages:
-        # Use v0.0.80+ — Docker manifest list format (not OCI image index)
-        # v0.0.78 and earlier use OCI index format rejected by Quay (Phase 25.1 finding)
-        # Cluster runs v0.0.83; channel "fast" is the catalog default
+        # Use v0.0.80+ — Docker manifest list format (not OCI image index;
+        # older tags use an OCI index format Quay rejects). Cluster runs
+        # v0.0.83; channel "fast" is the catalog default
         # (main.patternsOperator.channel in values-global.yaml)
         - name: patterns-operator
           channels:
@@ -162,10 +155,8 @@ mirror:
     - name: quay.io/validatedpatterns/imperative-container:v1
     # pattern-ui-catalog deliberately NOT mirrored: non-essential (console-tab
     # catalog content) and its OCI-index-wrapping-Docker-children manifest is
-    # rejected by Quay. Note: patterns-operator v0.0.83 does deploy it
-    # (quay.io/validatedpatterns/pattern-ui-catalog:stable-v1) — the console
+    # rejected by Quay. patterns-operator v0.0.83 does deploy it — the console
     # tab is simply unavailable in airgap.
-    # See coco-gsd specs/003-quay-sole-retest.
 
     # --- UBI minimal (ArgoCD repo-server init container) ---
     - name: registry.redhat.io/ubi9/ubi-minimal:latest
@@ -189,15 +180,11 @@ mirror:
     # --- Workload images ---
     - name: registry.access.redhat.com/ubi9/ubi:latest
 
-    # --- CNV guest images (OPTIONAL — CNV-OPTIONAL) ---
-    # DISABLED: ~2 GB each and NOT consumed (Phase 26 sets
-    # enableCommonBootImageImport: false in the HyperConverged CR), and
-    # registry.redhat.io REJECTS :latest for virtio-win — a hard mirror
-    # error. Re-enable only for VM boot from DataSource, with pinned tags.
-
-    # - name: registry.redhat.io/rhel9/rhel-guest-image:latest
-    # - name: registry.redhat.io/rhel8/rhel-guest-image:latest
-    # - name: registry.redhat.io/container-native-virtualization/virtio-win:latest
+    # --- CNV guest images (OPTIONAL — not mirrored) ---
+    # ~2 GB each and NOT consumed (enableCommonBootImageImport: false in the
+    # HyperConverged CR), and registry.redhat.io REJECTS :latest for
+    # virtio-win — a hard mirror error. Re-enable only for VM boot from
+    # DataSource, with pinned tags.
 
     # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
     # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —

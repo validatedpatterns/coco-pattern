@@ -8,7 +8,34 @@ For a **plain Docker registry** (registry:2) alternative, see
 
 Static verification of the values chain in both connectivity modes (the
 connected default and the airgap overlay) is `make render-gate` — it runs
-in CI on every push and pull request.
+in CI on every push and pull request, for OCP 4.22 and 5.0.
+
+## Qualified scope
+
+**OCP 4.22** (connected + disconnected) is fully qualified on bare-metal
+Intel TDX: 15/15 applications Synced+Healthy, CoCo TDX attestation
+Affirming.
+
+**OCP 5.0** is qualified on a narrower scope — **bare-metal Intel TDX,
+OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`). Two hard
+requirements:
+
+- The installer's `osImageStream` **must match**
+  `global.cluster.osStream` in `values-global.yaml` (the qualified 5.0.2
+  deploy sets `rhel-9` on both sides). The value gates the RHEL 10-only
+  SELinux `kvm_gmem` policy; a mismatch either ships a policy the node's
+  kernel cannot load or omits one TDX kata pods need.
+- The mirror and the pattern values must agree on the minor:
+  `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml` (not the 4.22
+  default) with `global.clusterVersion: "5.0"`.
+
+**Unverified on 5.0:** the RHEL 10 payload (`osImageStream: rhel-10` —
+the `kvm_gmem` SELinux policy renders but the combination has not been
+qualified), AMD SEV-SNP, GPU profiles, and every other topology (Azure
+peer-pods, hub/spoke, HCP). Setting `global.clusterVersion: "5.0"` alone
+is therefore NOT sufficient for a qualified 5.0 deploy — the imageset,
+`osStream` and (for pre-DCAP-v0.27.0 clusters) the Intel DCAP migration
+notes below all apply.
 
 ## Architecture
 
@@ -49,12 +76,15 @@ via a local Git HTTP server.
 
 Populate the mirror from a connected host (the imageset defaults to
 `airgap/imageset-config-4.22.yaml` — no `IMAGESET_CONFIG` override is
-needed for a 4.22 mirror; a 5.0 mirror uses
-`IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml`):
+needed for a 4.22 mirror; a 5.0 mirror must point at the 5.0 imageset):
 
 ```bash
-make airgap-mirror MIRROR_REGISTRY=<mirror-root-including-org>
-# e.g. make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror
+# 4.22 mirror
+make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror
+
+# 5.0 mirror (version-specific imageset — REQUIRED on 5.0)
+make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror \
+     IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml
 ```
 
 The Quay mirror must contain all images the pattern resolves. Verify with
@@ -82,12 +112,17 @@ min=max=5.0.2. Re-point the channel to `stable-5.0` once 5.0.2 is
 promoted. The 4.22-stream oc-mirror binary resolves 5.0 platform pins
 without issue (verified by dry-run).
 
-**Intel DCAP channel migration:** the pattern pins the `stable` channel
-(`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode — same bundle
-in the 4.22 and 5.0 catalogs; the old `alpha` channel was removed from the
-5.0 catalog). Intel does not support in-place upgrade from v0.1.0 to
-v0.27.0: on an existing 4.22 install, delete the old subscription,
-OperatorGroup, CSV and CRs before redeploying.
+**Intel DCAP channel migration (moving an existing cluster to 5.0 only):**
+the version overlay pins the DCAP subscription per minor — 4.22 keeps the
+`alpha` channel (`intel-tdx-dcap-operator` v0.1.0, AllNamespaces
+OperatorGroup, matching `imageset-config-4.22.yaml`, which mirrors `alpha`
+only); 5.0 pins `stable` (v0.27.0, OwnNamespace-only — the only channel in
+the 5.0 catalog, matching `imageset-config-5.0.yaml`). A fresh 4.22
+disconnected install therefore works unchanged, and 4.22 installs are never
+migrated by this pattern. When you MOVE a cluster to 5.0, Intel does not
+support an in-place upgrade from v0.1.0 to v0.27.0: on the 4.22 install,
+delete the old subscription, OperatorGroup, CSV and CRs before redeploying
+with `global.clusterVersion: "5.0"`.
 
 ### Imageset Pin Check (K16)
 
@@ -262,15 +297,12 @@ labctl generate \
 
 ### B-2: Boot and Install
 
-```bash
-# Mount the ISO via iDRAC/virtual media, one-time boot
-# Wait for install (~35 min):
-openshift-install agent wait-for install-complete \
-  --dir <output-dir>/<version>_build
+**Executable order (OCP 5.0): boot → wait for the API → routing
+prerequisite → `install-complete` → full bootstrap (C-1).** On 4.22 the
+prerequisite is not needed — go straight from boot to
+`install-complete`, then C-1.
 
-```
-
-**OCP 5.0+: the MCO needs mirror egress DURING bootstrap.** The 5.0
+**OCP 5.0: the MCO needs mirror egress DURING bootstrap.** The 5.0
 machine-config controller discovers OSImageStreams by inspecting the
 release image-stream images (`ocp-v5.0-art-dev` digests, resolved through
 the IDMS to the mirror). On labs where pod→off-cluster egress requires
@@ -281,46 +313,46 @@ while the node itself is installed and every image referenced IS in the
 mirror. 4.22 does not hit this: its MCO does no image inspection at
 bootstrap.
 
-Remedy (verified on the 5.0.2 airgap run): **prereq → install-complete →
-full bootstrap**, in that order:
+Remedy (verified on the 5.0.2 airgap run) — the four steps in this exact
+order:
 
 ```bash
+# 1) Boot the ISO via iDRAC/virtual media (one-time boot), then wait for
+#    the cluster API to answer:
 export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
+until oc get clusterversion >/dev/null 2>&1; do sleep 30; done
 cd ~/coco-pattern
 
-# 1) As soon as the API answers (before install-complete): apply ONLY
-#    routingViaHost — the 5.0 MCO needs pod egress to the mirror during
-#    bootstrap, and nothing else may land before the controller's first
-#    render (any other state change causes the MCO-466 bootstrap variance;
-#    routingViaHost alone is render-neutral):
-MIRROR_REGISTRY=<mirror-root-including-org> \
+# 2) Routing prerequisite — BEFORE install-complete and before anything
+#    else lands (the 5.0 MCO needs pod egress to the mirror during
+#    bootstrap, and no other cluster state may precede the controller's
+#    first render — MCO-466 bootstrap variance; routingViaHost alone is
+#    render-neutral). The flag is fail-closed: wrong version, non-OVN
+#    network, failed reads and failed patches all abort:
 scripts/airgap-post-install.sh --prereq-only
 # → must print "Prerequisite satisfied: routingViaHost=true"
 
-# 2) Let the installer finish (exit=0 required; machine-config must not be
-#    Degraded — the MCD exits bootstrap mode on its own, no repairs):
+# 3) Let the installer finish (exit=0 required; machine-config must not
+#    be Degraded — the MCD exits bootstrap mode on its own, no repairs):
 openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
 
-# 3) Full bootstrap (catalogs, IDMS, trustedCA, git server) only now:
-MIRROR_REGISTRY=<mirror-root-including-org> \
-GIT_SERVER=http://<git-host>:8080 \
-ENABLE_ROUTINGVIAHOST=true \
-scripts/airgap-post-install.sh
+# 4) Full bootstrap (catalogs, IDMS, trustedCA, git server) — C-1:
+#    https://#c-1-airgap-post-install
 ```
 
-If the MCD is already wedged (node annotation references a missing
+**If the MCD is already wedged** (node annotation references a missing
 install-time rendered config, `currentconfig` absent on disk), the daemon
-cannot self-heal — restarts do not help. Recovery is a node daemon-state
-repair: point the node's `machineconfiguration.openshift.io/currentConfig`
-and `desiredConfig` annotations at the pool's existing rendered config,
-then let the MCD complete its designed bootstrap exit (it renames
-`node-annotations.json` itself). If the follow-on on-disk drift check
-fails (expected — the rendered config now carries the full mirror IDMS),
-touch `/run/machine-config-daemon-force` on the node; the daemon then
-applies the config and reboots once. Both steps are recorded as
-deviations in the phase-2 evidence — with the `--prereq-only` ordering
-above they should never be needed.
+cannot self-heal and restarts do not help. This state means the
+prerequisite above was not applied in time. Do NOT hand-patch node
+annotations or daemon state files (`currentConfig`/`desiredConfig`
+pointing, `/run/machine-config-daemon-force`) — that repair is
+unsupported and was recorded as a deviation when it was last used.
+Instead: confirm the diagnosis below, then **reinstall the node** (the
+sanctioned path — the install is ~35 min) with the prerequisite applied
+at step 2. For sustained problems, escalate to Red Hat support with the
+`machine-config` controller/MCD logs and the node's
+`machineconfiguration.openshift.io/*` annotations.
 
 Diagnosis cues that this is egress and not missing mirror content: the
 controller log shows BOTH the source and the mirror failing with
@@ -496,12 +528,9 @@ oc rollout status  deployment/vp-gitops-repo-server -n vp-gitops --timeout=5m
 Both steps are safe to repeat: the `proxy` patch is a no-op when the field
 already holds that value, while the `rollout restart` deliberately triggers
 another rollout each time (that is what makes the bundle get picked up).
-The bootstrap gap itself — the patch not being part of the scripted
-post-install — is closed: it is step 7 of `scripts/airgap-post-install.sh`
-(tracked upstream, see the PR's follow-up issues). The earlier
-`argocd-tls-certs-cm` patch was a different and genuinely useless thing —
-it always ran before the `vp-gitops` namespace existed — so it stays
-deleted; it is not a substitute for the `proxy/cluster` patch above.
+The patch is scripted as step 7 of `scripts/airgap-post-install.sh`
+(fail-closed: it preserves a different existing trust anchor and verifies
+the bundle was reconciled before continuing).
 
 Verify once the pattern is deployed and `vp-gitops` exists:
 

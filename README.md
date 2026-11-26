@@ -32,7 +32,7 @@ Breaking change from v5. Upgrades to OSC 1.13 / Trustee 1.2, adds full airgap (d
 
 - **8.0** — OSC 1.13 / Trustee 1.2 upgrade. KBS TOML rewrite, RVPS format alignment, operator CSV pins, trustee-chart v0.10.0. Airgap deployment support: single mirror-registry architecture, `oc-mirror` v2, `airgap-post-install.sh` bootstrap, `DEPLOY-RUNBOOK.md` operational guide. Requires OCP 4.22+.
 
-OpenShift 5.0 is also supported: set `global.clusterVersion: "5.0"` (the airgap imageset for 5.0 is `airgap/imageset-config-5.0.yaml`). Note the Intel DCAP subscription now pins the `stable` channel (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode); Intel does not support in-place upgrade from the old `alpha` v0.1.0 — uninstall the old operator before redeploying.
+OpenShift 5.0 is also supported on a narrower scope — **bare-metal Intel TDX, OCP 5.0.2, RHCOS 9 payload** (qualified disconnected; connected is unverified). To deploy: set `global.clusterVersion: "5.0"`, mirror with `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml`, and make the installer's `osImageStream` match `global.cluster.osStream` (the qualified deploy uses `rhel-9` on both). Changing `clusterVersion` alone is not sufficient — see the qualified-scope section in `airgap/DEPLOY-RUNBOOK.md` (RHEL 10 payloads and all other topologies are unverified on 5.0). Version-specific behaviour: the Intel DCAP subscription pins `stable` on 5.0 (`intel-tdx-dcap-operator` v0.27.0, OwnNamespace install mode) while 4.22 keeps `alpha`; when moving a cluster to 5.0, Intel does not support an in-place upgrade from the `alpha` v0.1.0 bundle — uninstall the old operator before redeploying.
 
 **Key changes from v5:**
 
