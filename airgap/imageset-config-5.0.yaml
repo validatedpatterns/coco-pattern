@@ -41,11 +41,9 @@ mirror:
             - name: stable
               minVersion: "1.2.1"
               maxVersion: "1.2.1"
-        # GitOps (ArgoCD) — keep aligned with main.gitops.channel in values-global.yaml
-        # defaultChannel override required: the catalog default is "latest"; filtering
-        # it out without re-pointing the default fails catalog filtering in oc-mirror v2
-        # ("invalid default channel configuration ... a new default channel must be
-        # configured for this package").
+        # GitOps (ArgoCD) — keep aligned with main.gitops.channel in
+        # values-global.yaml. defaultChannel override required: filtering
+        # out the catalog default ("latest") fails oc-mirror v2 filtering.
         - name: openshift-gitops-operator
           defaultChannel: gitops-1.22
           channels:
@@ -83,19 +81,16 @@ mirror:
     - catalog: registry.redhat.io/redhat/certified-operator-index:v5.0
       packages:
         # GPU operator DISABLED — matches values-baremetal.yaml (the
-        # gpu-operator subscription is commented out there: NVIDIA bundle
-        # oc-mirror signature issue; nvcr.io copy timeouts). Re-enabling
-        # needs its own mirror update and a values change together.
+        # subscription is commented out there; re-enable both together).
 
         # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
         # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
         - name: intel-device-plugins-operator
           channels:
             - name: stable
-        # Intel TDX DCAP operator — QGS lifecycle management.
-        # 5.0: the alpha channel is gone from the catalog; stable is now
-        # the default and only channel (CSV v0.27.0, OwnNamespace-only,
-        # same bundle digest as the 4.22 stable channel)
+        # Intel TDX DCAP operator — QGS lifecycle management. The alpha
+        # channel is gone from the 5.0 catalog; stable is the default and
+        # only channel (CSV v0.27.0, OwnNamespace-only).
         - name: intel-tdx-dcap-operator
           channels:
             - name: stable
@@ -103,10 +98,9 @@ mirror:
   # Community operators
     - catalog: registry.redhat.io/redhat/community-operator-index:v5.0
       packages:
-        # Use v0.0.80+ — Docker manifest list format (not OCI image index;
-        # older tags use an OCI index format Quay rejects). Cluster runs
-        # v0.0.83; channel "fast" is the catalog default
-        # (main.patternsOperator.channel in values-global.yaml)
+        # Use v0.0.80+ (Docker manifest list; older tags use an OCI index
+        # Quay rejects). Cluster runs v0.0.83; "fast" is the catalog
+        # default (main.patternsOperator.channel).
         - name: patterns-operator
           channels:
             - name: fast
@@ -123,10 +117,8 @@ mirror:
     # Vault — Red Hat certified UBI image from registry.connect.redhat.com
     # (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi by default)
     - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
-    # Kyverno (Helm chart, not OLM). The chart's defaultRegistry is
-    # reg.kyverno.io, but the image paths are identical under ghcr.io —
-    # mirror from ghcr.io and let the manual ITMS (itms-manual-mirrors.yaml)
-    # redirect reg.kyverno.io pulls to the mirror.
+    # Kyverno (Helm chart, not OLM): mirror from ghcr.io (paths identical
+    # to the chart's reg.kyverno.io) and let the manual ITMS redirect pulls.
     - name: ghcr.io/kyverno/kyverno:v1.17.2
     - name: ghcr.io/kyverno/kyvernopre:v1.17.2
     - name: ghcr.io/kyverno/background-controller:v1.17.2
@@ -153,10 +145,8 @@ mirror:
     - name: quay.io/validatedpatterns/utility-container:latest
     - name: quay.io/validatedpatterns/imperative-container:latest
     - name: quay.io/validatedpatterns/imperative-container:v1
-    # pattern-ui-catalog deliberately NOT mirrored: non-essential (console-tab
-    # catalog content) and its OCI-index-wrapping-Docker-children manifest is
-    # rejected by Quay. patterns-operator v0.0.83 does deploy it — the console
-    # tab is simply unavailable in airgap.
+    # pattern-ui-catalog deliberately NOT mirrored: non-essential, and Quay
+    # rejects its hybrid manifest — the console tab is unavailable in airgap.
 
     # --- UBI minimal (ArgoCD repo-server init container) ---
     - name: registry.redhat.io/ubi9/ubi-minimal:latest
@@ -168,10 +158,9 @@ mirror:
     - name: registry.redhat.io/openshift4/ose-cli:latest
 
     # --- Intel DCAP chart images ---
-    # Requires registries.d/no-sigstore-certified.yaml for intel-sgx-plugin
-    # DCAP v0.27.0 moved QGS from osc-tdx-qgs (redhat.io) to the certified
-    # intel/intel-tdx-qgs repo; both digests are the CSV relatedImage values
-    # the running cluster deploys (not the 4.22 digests)
+    # Requires registries.d/no-sigstore-certified.yaml. DCAP v0.27.0 moved
+    # QGS to the certified intel/intel-tdx-qgs repo; digests are the CSV
+    # relatedImage values (not the 4.22 digests).
     - name: registry.connect.redhat.com/intel/intel-tdx-qgs@sha256:d86a48e3668bff87e2e5f6914b1b06b861efeb9bd145abbcce3129cfb7eb972d
     # intel-device-plugins CSV v0.37.1 digest — the operator overrides the
     # chart's stale 4.22 pin on the SgxDevicePlugin CR at runtime
@@ -181,11 +170,9 @@ mirror:
     - name: registry.access.redhat.com/ubi9/ubi:latest
 
     # --- CNV guest images (OPTIONAL — not mirrored) ---
-    # ~2 GB each and NOT consumed (enableCommonBootImageImport: false in the
-    # HyperConverged CR), and registry.redhat.io REJECTS :latest for
-    # virtio-win — a hard mirror error. Re-enable only for VM boot from
-    # DataSource, with pinned tags.
+    # ~2 GB each and NOT consumed (enableCommonBootImageImport: false), and
+    # registry.redhat.io REJECTS :latest for virtio-win. Re-enable only for
+    # VM boot from DataSource, with pinned tags.
 
-    # Note: kubeVirtContainer: true (oc-mirror platform flag) is for RHCOS/Hosted Control Planes only.
-    # Do NOT add it to the OCP platform channel for standalone TDX VMs on baremetal —
-    # it is not applicable to this topology and would pull unneeded RHCOS artifacts.
+    # Note: kubeVirtContainer: true is for RHCOS/Hosted Control Planes only —
+    # do NOT add it for standalone TDX VMs on baremetal.

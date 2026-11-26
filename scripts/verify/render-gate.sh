@@ -3,9 +3,8 @@
 # catalog sources, sync-wave layout, chart CRB, workload image rewrite
 # (see the section headers below). Usage: render-gate.sh [mirror-root];
 # needs helm+python3; pulls the clustergroup chart unless CLUSTERGROUP_CHART
-# is a local dir. CLUSTER_VERSION (default 4.22) selects the
-# overrides/values-<ver> overlay. Pipes: here-strings/fds — `echo|grep`
-# SIGPIPEs (pipefail).
+# is a local dir. CLUSTER_VERSION (default 4.22) selects the version
+# overlay. Pipes: here-strings/fds — `echo|grep` SIGPIPEs (pipefail).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,20 +19,17 @@ CLUSTER_VERSION="${CLUSTER_VERSION:-4.22}"  # OCP minor: selects overrides/value
 MIRROR_ROOT="${1:-quay.example:443/mirror}"
 FAILS=0
 
-# Dashed minor (4.22 → 4-22) — the oc-mirror CatalogSource tag convention
-# (cs-<index>-operator-index-v<minor>). Derived, never hardcoded, so a new
-# minor only needs its overlays + imageset config to exist.
+# Dashed minor (4.22 → 4-22) — the oc-mirror CatalogSource tag convention;
+# derived, never hardcoded.
 VER_DASHED="${CLUSTER_VERSION//./-}"
 REDHAT_CS="cs-redhat-operator-index-v${VER_DASHED}"
 CERTIFIED_CS="cs-certified-operator-index-v${VER_DASHED}"
-# Airgap overlay: 4.22 keeps the historical unsuffixed name (byte-identical
-# render with the qualified 4.22 airgap deploy); other minors append the
+# Airgap overlay: 4.22 keeps the unsuffixed name; other minors append the
 # dashed version, mirroring the sharedValueFiles tpl in values-baremetal.yaml.
 AIRGAP_OVERLAY="values-baremetal-airgap"
 [[ "$CLUSTER_VERSION" != "4.22" ]] && AIRGAP_OVERLAY="values-baremetal-airgap-${VER_DASHED}"
 # Version overlay for the baremetal chain: 5.0 diverts to
-# values-5.0-baremetal.yaml (namespaces-list replacement for the DCAP
-# OperatorGroup — see that file), mirroring the sharedValueFiles tpl.
+# values-5.0-baremetal.yaml (DCAP OperatorGroup — see that file).
 VERSION_OVERLAY="values-${CLUSTER_VERSION}"
 [[ "$CLUSTER_VERSION" == "5.0" ]] && VERSION_OVERLAY="values-5.0-baremetal"
 
@@ -75,9 +71,8 @@ render_root() { # $1 = airgap|connected (baremetal chain)
 
 render_group() { # $1 = cluster group; prints the connected-mode render
     # The same chains the patterns-operator resolves via sharedValueFiles
-    # for each group (connected mode: global.airgap=false). The bare-metal
-    # groups divert to the version-split overlay on 5.0 (DCAP
-    # OperatorGroup), mirroring their sharedValueFiles tpl.
+    # for each group (connected mode: global.airgap=false); the bare-metal
+    # groups divert to the version-split overlay on 5.0.
     local group="$1"
     local -a args=()
     case "$group" in
@@ -211,12 +206,9 @@ val="$(collateral_override "$CONNECTED")"
     || fail "kbs.tdx.collateralService → '${val}' (expected Intel PCS URL)"
 
 # ── DCAP: channel, OperatorGroup, imageset consistency ──────────────
-# The Intel DCAP operator is version-divergent: 4.22 pins the alpha channel
-# (v0.1.0, AllNamespaces OperatorGroup — what imageset-config-4.22.yaml
-# mirrors), 5.0 pins stable (v0.27.0, OwnNamespace-only — what
-# imageset-config-5.0.yaml mirrors). Assert all three stay consistent:
-# what the render requests, what the OperatorGroup allows, and what the
-# corresponding imageset actually mirrors.
+# DCAP is version-divergent (4.22: alpha channel, AllNamespaces; 5.0:
+# stable, OwnNamespace — see the PR description). Assert the render, the
+# OperatorGroup and the imageset stay consistent.
 echo "── Intel DCAP channel / OperatorGroup / imageset consistency (version ${CLUSTER_VERSION})"
 sub_channel() { # $1 = rendered manifest, $2 = subscription name
     awk -v wanted="$2" '
@@ -267,9 +259,7 @@ PYEOF
 
 # ── Resolved value-file chain in the root render ─────────────────────
 # The sharedValueFiles tpl resolution is pinned end-to-end AND in order:
-# the child Applications in the root render must carry exactly the
-# overlay chain the tpl resolves to for this version, in the chain order
-# (a reordered or duplicated entry is as broken as a missing one).
+# a reordered or duplicated valueFiles entry is as broken as a missing one.
 echo "── resolved overlay chain, exact order (version ${CLUSTER_VERSION})"
 
 # Ordered $patternref entries of the first valueFiles block in a render.
@@ -286,9 +276,8 @@ valuefiles_list() { # $1 = rendered root manifest
     ' <<< "$1"
 }
 
-# Expected chain for a bare-metal group: chart-prefixed globals
-# (values-global, values-<group>, the variants entry values-<v>-<group>),
-# then the sharedValueFiles chain (platform, storage, version, hw, mode).
+# Expected chain for a bare-metal group: chart-prefixed globals, then the
+# sharedValueFiles chain (platform, storage, version, hw, mode).
 expected_valuefiles() { # $1 = group, $2 = mode overlay file name
     printf '$patternref/values-global.yaml\n'
     printf '$patternref/values-%s.yaml\n' "$1"
@@ -325,12 +314,9 @@ else
 fi
 
 # ── Namespace-list drift guard (5.0 overlay vs base) ─────────────────
-# Helm replaces lists wholesale, so overrides/values-5.0-baremetal.yaml
-# carries a full copy of the values-baremetal.yaml namespaces list (with
-# the DCAP OperatorGroup entry flipped to OwnNamespace) — and the hub uses
-# the same list, so it must match values-baremetal-hub.yaml too. Assert
-# the lists are identical apart from that one entry — a base-list edit
-# without the 5.0 copy (or vice versa) fails here.
+# Helm replaces lists wholesale, so values-5.0-baremetal.yaml carries a
+# full copy of the base namespaces list (DCAP entry flipped). Assert the
+# copies stay in sync apart from that one entry.
 echo "── namespaces-list parity: values-5.0-baremetal.yaml vs values-baremetal{,-hub}.yaml"
 namespace_parity() { # $1 = base values file; prints OK or the divergence
     python3 - "$1" "${PATTERN_DIR}" <<'PYEOF'
@@ -359,10 +345,8 @@ done
 
 # ── Version-specific workload behaviour ──────────────────────────────
 # 5.0 + kata-cc only: the CRI-O guest-pull defect forces imagePullPolicy:
-# Always on the digest-pinned kata-cc workload containers. Every other
-# combination keeps the default: 4.22 in any runtime, and 5.0 with
-# kata-remote (Azure peer-pods — unqualified on 5.0, out of scope for the
-# defect). Each affected container is asserted with an exact count.
+# Always on digest-pinned kata-cc containers (issue #176 tracks the real
+# fix); every other combination keeps the default.
 echo "── workload imagePullPolicy (version ${CLUSTER_VERSION})"
 declare -A EXPECT_ALWAYS=( [hello-openshift]=2 [kbs-access-curl]=1 [kbs-access-sealed]=1 )
 for chart in hello-openshift kbs-access-curl kbs-access-sealed; do

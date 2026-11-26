@@ -66,9 +66,7 @@ print('' if d is None else d)
 }
 
 # Resolve the version-pinned airgap overlay path from global.clusterVersion,
-# mirroring the sharedValueFiles tpl in values-baremetal.yaml: 4.22 keeps
-# the historical unsuffixed name (byte-identical render with the qualified
-# 4.22 deploy); other minors append the dashed version (5.0 → -5-0).
+# mirroring the sharedValueFiles tpl in values-baremetal.yaml (4.22 unsuffixed).
 airgap_overlay_path() {
     local cluster_version suffix
     cluster_version=$(read_global_key global.clusterVersion '')
@@ -86,8 +84,7 @@ airgap_overlay_path() {
 
 # ─── Mode dispatch ───────────────────────────────────────────────
 # Fail closed on argument errors BEFORE any cluster I/O: an unrecognised
-# or mistyped flag must abort, never fall through to the full bootstrap
-# or another mode. A mode flag takes no operands.
+# flag must abort, never fall through to another mode.
 MODE="full"
 case "${1:-}" in
     "")                    ;;
@@ -564,14 +561,8 @@ for s in d.get('items', []):
 }
 
 # ─── Local preflight: airgap values consistency (no cluster I/O) ───
-# All LOCAL config checks from the old step 3e, run BEFORE any cluster
-# write: a bad values file (missing overlay for the configured version,
-# placeholder mirrorRegistry, connected-default operator sources) must
-# abort the bootstrap before it disables catalogs or patches anything —
-# leaving a half-reconfigured cluster behind on a config typo.
-# Airgap-only by design ("connected works by default"): unless
-# global.airgap is true the function is inert, so a connected run never
-# aborts on airgap-only conditions.
+# Bad values (missing overlay, placeholder mirrorRegistry, connected-default
+# sources) must abort BEFORE any cluster write. Airgap-only by design.
 preflight_local_config() {
     local airgap_flag
     airgap_flag=$(read_global_key global.airgap false)
@@ -582,9 +573,6 @@ preflight_local_config() {
     local overlay
     overlay=$(airgap_overlay_path)
     if [[ ! -f "$overlay" ]]; then
-        # Preflight, not warn-and-skip: in airgap mode a missing overlay
-        # means the render chain would fail (or fall back to defaults that
-        # point at unreachable connected catalogs) — fail before deploy.
         error "No airgap overlay at $overlay for the configured"
         error "global.clusterVersion — the sharedValueFiles chain in"
         error "values-baremetal.yaml resolves to that file. Fix"
@@ -595,9 +583,8 @@ preflight_local_config() {
 }
 
 # ─── Step 3e: Validate the airgap overlay's catalog references ───
-# The overlay names mirrored CatalogSources literally; fail fast (before
-# the pattern deploys) if any is missing. Runs AFTER step 3/3b applied
-# the oc-mirror CatalogSources (not-READY may be plain timing).
+# The overlay names mirrored CatalogSources literally; fail fast if any is
+# missing. Runs after step 3/3b (not-READY may be plain timing).
 validate_airgap_overlay() {
     step "3e" "Validate airgap overlay catalog references"
 
@@ -741,10 +728,8 @@ preflight_values_consistency() {
 mirror_oci_charts() {
     step 5 "Mirror OCI Helm charts and utility images"
 
-    # Version-derived imageset: the chart/artifact list must match what the
-    # corresponding oc-mirror run mirrored (e.g. the 5.0 imageset pins the
-    # 5.0 NFD operand digest). Derive the file from global.clusterVersion
-    # rather than silently taking the 4.22 one.
+    # Version-derived imageset: the chart/artifact list must match the
+    # oc-mirror run's — derive from global.clusterVersion, never assume 4.22.
     local cluster_version imageset
     cluster_version=$(read_global_key global.clusterVersion '4.22')
     imageset="${PATTERN_DIR}/airgap/imageset-config-${cluster_version}.yaml"
@@ -822,17 +807,9 @@ mirror_oci_charts() {
             error "(no version pin — highest semver tag) and will fail at chart-fetch."
             exit 1
         fi
-        # Verify the destination actually holds at least one tag — the
-        # source-side count above is not proof the mirror is usable.
-        # Credentials NEVER appear on the command line (argv is readable
-        # via /proc/<pid>/cmdline): skopeo gets a docker-config auth file
-        # (SKOPEO_AUTHFILE, default ~/pull-secret.json when present — the
-        # mirror entry is selected by host). TLS: when MIRROR_CA_FILE is
-        # set (default ~/.coco-pattern/registry-ca-cert.pem when present,
-        # the runbook's mirror CA) it is trusted via a generated cert-dir;
-        # without a CA the check degrades to --tls-verify=false, matching
-        # the oc image mirror calls above. auth/TLS/connection failures
-        # are reported distinctly from an empty-but-readable tag list.
+        # Credentials never appear on argv (/proc/<pid>/cmdline is readable):
+        # skopeo gets an authfile and a generated cert-dir when a mirror CA
+        # is configured (see tests/test-airgap-mirror-verify.sh).
         local pi_authfile="${SKOPEO_AUTHFILE:-}"
         local pi_certdir=""
         local -a pi_verify=()
@@ -851,15 +828,8 @@ mirror_oci_charts() {
             pi_ca="${HOME}/.coco-pattern/registry-ca-cert.pem"
         fi
         if [[ -n "$pi_ca" ]]; then
-            # Flat cert dir: an explicit skopeo --cert-dir sets
-            # SystemContext.DockerCertPath, which containers/image uses
-            # UNCHANGED (dockerCertDir() returns it as-is; the
-            # <cert-dir>/<host>/ per-registry layout applies only to the
-            # default /etc/containers/certs.d discovery). ca.crt therefore
-            # goes directly in the directory passed to --cert-dir.
-            # TLS verification is explicitly ON in this branch — the CA is
-            # configured, so there is no reason to tolerate a silent
-            # --tls-verify=false fallback.
+            # Flat cert dir: containers/image uses an explicit --cert-dir
+            # unchanged (no per-host layout), so ca.crt goes directly in it.
             pi_certdir="$(mktemp -d)"
             cp "$pi_ca" "${pi_certdir}/ca.crt"
             pi_verify+=(--cert-dir "$pi_certdir" --tls-verify=true)
@@ -972,37 +942,18 @@ fix_manifest_lists() {
 
 # ─── Step 7: Anchor the cluster trust bundle at user-ca-bundle ───
 # Runbook C-3 (upstream #171): the install-time --additional-trust-bundle
-# writes the mirror CA into openshift-config/user-ca-bundle, but that alone
-# does NOT make it the cluster trust bundle — proxy/cluster.spec.trustedCA
-# stays empty, so every config.openshift.io/inject-trusted-cabundle
-# ConfigMap (including the trusted-ca-bundle the clustergroup chart renders
-# in vp-gitops) is populated with the default system bundle only, and the
-# ArgoCD repo-server's first chart fetch fails:
-#   helm registry login … x509: certificate signed by unknown authority
-# Applying the patch HERE — before the pattern deploys — means injected
-# ConfigMaps are born with the mirror CA already in them.
-# Fail-closed by design: a failed read aborts (never treated as empty), a
-# different non-empty trust anchor is preserved (never clobbered — the
-# write is conditional on the resourceVersion we read), the CA data is
-# validated by openssl certificate-by-certificate before it is trusted,
-# and "pointer updated" is distinguished from "bundle reconciled" before
-# the bootstrap continues. Idempotent: a no-op when the field already
-# holds the value.
+# alone does not make the mirror CA the cluster trust anchor — the ArgoCD
+# repo-server's first chart fetch fails without this step (x509).
 
 # Split a PEM bundle into certificates and print each one's SHA256
-# fingerprint (lowercase hex, no colons), one per line. Fails (rc 1, no
-# output) when the bundle contains no certificate or a block openssl
-# refuses to parse — used to validate the user bundle BEFORE it is
-# trusted, and to match injected bundles by COMPLETE certificate
-# fingerprints (a shared base64 body line can appear in unrelated
-# certificates; a fingerprint cannot).
+# fingerprint (lowercase hex, no colons), one per line. Fails when a block
+# openssl refuses to parse; fingerprints match bundles exactly.
 cert_fingerprints() { # $1 = PEM bundle text
     local pem="$1" work f fp n=0
     work="$(mktemp -d)"
     printf '%s\n' "$pem" > "${work}/bundle.pem"
-    # One file per -----BEGIN CERTIFICATE----- block (-z drops the empty
-    # prefix chunk when the bundle starts with a marker; leading
-    # non-certificate text lands in its own chunk and is skipped below).
+    # One file per -----BEGIN CERTIFICATE----- block; leading
+    # non-certificate text lands in its own chunk and is skipped below.
     if ! csplit -z -s -f "${work}/cert-" -b "%03d.pem" "${work}/bundle.pem" \
             '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1; then
         rm -rf "$work"
@@ -1022,11 +973,8 @@ cert_fingerprints() { # $1 = PEM bundle text
 }
 
 # Read a dotted field from `oc get <resource> cluster -o json`. oc's
-# jsonpath output ERRORS on a missing field, which is indistinguishable
-# from an API failure at the call site (a genuinely absent field is the
-# NORMAL state on a fresh cluster); reading the object as JSON and
-# parsing locally keeps "unset" and "unreadable" distinct. Prints
-# READ_FAILED when the oc query itself fails.
+# jsonpath ERRORS on a missing field (indistinguishable from an API
+# failure); reading JSON keeps "unset" and "unreadable" distinct.
 read_cluster_field() { # $1 = dotted JSON path from the object root, $2 = resource (default: proxy)
     local res="${2:-proxy}" json val
     if ! json=$(oc get "$res" cluster -o json 2>/dev/null); then
@@ -1061,8 +1009,7 @@ configure_cluster_trusted_ca() {
     fi
 
     # openssl is required: the bundle is validated certificate-by-
-    # certificate before it is trusted cluster-wide (a grep for
-    # BEGIN CERTIFICATE lets arbitrary non-certificate data through).
+    # certificate before it is trusted (a BEGIN CERTIFICATE grep does not).
     if ! command -v openssl >/dev/null 2>&1; then
         error "openssl is required to validate the user CA bundle —"
         error "refusing to point the cluster trust anchor at an unvalidated one."
@@ -1110,9 +1057,8 @@ configure_cluster_trusted_ca() {
     if [[ "$current" == "user-ca-bundle" ]]; then
         info "proxy/cluster trustedCA already points at user-ca-bundle"
     else
-        # Conditional write: JSON-patch "test" on the resourceVersion we
-        # just read, so a concurrent trust-anchor change between read and
-        # write FAILS the patch instead of being overwritten.
+        # Conditional write: JSON-patch "test" on the resourceVersion just
+        # read, so a concurrent trust-anchor change fails the patch.
         local rv
         rv=$(read_cluster_field metadata.resourceVersion)
         if [[ "$rv" == "READ_FAILED" || -z "$rv" ]]; then
@@ -1151,16 +1097,9 @@ configure_cluster_trusted_ca() {
         fi
     fi
 
-    # "Pointer updated" is not "bundle reconciled": the injection into
-    # config.openshift.io/inject-trusted-cabundle ConfigMaps is
-    # asynchronous. When labeled ConfigMaps exist, at least one must carry
-    # EVERY user-bundle certificate (matched by fingerprint) before the
-    # bootstrap continues; when none exist yet (fresh install,
-    # pre-pattern), the pointer alone is sufficient — ConfigMaps rendered
-    # later are born with the bundle. Wall-clock deadline (SECONDS counts
-    # oc call time too, unlike a sleep counter) and the candidate list is
-    # re-fetched every round so ConfigMaps created while waiting are seen.
-    # The deadline and poll interval are tunable for slow labs and tests.
+    # "Pointer updated" is not "bundle reconciled": the injection is async.
+    # When labeled ConfigMaps exist, one must carry EVERY user-bundle
+    # certificate before continuing; deadline and poll interval are tunable.
     local labeled_cms deadline=$(( SECONDS + ${CA_RECONCILE_TIMEOUT_SECONDS:-180} ))
     local line ns name cmdata cm_fps fp matched examined
     while (( SECONDS < deadline )); do
@@ -1528,10 +1467,8 @@ echo "╚═══════════════════════�
 echo ""
 
 validate_prereqs
-# Local config preflight BEFORE any cluster write: a missing airgap
-# overlay for the configured version, a placeholder mirrorRegistry or a
-# connected-default operator source must abort here, not after the
-# bootstrap has disabled catalogs and patched mirror rules.
+# Local config preflight BEFORE any cluster write: a missing airgap overlay
+# or placeholder values must abort here, not mid-bootstrap.
 preflight_local_config
 disable_default_catalogs
 create_catalog_sources
@@ -1542,11 +1479,8 @@ validate_airgap_overlay
 mirror_oci_charts
 fix_manifest_lists
 configure_cluster_trusted_ca
-# The old argocd-tls-certs-cm step (removed) was a silent no-op (ran before
-# the vp-gitops namespace existed); do not re-add. The mirror CA reaches the
-# repo-server via step 7 above (runbook C-3, upstream #171). Step 7b never
-# ran: mirror chart repos are public (ANONYMOUS_ACCESS); a pull-secret
-# HELM_REGISTRY_CONFIG 401'd.
+# The old argocd-tls-certs-cm step (removed) was a silent no-op; step 7b
+# never ran (public repos; a pull-secret HELM_REGISTRY_CONFIG 401'd).
 enable_routing_via_host
 setup_git_server
 create_operator_config

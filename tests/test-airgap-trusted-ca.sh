@@ -1,29 +1,9 @@
 #!/usr/bin/env bash
-# Tests for the configure_cluster_trusted_ca step of
-# scripts/airgap-post-install.sh (runbook C-3, trust-anchor hardening).
-#
-# The functions (configure_cluster_trusted_ca, read_cluster_field,
-# cert_fingerprints) are extracted from the script with sed and run
-# against a mocked `oc` whose output shapes match the REAL client:
-#   - `oc get <res> cluster -o json`           → full JSON object
-#   - `oc get configmaps -A -l ... -o jsonpath={range ...}` → "ns name" lines
-#   - `oc get cm <n> -n <ns> -o jsonpath=...`  → the data value
-# (`-o name` prints only `configmap/<name>` with NO namespace, which is
-# why the script does not use it — the mock asserts that shape is gone.)
-# Certificates are REAL openssl-generated self-signed PEMs, so the
-# openssl validation and fingerprint matching run for real.
-#
-# Covered cases:
-#   - different non-empty anchor   → exit 1, preserved (no patch)
-#   - empty / non-PEM / unparseable CA data → exit 1, no patch
-#   - failed reads                 → exit 1, no patch
-#   - patch failure / reverted-ish → exit 1, propagated
-#   - concurrent anchor change at patch time (json-patch test fails)
-#                                  → exit 1, concurrent value NOT overwritten
-#   - already anchored + reconciled → exit 0, no patch (idempotent)
-#   - fresh anchor, reconciled      → exit 0, patched once
-#   - delayed injection (round 2)   → exit 0, patched once, waited
-#   - genuine timeout (never injected) → exit 1
+# Tests for configure_cluster_trusted_ca (step 7 of
+# scripts/airgap-post-install.sh — runbook C-3): the functions are
+# extracted with sed and run against a mocked `oc` with real output
+# shapes; certificates are real openssl-generated PEMs. Each case has
+# its own section header below.
 #
 # Usage: bash tests/test-airgap-trusted-ca.sh
 set -u
@@ -66,15 +46,10 @@ CA_DATA="$(cat "${WORK}/ca-1.pem" "${WORK}/ca-2.pem")"
 OTHER_CA="$(cat "${WORK}/ca-sys.pem")"
 
 # ── The oc mock (REAL output shapes) ─────────────────────────────────
-# State files:
-#   state/trustedca   current spec.trustedCA.name ("" = unset)
-#   state/rv          metadata.resourceVersion (bumped by a successful patch)
-#   state/injected    data of the injected ConfigMap ("" = no match yet)
-#   state/list_rounds jsonpath listing poll counter (for delayed success)
-# Failure injection:
-#   OC_FAIL_CM_GET / OC_FAIL_PROXY_GET / OC_FAIL_PATCH / OC_FAIL_PATCH_TEST
-#   OC_CONCURRENT_ANCHOR (value the concurrent writer sets when the
-#   json-patch resourceVersion test fails)
+# State: trustedca (current anchor), rv (resourceVersion), injected
+# (injected ConfigMap data), list_rounds (listing poll counter).
+# Failure injection: OC_FAIL_CM_GET / OC_FAIL_PROXY_GET / OC_FAIL_PATCH /
+# OC_FAIL_PATCH_TEST / OC_CONCURRENT_ANCHOR / OC_DELAY_ROUNDS.
 mkdir -p "${WORK}/bin" "${WORK}/state"
 : > "${WORK}/state/trustedca"
 echo "100" > "${WORK}/state/rv"
@@ -120,8 +95,7 @@ case "$*" in
         printf '%s' "${OC_CA_DATA:-}"
         exit 0 ;;
     # Structured ConfigMap listing — the real jsonpath range shape
-    # ("ns name" per line). Delays first appearance when OC_DELAY_ROUNDS
-    # is set (the injection landing late).
+    # ("ns name" per line); OC_DELAY_ROUNDS delays first appearance.
     "get configmaps -A -l config.openshift.io/inject-trusted-cabundle=true -o "*)
         rounds=$(cat "${STATE}/list_rounds")
         echo $(( rounds + 1 )) > "${STATE}/list_rounds"

@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 # Unit test for the skopeo invocation in mirror_oci_charts (step 5):
-# the mirror-side verification must
-#   - pass --cert-dir <dir> where <dir>/ca.crt exists DIRECTLY (flat
-#     layout: skopeo's --cert-dir sets SystemContext.DockerCertPath,
-#     which containers/image uses unchanged — dockerCertDir() returns
-#     it as-is; a <dir>/<host>/ subdirectory would never be read);
-#   - explicitly pass --tls-verify=true when a CA is configured (no
-#     silent --tls-verify=false fallback);
-#   - pass credentials via --authfile only, never --creds (argv is
-#     world-readable via /proc/<pid>/cmdline);
-#   - clean the temporary cert dir up afterwards.
-#
-# mirror_oci_charts is extracted from the script with sed and run with a
-# mocked `oc` (image mirror no-ops) and a mocked `skopeo` that records
-# its argv. The CA is a real self-signed certificate that is NOT in the
-# system trust store.
+# flat --cert-dir layout, --tls-verify=true with a CA configured,
+# --authfile only (never --creds on argv), temp cert dir cleanup. Runs
+# the sed-extracted function against mocked oc/skopeo (argv recorded)
+# with a real self-signed CA.
 #
 # Usage: bash tests/test-airgap-mirror-verify.sh
 set -u
@@ -68,9 +57,8 @@ case "$*" in
     "list-tags docker://quay.io/validatedpatterns/pattern-install")
         echo '{"Tags":["0.0.19","0.0.20"]}'; exit 0 ;;
     "list-tags --authfile "*" --cert-dir "*" --tls-verify=true docker://"*)
-        # Assert the cert-dir layout AT CALL TIME (the script cleans the
-        # temp dir up when the step finishes — checking afterwards would
-        # always see it gone).
+        # Assert the cert-dir layout AT CALL TIME — the script cleans
+        # the temp dir up when the step finishes.
         certdir=""
         prev=""
         for a in "$@"; do
@@ -137,9 +125,7 @@ elif [[ -z "$verify_line" ]]; then
     bad "no mirror-side skopeo verification call recorded"
     cat "$SKOPEO_ARGS" | sed 's/^/    /'
 else
-    # 1. --cert-dir <dir> with ca.crt DIRECTLY inside (flat layout) —
-    #    asserted at call time by the skopeo mock (see above), because the
-    #    script removes the temp dir when the step finishes.
+    # 1. flat --cert-dir layout — asserted at call time by the mock above
     verdict="$(cat "${SKOPEO_CERTDIR_VERDICT}" 2>/dev/null || true)"
     if [[ "$verdict" == *"layout=FLAT content=MATCH" ]]; then
         ok "--cert-dir <dir> contains ca.crt directly (flat layout) with the configured CA content"
