@@ -172,6 +172,29 @@ printf '%s' "<api-key>" > ~/.coco-pattern/intel-pcs-api-key
 
 ```
 
+**Who consumes those credentials.** Two different mechanisms, exported in
+the same shell:
+
+- `oc-mirror` (`make airgap-mirror`) and `oc image mirror` authenticate
+  from their **own registry auth file** — `--authfile`, defaulting to
+  `${XDG_RUNTIME_DIR}/containers/auth.json` and then
+  `~/.docker/config.json`. They do **not** read `MIRROR_USER`/`MIRROR_PASS`,
+  so the robot account must be logged in there for the mirroring steps.
+- `scripts/airgap-post-install.sh` (C-1) verifies that
+  `pattern-install` exists in the mirror with `skopeo list-tags`. When
+  both `MIRROR_USER` and `MIRROR_PASS` are set it writes a temporary
+  **0600** authfile containing
+  `{"auths":{"<mirror-host:port>":{"auth":"<base64 user:pass>"}}}`,
+  passes it as `--authfile` and deletes it afterwards (the password never
+  reaches a command line). When they are unset it falls back to
+  `SKOPEO_AUTHFILE`, then to `~/pull-secret.json`.
+
+A stock pull secret normally holds the Red Hat/Vendor pull credentials,
+not the private Quay robot account, so leaving `MIRROR_USER`/`MIRROR_PASS`
+unset on a private mirror makes the verification fail with an auth error
+that names the source it tried. Either export the pair (as above) or
+`export SKOPEO_AUTHFILE=<authfile containing the robot account>`.
+
 ### Values-Secret (Convention Location)
 
 The values-secret file **must** be at `~/values-secret-<pattern>.yaml`.

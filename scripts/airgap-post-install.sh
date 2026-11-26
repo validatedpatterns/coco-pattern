@@ -14,6 +14,10 @@
 #                     on Quay.
 
 # Optional env:
+#   MIRROR_USER / MIRROR_PASS — mirror robot account; both set → skopeo gets
+#                     a temporary 0600 authfile (never on argv), removed after.
+#   SKOPEO_AUTHFILE — fallback authfile for the mirror verification
+#                     (default: ~/pull-secret.json, which may lack the robot).
 #   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
@@ -807,21 +811,50 @@ mirror_oci_charts() {
             error "(no version pin — highest semver tag) and will fail at chart-fetch."
             exit 1
         fi
-        # Credentials never appear on argv (/proc/<pid>/cmdline is readable):
-        # skopeo gets an authfile and a generated cert-dir when a mirror CA
-        # is configured (see tests/test-airgap-mirror-verify.sh).
-        local pi_authfile="${SKOPEO_AUTHFILE:-}"
+        # No creds on argv (/proc/<pid>/cmdline): the runbook's
+        # MIRROR_USER/MIRROR_PASS become a 0600 temp authfile, else SKOPEO_AUTHFILE.
+        local pi_authfile="" pi_authfile_tmp="" pi_auth_source=""
         local pi_certdir=""
         local -a pi_verify=()
-        if [[ -z "$pi_authfile" && -f "${HOME}/pull-secret.json" ]]; then
-            pi_authfile="${HOME}/pull-secret.json"
+        if [[ -n "${MIRROR_USER:-}" && -n "${MIRROR_PASS:-}" ]]; then
+            local pi_registry_host="${MIRROR_REGISTRY%%/*}"
+            pi_authfile_tmp="$(umask 077; mktemp)"
+            # Secrets via the environment, the encoded token via the file:
+            # neither lands on a command line.
+            if MIRROR_USER="${MIRROR_USER}" MIRROR_PASS="${MIRROR_PASS}" \
+                    PI_REGISTRY_HOST="${pi_registry_host}" \
+                    PI_AUTHFILE="${pi_authfile_tmp}" python3 - <<'PY'
+import base64, json, os
+token = base64.b64encode(
+    f"{os.environ['MIRROR_USER']}:{os.environ['MIRROR_PASS']}".encode()).decode()
+with open(os.environ['PI_AUTHFILE'], 'w') as fh:
+    json.dump({"auths": {os.environ['PI_REGISTRY_HOST']: {"auth": token}}}, fh)
+PY
+            then
+                pi_authfile="$pi_authfile_tmp"
+                pi_auth_source="MIRROR_USER/MIRROR_PASS (temporary 0600 authfile)"
+            else
+                rm -f "$pi_authfile_tmp"
+                error "Could not write the temporary authfile for"
+                error "MIRROR_USER/MIRROR_PASS (python3 json.dump failed)."
+                exit 1
+            fi
+        else
+            pi_authfile="${SKOPEO_AUTHFILE:-}"
+            if [[ -n "$pi_authfile" ]]; then
+                pi_auth_source="SKOPEO_AUTHFILE (${pi_authfile})"
+            elif [[ -f "${HOME}/pull-secret.json" ]]; then
+                pi_authfile="${HOME}/pull-secret.json"
+                pi_auth_source="default pull secret (${pi_authfile})"
+            fi
         fi
         if [[ -n "$pi_authfile" ]]; then
             pi_verify+=(--authfile "$pi_authfile")
         else
-            warn "  No auth file for the mirror (SKOPEO_AUTHFILE unset,"
-            warn "  ~/pull-secret.json absent) — verifying pattern-install"
-            warn "  anonymously (fails on private repos)"
+            pi_auth_source="anonymous (no credentials provided)"
+            warn "  No auth file for the mirror (MIRROR_USER/MIRROR_PASS unset,"
+            warn "  SKOPEO_AUTHFILE unset, ~/pull-secret.json absent) — verifying"
+            warn "  pattern-install anonymously (fails on private repos)"
         fi
         local pi_ca="${MIRROR_CA_FILE:-}"
         if [[ -z "$pi_ca" && -f "${HOME}/.coco-pattern/registry-ca-cert.pem" ]]; then
@@ -842,6 +875,7 @@ mirror_oci_charts() {
         pi_errfile="$(mktemp)"
         pi_cleanup() { # temp files on every exit path from this block
             rm -f "$pi_errfile"
+            [[ -n "${pi_authfile_tmp:-}" ]] && rm -f "$pi_authfile_tmp"
             [[ -n "${pi_certdir:-}" && -d "${pi_certdir:-}" ]] && rm -rf "$pi_certdir"
             return 0
         }
@@ -853,8 +887,14 @@ mirror_oci_charts() {
             error "connectivity — this is NOT an empty-mirror verdict):"
             sed 's/^/    /' "$pi_errfile" >&2 || true
             pi_cleanup
-            error "Check the mirror credentials (SKOPEO_AUTHFILE), the CA"
-            error "(MIRROR_CA_FILE) and connectivity to ${pi_dest}."
+            error "Credentials came from: ${pi_auth_source}."
+            error "A private Quay mirror needs its own robot account, which a"
+            error "stock pull secret does not contain. Either export"
+            error "MIRROR_USER and MIRROR_PASS (the script writes a temporary"
+            error "0600 authfile and never puts them on argv), or point"
+            error "SKOPEO_AUTHFILE at an authfile holding that robot account."
+            error "Then check the mirror CA (MIRROR_CA_FILE) and connectivity"
+            error "to ${pi_dest}."
             exit 1
         fi
         # Parse the tag list; unparseable JSON is a skopeo/registry defect and

@@ -60,9 +60,11 @@ case "$*" in
         # Assert the cert-dir layout AT CALL TIME — the script cleans
         # the temp dir up when the step finishes.
         certdir=""
+        authfile=""
         prev=""
         for a in "$@"; do
             [[ "$prev" == "--cert-dir" ]] && certdir="$a"
+            [[ "$prev" == "--authfile" ]] && authfile="$a"
             prev="$a"
         done
         verdict="certdir=${certdir}"
@@ -74,6 +76,13 @@ case "$*" in
             verdict="$verdict layout=WRONG"
         fi
         printf '%s\n' "$verdict" >> "${SKOPEO_CERTDIR_VERDICT:?}"
+        # Record the authfile AT CALL TIME (path, mode, content): the
+        # script removes a generated one when the step finishes.
+        {
+            printf 'path=%s\n' "$authfile"
+            printf 'mode=%s\n' "$(stat -c %a "$authfile" 2>/dev/null || echo MISSING)"
+            printf 'content=%s\n' "$(cat "$authfile" 2>/dev/null)"
+        } >> "${SKOPEO_AUTHFILE_INSPECT:?}"
         echo '{"Tags":["0.0.19","0.0.20"]}'; exit 0 ;;
     *) echo "skopeo mock: unhandled: $*" >&2; exit 64 ;;
 esac
@@ -82,20 +91,28 @@ chmod +x "${WORK}/bin/oc" "${WORK}/bin/skopeo"
 export PATH="${WORK}/bin:$PATH"
 export SKOPEO_ARGS="${WORK}/skopeo-args"
 export SKOPEO_CERTDIR_VERDICT="${WORK}/certdir-verdict"
+export SKOPEO_AUTHFILE_INSPECT="${WORK}/authfile-inspect"
 export TEST_CA="${WORK}/ca.pem"
 
-# ── Run the step ─────────────────────────────────────────────────────
+# ── Run the step (once per credential source) ────────────────────────
 export MIRROR_REGISTRY="quay.example.com:443/mirror"
-: > "$SKOPEO_CERTDIR_VERDICT"
-: > "$SKOPEO_ARGS"
-if (
-    export PATH MIRROR_REGISTRY SKOPEO_ARGS PATTERN_DIR
-    info()  { echo "[INFO] $*"; }
-    warn()  { echo "[WARN] $*"; }
-    error() { echo "[ERROR] $*" >&2; }
-    step()  { echo "=== Step $1: $2 ==="; }
-    read_global_key() { # real parse of the repo values (clusterVersion → 4.22)
-        python3 - "$1" "$2" <<'PY'
+RC=0 OUT="" ERR=""
+run_step() { # $1 = tag; uses MIRROR_USER/MIRROR_PASS/SKOPEO_AUTHFILE from env
+    local tag="$1"
+    OUT="${WORK}/out-${tag}" ERR="${WORK}/err-${tag}"
+    : > "$SKOPEO_CERTDIR_VERDICT"
+    : > "$SKOPEO_ARGS"
+    : > "$SKOPEO_AUTHFILE_INSPECT"
+    if (
+        export PATH MIRROR_REGISTRY SKOPEO_ARGS PATTERN_DIR SKOPEO_AUTHFILE_INSPECT
+        export MIRROR_USER="${MIRROR_USER:-}" MIRROR_PASS="${MIRROR_PASS:-}" \
+               SKOPEO_AUTHFILE="${SKOPEO_AUTHFILE:-}"
+        info()  { echo "[INFO] $*"; }
+        warn()  { echo "[WARN] $*"; }
+        error() { echo "[ERROR] $*" >&2; }
+        step()  { echo "=== Step $1: $2 ==="; }
+        read_global_key() { # real parse of the repo values (clusterVersion → 4.22)
+            python3 - "$1" "$2" <<'PY'
 import sys, yaml
 key, default = sys.argv[1], sys.argv[2]
 d = yaml.safe_load(open(f"{__import__('os').environ['PATTERN_DIR']}/values-global.yaml")) or {}
@@ -105,22 +122,29 @@ for part in key.split('.'):
     d = d[part]
 print('' if d is None else d)
 PY
-    }
-    # shellcheck disable=SC1090
-    source "${WORK}/func.sh"
-    mirror_oci_charts
-) >"${WORK}/out" 2>"${WORK}/err"; then
-    rc=0
-else
-    rc=$?
-fi
+        }
+        # shellcheck disable=SC1090
+        source "${WORK}/func.sh"
+        mirror_oci_charts
+    ) >"$OUT" 2>"$ERR"; then
+        RC=0
+    else
+        RC=$?
+    fi
+}
+
+# Case A: default pull-secret authfile (SKOPEO_AUTHFILE and the
+# MIRROR_USER/MIRROR_PASS pair both unset).
+MIRROR_USER="" MIRROR_PASS="" SKOPEO_AUTHFILE=""
+run_step pull-secret
+rc="$RC"
 
 # ── Assertions on the recorded skopeo argv ───────────────────────────
 verify_line="$(grep 'list-tags --authfile' "$SKOPEO_ARGS" | head -1)"
 
 if [[ $rc -ne 0 ]]; then
     bad "mirror_oci_charts exited $rc"
-    sed 's/^/    /' "${WORK}/err" | head -8
+    sed 's/^/    /' "$ERR" | head -8
 elif [[ -z "$verify_line" ]]; then
     bad "no mirror-side skopeo verification call recorded"
     cat "$SKOPEO_ARGS" | sed 's/^/    /'
@@ -161,6 +185,65 @@ else
         ok "verification targets the mirror destination"
     else
         bad "verification target wrong: $verify_line"
+    fi
+fi
+
+# ── Case B: MIRROR_USER/MIRROR_PASS → temporary 0600 authfile ────────
+# SKOPEO_AUTHFILE points elsewhere here, so precedence is asserted too.
+MIRROR_USER="robot\$mirror+coco" MIRROR_PASS="p4ss w0rd!" \
+    SKOPEO_AUTHFILE="${WORK}/bogus-authfile.json"
+cat > "${SKOPEO_AUTHFILE}" <<'EOF'
+{"auths":{"quay.example.com:443":{"auth":"Ym9ndXM6Ym9ndXM="}}}
+EOF
+run_step mirror-robot
+rc="$RC"
+verify_line="$(grep 'list-tags --authfile' "$SKOPEO_ARGS" | head -1)"
+inspect_path="$(sed -n 's/^path=//p' "$SKOPEO_AUTHFILE_INSPECT" | head -1)"
+inspect_mode="$(sed -n 's/^mode=//p' "$SKOPEO_AUTHFILE_INSPECT" | head -1)"
+inspect_content="$(sed -n 's/^content=//p' "$SKOPEO_AUTHFILE_INSPECT" | head -1)"
+
+expected_auth="$(MIRROR_USER="$MIRROR_USER" MIRROR_PASS="$MIRROR_PASS" python3 -c '
+import base64, json, os
+token = base64.b64encode(
+    (os.environ["MIRROR_USER"] + ":" + os.environ["MIRROR_PASS"]).encode()).decode()
+print(json.dumps({"auths": {"quay.example.com:443": {"auth": token}}}, sort_keys=True))')"
+
+if [[ $rc -ne 0 ]]; then
+    bad "MIRROR_USER/MIRROR_PASS run exited $rc"
+    sed 's/^/    /' "$ERR" | head -8
+elif [[ -z "$verify_line" ]]; then
+    bad "MIRROR_USER/MIRROR_PASS: no mirror-side skopeo verification call"
+    sed 's/^/    /' "$SKOPEO_ARGS"
+else
+    # 5. the documented pair produced the authfile actually passed to skopeo
+    if [[ -n "$inspect_path" && "$inspect_path" != "${HOME}/pull-secret.json" \
+        && "$inspect_path" != "${SKOPEO_AUTHFILE}" ]] \
+        && grep -q -- "--authfile ${inspect_path}" <<< "$verify_line"; then
+        ok "MIRROR_USER/MIRROR_PASS generate a temp authfile that takes precedence over SKOPEO_AUTHFILE"
+    else
+        bad "temp authfile not used: path='${inspect_path}' argv=${verify_line}"
+    fi
+    # 6. its content is exactly {"auths":{"<registry host>":{"auth":<b64 user:pass>}}}
+    if [[ -n "$inspect_content" ]] \
+        && [[ "$(printf '%s' "$inspect_content" | python3 -c '
+import json, sys
+print(json.dumps(json.load(sys.stdin), sort_keys=True))' 2>/dev/null)" == "$expected_auth" ]]; then
+        ok "temp authfile content = base64(MIRROR_USER:MIRROR_PASS) keyed by the registry host"
+    else
+        bad "temp authfile content wrong: '${inspect_content}' (expected '${expected_auth}')"
+    fi
+    # 7. 0600 at call time, and the password never reaches argv
+    if [[ "$inspect_mode" == "600" ]] && ! grep -q -- "--creds" <<< "$verify_line" \
+        && ! grep -qF "$MIRROR_PASS" <<< "$verify_line"; then
+        ok "temp authfile is 0600 at call time; no password or --creds on argv"
+    else
+        bad "authfile mode/password leak: mode='${inspect_mode}' argv=${verify_line}"
+    fi
+    # 8. removed after the step (only the caller-supplied file survives)
+    if [[ -n "$inspect_path" && ! -e "$inspect_path" ]] && [[ -f "${SKOPEO_AUTHFILE}" ]]; then
+        ok "temporary authfile removed after the step"
+    else
+        bad "temporary authfile leaked: '${inspect_path}'"
     fi
 fi
 
