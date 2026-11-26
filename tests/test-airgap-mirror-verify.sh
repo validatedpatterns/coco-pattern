@@ -97,16 +97,17 @@ export TEST_CA="${WORK}/ca.pem"
 # ── Run the step (once per credential source) ────────────────────────
 export MIRROR_REGISTRY="quay.example.com:443/mirror"
 RC=0 OUT="" ERR=""
-run_step() { # $1 = tag; uses MIRROR_USER/MIRROR_PASS/SKOPEO_AUTHFILE from env
-    local tag="$1"
+run_step() { # $1 = tag; $2 = "strict" to model the script's own set -euo pipefail
+    local tag="$1" mode="${2:-}"
     OUT="${WORK}/out-${tag}" ERR="${WORK}/err-${tag}"
     : > "$SKOPEO_CERTDIR_VERDICT"
     : > "$SKOPEO_ARGS"
     : > "$SKOPEO_AUTHFILE_INSPECT"
-    if (
+    (
         export PATH MIRROR_REGISTRY SKOPEO_ARGS PATTERN_DIR SKOPEO_AUTHFILE_INSPECT
         export MIRROR_USER="${MIRROR_USER:-}" MIRROR_PASS="${MIRROR_PASS:-}" \
-               SKOPEO_AUTHFILE="${SKOPEO_AUTHFILE:-}"
+               SKOPEO_AUTHFILE="${SKOPEO_AUTHFILE:-}" \
+               MIRROR_CA_FILE="${MIRROR_CA_FILE:-}"
         info()  { echo "[INFO] $*"; }
         warn()  { echo "[WARN] $*"; }
         error() { echo "[ERROR] $*" >&2; }
@@ -123,14 +124,17 @@ for part in key.split('.'):
 print('' if d is None else d)
 PY
         }
+        # The real script runs under `set -euo pipefail`; Case C needs that
+        # to reproduce the abort path faithfully.
+        [[ "$mode" == "strict" ]] && set -euo pipefail
         # shellcheck disable=SC1090
         source "${WORK}/func.sh"
         mirror_oci_charts
-    ) >"$OUT" 2>"$ERR"; then
-        RC=0
-    else
-        RC=$?
-    fi
+    ) >"$OUT" 2>"$ERR"
+    # NOT `if ( … ); then`: bash ignores `set -e` for a command in an
+    # `if` condition, and the ignoring propagates into the subshell even
+    # though it re-enables -e itself — the abort path would not reproduce.
+    RC=$?
 }
 
 # Case A: default pull-secret authfile (SKOPEO_AUTHFILE and the
@@ -245,6 +249,55 @@ print(json.dumps(json.load(sys.stdin), sort_keys=True))' 2>/dev/null)" == "$expe
     else
         bad "temporary authfile leaked: '${inspect_path}'"
     fi
+fi
+
+# ── Case C: failure BETWEEN authfile creation and the verification call ─
+# The 0600 authfile holding base64(MIRROR_USER:MIRROR_PASS) is created
+# before the mirror CA is used. A MIRROR_CA_FILE that does not exist makes
+# the cert-dir `cp` fail, which under `set -e` aborts the step *there* —
+# after the credential file exists, before skopeo runs. The credential file
+# must not survive that exit.
+CA_FAIL_USER='robot$mirror+coco'
+CA_FAIL_PASS='p4ss w0rd!'
+export TMPDIR="${WORK}/tmp-ca-fail"     # private temp dir — the only place
+mkdir -p "$TMPDIR"                      # the authfile may be created
+export MIRROR_CA_FILE="${WORK}/this-ca-does-not-exist.pem"
+MIRROR_USER="$CA_FAIL_USER" MIRROR_PASS="$CA_FAIL_PASS" SKOPEO_AUTHFILE="" \
+    run_step ca-missing strict
+rc="$RC"
+unset MIRROR_CA_FILE
+
+if [[ $rc -eq 0 ]]; then
+    bad "missing MIRROR_CA_FILE did not abort the step (rc=0)"
+    sed 's/^/    /' "$OUT" | head -5
+else
+    ok "step aborts (rc=${rc}) when MIRROR_CA_FILE is missing — mid-step failure reproduced"
+fi
+
+# 9. nothing created so far survives the abort
+leftovers="$(find "$TMPDIR" -mindepth 1 2>/dev/null | sort || true)"
+if [[ -z "$leftovers" ]]; then
+    ok "no temp artefact survives the mid-step failure"
+else
+    bad "temp artefacts leaked after the mid-step failure: $(tr '\n' ' ' <<< "$leftovers")"
+fi
+
+# 10. and the mirror robot credential is nowhere on disk under the temp dir
+ca_fail_token="$(CA_FAIL_USER="$CA_FAIL_USER" CA_FAIL_PASS="$CA_FAIL_PASS" python3 -c '
+import base64, os
+print(base64.b64encode(
+    (os.environ["CA_FAIL_USER"] + ":" + os.environ["CA_FAIL_PASS"]).encode()).decode())')"
+leaked=""
+while IFS= read -r f; do
+    [[ -z "$f" || ! -f "$f" ]] && continue
+    if grep -qF "$ca_fail_token" "$f" 2>/dev/null || grep -qF "$CA_FAIL_PASS" "$f" 2>/dev/null; then
+        leaked="$f"
+    fi
+done <<< "$leftovers"
+if [[ -z "$leaked" ]]; then
+    ok "credential content absent from every leftover temp file"
+else
+    bad "credential leaked in leftover temp file: ${leaked}"
 fi
 
 echo

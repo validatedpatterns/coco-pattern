@@ -814,8 +814,28 @@ mirror_oci_charts() {
         # No creds on argv (/proc/<pid>/cmdline): the runbook's
         # MIRROR_USER/MIRROR_PASS become a 0600 temp authfile, else SKOPEO_AUTHFILE.
         local pi_authfile="" pi_authfile_tmp="" pi_auth_source=""
-        local pi_certdir=""
+        local pi_certdir="" pi_errfile=""
         local -a pi_verify=()
+        # Cleanup is defined BEFORE the first artefact exists and armed on EXIT
+        # immediately, so the credential file is covered from the instant it is
+        # created: under `set -e` a failing statement between mktemp and the
+        # verification call (the cert-dir `cp` on a bad MIRROR_CA_FILE is the
+        # easy one) must not leave a 0600 file holding the mirror robot
+        # password on disk. Idempotent, so the explicit pi_cleanup calls at
+        # each exit path below are harmless double-cleans.
+        pi_cleanup() {
+            if [[ -n "${pi_errfile:-}" ]]; then rm -f "$pi_errfile"; fi
+            if [[ -n "${pi_authfile_tmp:-}" ]]; then rm -f "$pi_authfile_tmp"; fi
+            if [[ -n "${pi_certdir:-}" && -d "${pi_certdir:-}" ]]; then
+                rm -rf "$pi_certdir"
+            fi
+            pi_errfile="" pi_authfile_tmp="" pi_certdir=""
+            return 0
+        }
+        # The only other trap in this script is a function-scoped `RETURN` trap
+        # in normalise_mirror_source_policy; there is no EXIT trap to compose
+        # with, so this arms rather than replaces anything.
+        trap pi_cleanup EXIT
         if [[ -n "${MIRROR_USER:-}" && -n "${MIRROR_PASS:-}" ]]; then
             local pi_registry_host="${MIRROR_REGISTRY%%/*}"
             pi_authfile_tmp="$(umask 077; mktemp)"
@@ -871,15 +891,8 @@ PY
             warn "  registry-ca-cert.pem absent) — falling back to --tls-verify=false"
             pi_verify+=(--tls-verify=false)
         fi
-        local pi_errfile
-        pi_errfile="$(mktemp)"
-        pi_cleanup() { # temp files on every exit path from this block
-            rm -f "$pi_errfile"
-            [[ -n "${pi_authfile_tmp:-}" ]] && rm -f "$pi_authfile_tmp"
-            [[ -n "${pi_certdir:-}" && -d "${pi_certdir:-}" ]] && rm -rf "$pi_certdir"
-            return 0
-        }
         local pi_mirror_tags pi_rc
+        pi_errfile="$(mktemp)"
         pi_mirror_tags=$(skopeo list-tags "${pi_verify[@]}" "docker://${pi_dest}" 2>"$pi_errfile") \
             && pi_rc=0 || pi_rc=$?
         if [[ $pi_rc -ne 0 ]]; then
