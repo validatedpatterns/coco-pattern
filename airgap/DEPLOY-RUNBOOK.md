@@ -24,22 +24,19 @@ the hardening fixes on `feat/ocp5-compatibility` post-date that record
 and re-qualify through the render gate and the mocked-`oc` suites in
 `tests/`. Two hard requirements:
 
-- The installer's `osImageStream` **must match**
-  `global.cluster.osStream` in `values-global.yaml` (the qualified 5.0.2
-  deploy sets `rhel-9` on both sides). The value gates the RHEL 10-only
-  SELinux `kvm_gmem` policy; a mismatch either ships a policy the node's
-  kernel cannot load or omits one TDX kata pods need.
+- The installer must run the RHCOS 9 payload (`--os-image-stream rhel-9`
+  at `labctl generate`, B-1 — matching the qualified 5.0.2 deploy); the
+  RHEL 10 payload is unqualified.
 - The mirror and the pattern values must agree on the minor:
   `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml` (not the 4.22
   default) with `global.clusterVersion: "5.0"`.
 
-**Unverified on 5.0:** the RHEL 10 payload (`osImageStream: rhel-10` —
-the `kvm_gmem` SELinux policy renders but the combination has not been
-qualified), AMD SEV-SNP, GPU profiles, and every other topology (Azure
-peer-pods, hub/spoke, HCP). Setting `global.clusterVersion: "5.0"` alone
-is therefore NOT sufficient for a qualified 5.0 deploy — the imageset,
-`osStream` and (for pre-DCAP-v0.27.0 clusters) the Intel DCAP migration
-notes below all apply.
+**Unverified on 5.0:** the RHEL 10 payload (`osImageStream: rhel-10`),
+AMD SEV-SNP, GPU profiles, and every other topology (Azure peer-pods,
+hub/spoke, HCP). Setting `global.clusterVersion: "5.0"` alone is
+therefore NOT sufficient for a qualified 5.0 deploy — the imageset,
+the payload stream and (for pre-DCAP-v0.27.0 clusters) the Intel DCAP
+migration notes below all apply.
 
 ## Architecture
 
@@ -211,8 +208,6 @@ global:
   airgap: true
   mirrorRegistry: <mirror-root-including-org>          # e.g. quay.example.com:443/mirror
   clusterVersion: "<minor>"                            # e.g. "5.0" — selects the version overlay
-  cluster:
-    osStream: rhel-9    # OCP 5.0 ONLY (see below) — MUST match the installer's --os-image-stream
 main:
   clusterGroupName: baremetal
   git:
@@ -227,13 +222,11 @@ main:
 ```
 
 **OCP 5.0 — payload stream pin (required):** the qualified 5.0 deploy
-runs the **RHCOS 9** payload. Both sides must be set to the same stream:
-`global.cluster.osStream: rhel-9` in the deploy-branch values (above)
-**and** `--os-image-stream rhel-9` at `labctl generate` (B-1). Left
-unset, both the installer and the chart default to RHEL 10 — a
-qualified-but-untested payload (the SELinux `kvm_gmem` policy and the
-CoCo/kata/edk2 artifacts differ per stream; see the qualified-scope
-section). 4.22 needs no `osStream` (RHCOS 9 is its only stream).
+runs the **RHCOS 9** payload — pass `--os-image-stream rhel-9` at
+`labctl generate` (B-1). Left unset, the installer defaults to RHEL 10 —
+an unqualified payload (the CoCo/kata/edk2 artifacts differ per stream;
+see the qualified-scope section). 4.22 needs no pin (RHCOS 9 is its only
+stream).
 
 The mirrored catalog names are version-derived (see the sharedValueFiles
 tpl in `values-baremetal.yaml`): the airgap overlay is
@@ -312,9 +305,8 @@ labctl generate \
 ```
 
 `--os-image-stream` is the **OCP 5.0 payload pin** — RHCOS 9 for the
-qualified configuration. It must equal `global.cluster.osStream` in the
-deploy-branch values (see the disconnected value delta). Omit it only on
-4.22 (single stream).
+qualified configuration (see the payload stream pin note above). Omit it
+only on 4.22 (single stream).
 
 ### B-2: Boot and Install
 

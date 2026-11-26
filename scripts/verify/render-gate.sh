@@ -400,28 +400,6 @@ else
         || fail "NFD operand pin wrong on ${CLUSTER_VERSION}: $nfd_img"
 fi
 
-# SELinux kvm_gmem MachineConfig: 5.0/rhel-10 only (present), 5.0/rhel-9
-# and every 4.x must not render it.
-selinux_count() { # $1 = osStream, prints match count
-    helm template sel "${PATTERN_DIR}/charts/all/baremetal" \
-        -f "${PATTERN_DIR}/values-global.yaml" \
-        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
-        --set "global.cluster.osStream=$1" 2>/dev/null \
-        | grep -c 'name: 99-coco-selinux-kvm-gmem' || true
-}
-if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
-    [[ "$(selinux_count rhel-10)" -gt 0 ]] \
-        && pass "SELinux kvm_gmem MachineConfig present on 5.0/rhel-10" \
-        || fail "SELinux kvm_gmem MachineConfig missing on 5.0/rhel-10"
-    [[ "$(selinux_count rhel-9)" -eq 0 ]] \
-        && pass "SELinux kvm_gmem MachineConfig absent on 5.0/rhel-9" \
-        || fail "SELinux kvm_gmem MachineConfig must not render on 5.0/rhel-9"
-else
-    [[ "$(selinux_count rhel-10)" -eq 0 ]] \
-        && pass "SELinux kvm_gmem MachineConfig absent on ${CLUSTER_VERSION}" \
-        || fail "SELinux kvm_gmem MachineConfig must not render on ${CLUSTER_VERSION}"
-fi
-
 # ── Sync-wave layout: every cluster group (connected mode) ───────────
 echo "── sync-wave layout (all cluster groups, connected mode)"
 declare -A RENDER=()

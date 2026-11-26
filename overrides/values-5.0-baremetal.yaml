@@ -20,12 +20,6 @@
 # SCOPE — this overlay reaches the ROOT clustergroup render and every child
 # application that lists it as a value file. It does NOT reach the bootstrap
 # operators (created before ArgoCD renders).
-#
-# NOTE — global.cluster.osStream (node OS generation) deliberately does NOT
-# live here: overlays merge AFTER values-global.yaml, so a value here could
-# not be overridden from the deploy branch. Set it in values-global.yaml to
-# match the installer's osImageStream (the qualified 5.0.2 deploy used
-# rhel-9); when unset, charts/all/baremetal defaults it to rhel-10.
 
 clusterGroup:
   # Full replacement of the values-baremetal.yaml namespaces list — see the
