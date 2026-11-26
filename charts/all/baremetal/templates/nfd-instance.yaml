@@ -5,8 +5,9 @@ metadata:
   namespace: openshift-nfd
 spec:
   operand:
-    # OpenShift 5.0 ships the NFD operand from the openshift5 org by digest via
-    # the CSV; only pin the legacy image on 4.x clusters.
+    {{- /* OpenShift 5.0 ships the NFD operand from the openshift5 org by digest
+         via the CSV; only pin the legacy image on 4.x clusters. Helm comment:
+         emits nothing on any version, so the 4.22 render stays byte-stable. */}}
     {{- if ne .Values.global.clusterVersion "5.0" }}
     image: registry.redhat.io/openshift4/ose-node-feature-discovery-rhel9:v{{ .Values.global.clusterVersion }}
     {{- end }}

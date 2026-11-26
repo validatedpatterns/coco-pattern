@@ -1,6 +1,14 @@
 {{- if not .Values.global.cluster.hcp }}
+{{- /* RHEL 10 kernels only: the kvm_gmem_t SELinux check appeared with KVM
+      guest_memfd support in OCP 5.0 / RHEL 10. Match the stream explicitly
+      (rhel-10) — not "anything but rhel-9" — so an unknown osStream value
+      fails closed (no policy) instead of silently shipping it.
+      NOTE: pruning this MachineConfig (e.g. flipping osStream to rhel-9 or
+      uninstalling the pattern) does NOT uninstall the semodule the service
+      already loaded; run `semodule -r kvm-gmem-container-kvm` on the node
+      to remove it. */}}
 {{- range list "master" "worker" }}
-{{- if and $.Values.tdx.enabled (eq $.Values.global.clusterVersion "5.0") (ne (default "rhel-10" $.Values.global.cluster.osStream) "rhel-9") }}
+{{- if and $.Values.tdx.enabled (eq $.Values.global.clusterVersion "5.0") (eq (default "rhel-10" $.Values.global.cluster.osStream) "rhel-10") }}
 ---
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig

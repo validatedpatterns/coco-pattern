@@ -43,10 +43,6 @@ global:
   hardware:
     profile: intel-tdx  # Options: intel-tdx, amd-snp, intel-tdx-gpu, amd-snp-gpu
   cluster:
-    # Node OS generation (matches install-config osImageStream). 5.0 defaults to
-    # rhel-10; set rhel-9 when the payload's CoCo/kata/edk2 artifacts are el9.
-    # Gates the RHEL 10-only SELinux kvm_gmem policy.
-    osStream: rhel-10
     # Hosted Control Planes (HCP) mode. When true, MachineConfig resources are skipped
     # (no Machine Config Daemon on HCP workers). The sandboxed-containers operator
     # auto-detects HCP and uses DaemonSet deployment mode (Tech Preview in OSC 1.13).
