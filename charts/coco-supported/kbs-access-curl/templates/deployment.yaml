@@ -40,8 +40,10 @@ spec:
           image: {{ include "kbs-access-curl.image" (dict "root" $ "image" .Values.image) }}
           {{- /* Digest-pinned kata-cc images default to IfNotPresent; the OCP 5.0
                 CRI-O guest-pull defect only takes the CoCo pull path when CRI-O
-                itself pulls, so force it on 5.0 only (4.22 keeps the default). */}}
-          {{- if eq .Values.global.clusterVersion "5.0" }}
+                itself pulls, so force it on 5.0 kata-cc clusters only (kata-remote /
+                peer-pod runtimes are out of scope — unqualified on 5.0; 4.22 keeps
+                the default pull policy). */}}
+          {{- if and (eq .Values.global.clusterVersion "5.0") (hasPrefix "kata-cc" (default "" .Values.global.coco.runtimeClassName)) }}
           imagePullPolicy: Always
           {{- end }}
           ports:
