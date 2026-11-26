@@ -75,11 +75,19 @@ render_root() { # $1 = airgap|connected (baremetal chain)
 
 render_group() { # $1 = cluster group; prints the connected-mode render
     # The same chains the patterns-operator resolves via sharedValueFiles
-    # for each group (connected mode: global.airgap=false).
+    # for each group (connected mode: global.airgap=false). The bare-metal
+    # groups divert to the version-split overlay on 5.0 (DCAP
+    # OperatorGroup), mirroring their sharedValueFiles tpl.
     local group="$1"
     local -a args=()
     case "$group" in
-        baremetal|baremetal-hub|baremetal-spoke)
+        baremetal|baremetal-hub)
+            args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml"
+                  -f "${PATTERN_DIR}/overrides/${VERSION_OVERLAY}.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-baremetal-connected.yaml") ;;
+        baremetal-spoke)
             args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
                   -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml"
                   -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml"
@@ -228,7 +236,9 @@ for mode_label in AIRGAP CONNECTED; do
 done
 
 og_block="$(awk -v RS='---' '/kind: OperatorGroup/ && /intel-dcap-operator-system-operator-group/' <<< "$CONNECTED")"
-if [[ "$expected_og" == "OwnNamespace" ]]; then
+if [[ -z "$og_block" ]]; then
+    fail "DCAP OperatorGroup missing from the render entirely (an absent OperatorGroup must not pass as AllNamespaces)"
+elif [[ "$expected_og" == "OwnNamespace" ]]; then
     grep -q 'targetNamespaces:' <<< "$og_block" \
         && grep -q '  - intel-dcap-operator-system$' <<< "$og_block" \
         && pass "DCAP OperatorGroup → OwnNamespace (targetNamespaces pinned)" \
@@ -256,50 +266,77 @@ PYEOF
     || fail "imageset-config-${CLUSTER_VERSION}.yaml DCAP channel '${imageset_channel}' != rendered '${expected_channel}' — a fresh disconnected install cannot resolve the subscription"
 
 # ── Resolved value-file chain in the root render ─────────────────────
-# The sharedValueFiles tpl resolution is pinned end-to-end: the child
-# Applications in the root render must carry exactly the overlay paths the
-# chain resolves to for this version (rendered as $patternref/... paths).
-# Here-strings, not echo|grep: grep -q exits early and SIGPIPEs an upstream
-# echo under pipefail (see header).
-echo "── resolved overlay chain (version ${CLUSTER_VERSION})"
-if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
-    refs=("values-5.0-baremetal.yaml")
-else
-    refs=("values-${CLUSTER_VERSION}.yaml")
-fi
-refs+=("values-storage-lvm.yaml" "values-hw-intel-tdx.yaml")
-for ref in "${refs[@]}"; do
-    grep -q "\$patternref/overrides/${ref}" <<< "$AIRGAP" \
-        && pass "airgap root render valueFiles include overrides/${ref}" \
-        || fail "airgap root render valueFiles missing overrides/${ref}"
-    grep -q "\$patternref/overrides/${ref}" <<< "$CONNECTED" \
-        && pass "connected root render valueFiles include overrides/${ref}" \
-        || fail "connected root render valueFiles missing overrides/${ref}"
+# The sharedValueFiles tpl resolution is pinned end-to-end AND in order:
+# the child Applications in the root render must carry exactly the
+# overlay chain the tpl resolves to for this version, in the chain order
+# (a reordered or duplicated entry is as broken as a missing one).
+echo "── resolved overlay chain, exact order (version ${CLUSTER_VERSION})"
+
+# Ordered $patternref entries of the first valueFiles block in a render.
+valuefiles_list() { # $1 = rendered root manifest
+    awk '
+        /valueFiles:/ { inblock = 1; next }
+        inblock && /parameters:/ { exit }
+        inblock && /- "\$patternref\// {
+            line = $0
+            sub(/^[[:space:]]*- "/, "", line)
+            sub(/".*$/, "", line)
+            print line
+        }
+    ' <<< "$1"
+}
+
+# Expected chain for a bare-metal group: chart-prefixed globals
+# (values-global, values-<group>, the variants entry values-<v>-<group>),
+# then the sharedValueFiles chain (platform, storage, version, hw, mode).
+expected_valuefiles() { # $1 = group, $2 = mode overlay file name
+    printf '$patternref/values-global.yaml\n'
+    printf '$patternref/values-%s.yaml\n' "$1"
+    printf '$patternref/values-%s-%s.yaml\n' "$CLUSTER_VERSION" "$1"
+    printf '$patternref/overrides/values-.yaml\n'
+    printf '$patternref/overrides/values-storage-lvm.yaml\n'
+    printf '$patternref/overrides/%s.yaml\n' "${VERSION_OVERLAY}"
+    printf '$patternref/overrides/values-hw-intel-tdx.yaml\n'
+    printf '$patternref/overrides/%s.yaml\n' "$2"
+}
+
+for mode in airgap connected; do
+    render_var="AIRGAP"
+    [[ "$mode" == "connected" ]] && render_var="CONNECTED"
+    actual="$(valuefiles_list "${!render_var}")"
+    expected="$(expected_valuefiles baremetal "${AIRGAP_OVERLAY}")"
+    [[ "$mode" == "connected" ]] && expected="$(expected_valuefiles baremetal values-baremetal-connected)"
+    if [[ "$actual" == "$expected" ]]; then
+        pass "baremetal ${mode}: exact ordered valueFiles chain (${VERSION_OVERLAY} + ${mode} overlay)"
+    else
+        fail "baremetal ${mode}: valueFiles chain mismatch"
+        diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/      /'
+    fi
 done
-# Mode overlay: airgap render ↔ AIRGAP_OVERLAY, connected ↔ connected
-grep -q "\$patternref/overrides/${AIRGAP_OVERLAY}.yaml" <<< "$AIRGAP" \
-    && pass "airgap root render valueFiles include overrides/${AIRGAP_OVERLAY}.yaml" \
-    || fail "airgap root render valueFiles missing overrides/${AIRGAP_OVERLAY}.yaml"
-grep -q "\$patternref/overrides/values-baremetal-connected.yaml" <<< "$CONNECTED" \
-    && pass "connected root render valueFiles include overrides/values-baremetal-connected.yaml" \
-    || fail "connected root render valueFiles missing overrides/values-baremetal-connected.yaml"
-if [[ "$CLUSTER_VERSION" != "5.0" ]]; then
-    grep -q "values-5.0-baremetal" <<< "$AIRGAP" \
-        && fail "non-5.0 render must not reference values-5.0-baremetal.yaml" \
-        || pass "non-5.0 render does not reference the 5.0-only overlay"
+# The hub group rides the same shared chain (connected mode, render_group)
+hub_connected="$(render_group baremetal-hub)" || fail "baremetal-hub connected render errored"
+actual="$(valuefiles_list "$hub_connected")"
+expected="$(expected_valuefiles baremetal-hub values-baremetal-connected)"
+if [[ "$actual" == "$expected" ]]; then
+    pass "baremetal-hub connected: exact ordered valueFiles chain"
+else
+    fail "baremetal-hub connected: valueFiles chain mismatch"
+    diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/      /'
 fi
 
 # ── Namespace-list drift guard (5.0 overlay vs base) ─────────────────
 # Helm replaces lists wholesale, so overrides/values-5.0-baremetal.yaml
 # carries a full copy of the values-baremetal.yaml namespaces list (with
-# the DCAP OperatorGroup entry flipped to OwnNamespace). Assert the two
-# lists are identical apart from that one entry — a base-list edit without
-# the 5.0 copy (or vice versa) fails here.
-echo "── namespaces-list parity: values-5.0-baremetal.yaml vs values-baremetal.yaml"
-parity="$(python3 - "${PATTERN_DIR}" <<'PYEOF'
+# the DCAP OperatorGroup entry flipped to OwnNamespace) — and the hub uses
+# the same list, so it must match values-baremetal-hub.yaml too. Assert
+# the lists are identical apart from that one entry — a base-list edit
+# without the 5.0 copy (or vice versa) fails here.
+echo "── namespaces-list parity: values-5.0-baremetal.yaml vs values-baremetal{,-hub}.yaml"
+namespace_parity() { # $1 = base values file; prints OK or the divergence
+    python3 - "$1" "${PATTERN_DIR}" <<'PYEOF'
 import sys, yaml
-base = yaml.safe_load(open(f"{sys.argv[1]}/values-baremetal.yaml"))["clusterGroup"]["namespaces"]
-ovr = yaml.safe_load(open(f"{sys.argv[1]}/overrides/values-5.0-baremetal.yaml"))["clusterGroup"]["namespaces"]
+base = yaml.safe_load(open(sys.argv[1]))["clusterGroup"]["namespaces"]
+ovr = yaml.safe_load(open(f"{sys.argv[2]}/overrides/values-5.0-baremetal.yaml"))["clusterGroup"]["namespaces"]
 if len(base) != len(ovr):
     print(f"LENGTH base={len(base)} overlay={len(ovr)}")
     sys.exit(0)
@@ -312,30 +349,39 @@ for i, (b, o) in enumerate(zip(base, ovr)):
     sys.exit(0)
 print("OK")
 PYEOF
-)"
-[[ "$parity" == "OK" ]] \
-    && pass "namespaces lists identical apart from the DCAP OperatorGroup entry" \
-    || fail "namespaces drift between values-baremetal.yaml and values-5.0-baremetal.yaml: $parity"
+}
+for base_file in values-baremetal.yaml values-baremetal-hub.yaml; do
+    parity="$(namespace_parity "${PATTERN_DIR}/${base_file}")"
+    [[ "$parity" == "OK" ]] \
+        && pass "namespaces lists identical apart from the DCAP OperatorGroup entry (${base_file})" \
+        || fail "namespaces drift between ${base_file} and values-5.0-baremetal.yaml: $parity"
+done
 
 # ── Version-specific workload behaviour ──────────────────────────────
-# 5.0 only: the CRI-O guest-pull defect forces imagePullPolicy: Always on
-# the digest-pinned kata-cc workload containers; 4.22 keeps the default.
+# 5.0 + kata-cc only: the CRI-O guest-pull defect forces imagePullPolicy:
+# Always on the digest-pinned kata-cc workload containers. Every other
+# combination keeps the default: 4.22 in any runtime, and 5.0 with
+# kata-remote (Azure peer-pods — unqualified on 5.0, out of scope for the
+# defect). Each affected container is asserted with an exact count.
 echo "── workload imagePullPolicy (version ${CLUSTER_VERSION})"
+declare -A EXPECT_ALWAYS=( [hello-openshift]=2 [kbs-access-curl]=1 [kbs-access-sealed]=1 )
 for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
-    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
-        --set global.coco.runtimeClassName=kata-cc \
-        --set-string "global.clusterVersion=${CLUSTER_VERSION}" 2>/dev/null)" \
-        || { fail "$chart ${CLUSTER_VERSION} render errored"; continue; }
-    n="$(grep -c 'imagePullPolicy: Always' <<< "$out" || true)"
-    if [[ "$CLUSTER_VERSION" == "5.0" ]]; then
-        [[ "$n" -gt 0 ]] \
-            && pass "$chart: imagePullPolicy Always on ${CLUSTER_VERSION} (CRI-O guest-pull defect)" \
-            || fail "$chart: imagePullPolicy Always missing on ${CLUSTER_VERSION}"
-    else
-        [[ "$n" -eq 0 ]] \
-            && pass "$chart: default pull policy on ${CLUSTER_VERSION}" \
-            || fail "$chart: imagePullPolicy Always must not render on ${CLUSTER_VERSION}"
-    fi
+    for rc in kata-cc kata-remote kata-cc-nvidia-gpu; do
+        out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
+            --set global.coco.runtimeClassName=${rc} \
+            --set-string "global.clusterVersion=${CLUSTER_VERSION}" 2>/dev/null)" \
+            || { fail "$chart ${CLUSTER_VERSION}/${rc} render errored"; continue; }
+        n="$(grep -c 'imagePullPolicy: Always' <<< "$out" || true)"
+        if [[ "$CLUSTER_VERSION" == "5.0" && "$rc" == kata-cc* ]]; then
+            [[ "$n" -eq "${EXPECT_ALWAYS[$chart]}" ]] \
+                && pass "$chart: ${n}× imagePullPolicy Always on ${CLUSTER_VERSION}/${rc}" \
+                || fail "$chart: ${n}× imagePullPolicy Always on ${CLUSTER_VERSION}/${rc} (expected ${EXPECT_ALWAYS[$chart]})"
+        else
+            [[ "$n" -eq 0 ]] \
+                && pass "$chart: default pull policy on ${CLUSTER_VERSION}/${rc}" \
+                || fail "$chart: imagePullPolicy Always must not render on ${CLUSTER_VERSION}/${rc}"
+        fi
+    done
 done
 
 # 5.0 only: NFD operand image is CSV-provided (openshift5 org, digest) —

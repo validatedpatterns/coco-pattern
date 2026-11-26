@@ -45,14 +45,17 @@ jobs:
           bash -n scripts/verify/render-gate.sh
           bash -n tests/test-airgap-post-install-prereq.sh
           bash -n tests/test-airgap-trusted-ca.sh
+          bash -n tests/test-airgap-mirror-verify.sh
 
       - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           shellcheck scripts/airgap-post-install.sh scripts/verify/render-gate.sh \
-            tests/test-airgap-post-install-prereq.sh tests/test-airgap-trusted-ca.sh
+            tests/test-airgap-post-install-prereq.sh tests/test-airgap-trusted-ca.sh \
+            tests/test-airgap-mirror-verify.sh
 
-      - name: Mocked-oc tests (prereq + trusted-CA)
+      - name: Mocked-oc tests (prereq + trusted-CA + mirror verify)
         run: |
           bash tests/test-airgap-post-install-prereq.sh
           bash tests/test-airgap-trusted-ca.sh
+          bash tests/test-airgap-mirror-verify.sh
