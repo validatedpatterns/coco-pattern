@@ -28,7 +28,7 @@ cp "${PATTERN_DIR}/values-global.yaml" "${WORK}/pattern/values-global.yaml"
 sed -i 's/^  airgap: false/  airgap: true/' "${WORK}/pattern/values-global.yaml"
 grep -q "^  airgap: true" "${WORK}/pattern/values-global.yaml" || { echo "fixture failed"; exit 1; }
 
-for fn in configure_cluster_trusted_ca read_cluster_field cert_fingerprints; do
+for fn in configure_cluster_trusted_ca read_cluster_field read_cluster_snapshot cert_fingerprints; do
     sed -n "/^${fn}() {/,/^}\$/p" "$SCRIPT" > "${WORK}/func-${fn}.sh"
     grep -q "^${fn}() {" "${WORK}/func-${fn}.sh" \
         || { echo "FAIL: could not extract ${fn}"; exit 1; }
@@ -131,6 +131,8 @@ run_func() { # runs the extracted step; RC, stdout OUT, stderr ERR
         # shellcheck disable=SC1090
         source "${WORK}/func-read_cluster_field.sh"
         # shellcheck disable=SC1090
+        source "${WORK}/func-read_cluster_snapshot.sh"
+        # shellcheck disable=SC1090
         source "${WORK}/func-cert_fingerprints.sh"
         # shellcheck disable=SC1090
         source "${WORK}/func-configure_cluster_trusted_ca.sh"
@@ -161,6 +163,13 @@ PY
 HELPERS
 
 patch_calls() { awk '/patch proxy cluster/{n++} END{print n+0}' "$OC_CALLS" 2>/dev/null; }
+# Proxy reads: the TOCTOU guard is one snapshot per decision (no separate
+# trustedCA.name / resourceVersion requests). END still runs after `exit`.
+proxy_gets() { awk '/^get proxy cluster -o json$/{n++} END{print n+0}' "$OC_CALLS" 2>/dev/null; }
+proxy_gets_before_patch() {
+    awk '/^patch proxy cluster/{exit} /^get proxy cluster -o json$/{n++} END{print n+0}' \
+        "$OC_CALLS" 2>/dev/null
+}
 reset_state() {
     : > "${WORK}/state/trustedca"
     echo "100" > "${WORK}/state/rv"
@@ -247,6 +256,22 @@ else
 fi
 OC_FAIL_PROXY_GET=""
 
+# ── 5b. TOCTOU: anchor + resourceVersion from ONE snapshot ──────────
+# A second proxy GET before the patch is the window a writer slips through.
+reset_state
+printf '%s' "$CA_DATA" > "${WORK}/state/injected"
+run_func
+snapshot_rv="$(grep '^patch proxy cluster' "$OC_CALLS" \
+    | grep -o '"path":"/metadata/resourceVersion","value":"[^"]*"' \
+    | sed 's/.*"value":"//; s/"$//' | head -1)"
+if [[ "$RC" == "0" && "$(proxy_gets_before_patch)" == "1" ]] \
+    && [[ "$snapshot_rv" == "100" ]] && [[ "$(proxy_gets)" == "2" ]]; then
+    ok "single proxy snapshot: 1 GET before the patch, rv from that snapshot, 1 readback after"
+else
+    bad "snapshot reads: gets_before_patch=$(proxy_gets_before_patch) total=$(proxy_gets) rv='${snapshot_rv}' RC=$RC"
+    sed 's/^/    /' "$OC_CALLS" | head -8
+fi
+
 # ── 6. Patch failure → exit 1, propagated ───────────────────────────
 reset_state
 OC_FAIL_PATCH=1
@@ -271,6 +296,19 @@ if [[ "$RC" == "1" && "$(patch_calls)" == "1" ]] \
 else
     bad "concurrent anchor: RC=$RC patches=$(patch_calls) state=$(cat "${WORK}/state/trustedca")"
     sed 's/^/    /' "$ERR" | head -5
+fi
+OC_FAIL_PATCH_TEST="" OC_CONCURRENT_ANCHOR=""
+
+# ── 6c. Conflict → exactly one re-read, then abort ──────────────────
+# Two proxy reads total (snapshot + re-read): a retry loop would hide a flapping writer.
+reset_state
+OC_FAIL_PATCH_TEST=1 OC_CONCURRENT_ANCHOR="someone-elses-bundle"
+run_func
+if [[ "$RC" == "1" && "$(patch_calls)" == "1" ]] && [[ "$(proxy_gets)" == "2" ]]; then
+    ok "conflict path: one snapshot + one re-read, no retry (exit 1)"
+else
+    bad "conflict re-read: RC=$RC patches=$(patch_calls) gets=$(proxy_gets)"
+    sed 's/^/    /' "$OC_CALLS" | head -6
 fi
 OC_FAIL_PATCH_TEST="" OC_CONCURRENT_ANCHOR=""
 

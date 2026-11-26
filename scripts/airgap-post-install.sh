@@ -1036,6 +1036,25 @@ print("" if cur is None else cur)
     printf '%s\n' "$val"
 }
 
+# One proxy/cluster snapshot (anchor + resourceVersion) — two reads would
+# leave a TOCTOU window. Prints "<trustedCA.name>\t<resourceVersion>" or READ_FAILED.
+read_cluster_snapshot() {
+    local json
+    if ! json=$(oc get proxy cluster -o json 2>/dev/null); then
+        echo "READ_FAILED"
+        return
+    fi
+    if ! printf '%s' "$json" | python3 -c '
+import json, sys
+cur = json.load(sys.stdin)
+name = ((cur.get("spec") or {}).get("trustedCA") or {}).get("name") or ""
+rv = (cur.get("metadata") or {}).get("resourceVersion") or ""
+print(f"{name}\t{rv}")
+' 2>/dev/null; then
+        echo "READ_FAILED"
+    fi
+}
+
 configure_cluster_trusted_ca() {
     step 7 "Anchor cluster trust bundle at user-ca-bundle (runbook C-3)"
 
@@ -1076,15 +1095,17 @@ configure_cluster_trusted_ca() {
         exit 1
     fi
 
-    # Preserve an existing, different trust anchor: clobbering it would
-    # silently drop whatever CA the cluster already trusts.
-    local current
-    current=$(read_cluster_field spec.trustedCA.name)
-    if [[ "$current" == "READ_FAILED" ]]; then
-        error "Cannot read proxy/cluster spec.trustedCA.name (oc get failed) —"
-        error "refusing to patch blind."
+    # Preserve an existing, different anchor; name+rv come from ONE
+    # snapshot (read_cluster_snapshot).
+    local snapshot current rv
+    snapshot=$(read_cluster_snapshot)
+    if [[ "$snapshot" == "READ_FAILED" ]]; then
+        error "Cannot read proxy/cluster (oc get failed) — refusing to patch"
+        error "blind."
         exit 1
     fi
+    current="${snapshot%%$'\t'*}"
+    rv="${snapshot#*$'\t'}"
     if [[ -n "$current" && "$current" != "user-ca-bundle" ]]; then
         error "proxy/cluster trustedCA.name is '${current}' — this cluster"
         error "already anchors at a different bundle. Pointing it at"
@@ -1097,27 +1118,32 @@ configure_cluster_trusted_ca() {
     if [[ "$current" == "user-ca-bundle" ]]; then
         info "proxy/cluster trustedCA already points at user-ca-bundle"
     else
-        # Conditional write: JSON-patch "test" on the resourceVersion just
-        # read, so a concurrent trust-anchor change fails the patch.
-        local rv
-        rv=$(read_cluster_field metadata.resourceVersion)
-        if [[ "$rv" == "READ_FAILED" || -z "$rv" ]]; then
-            error "Cannot read proxy/cluster metadata.resourceVersion —"
+        # Conditional write: JSON-patch "test" on the rv from that snapshot.
+        if [[ -z "$rv" ]]; then
+            error "proxy/cluster metadata.resourceVersion is empty —"
             error "refusing to write without a conflict precondition."
             exit 1
         fi
         if ! oc patch proxy cluster --type json -p "[{\"op\":\"test\",\"path\":\"/metadata/resourceVersion\",\"value\":\"${rv}\"},{\"op\":\"add\",\"path\":\"/spec/trustedCA\",\"value\":{\"name\":\"user-ca-bundle\"}}]"; then
-            # Either a concurrent change or a genuine API error: re-read
-            # and decide instead of retrying the write.
-            local after
-            after=$(read_cluster_field spec.trustedCA.name)
+            # Conflict or API error: re-read ONCE, never retry the write.
+            local after_snap after
+            after_snap=$(read_cluster_snapshot)
+            if [[ "$after_snap" == "READ_FAILED" ]]; then
+                error "The proxy/cluster trustedCA patch failed and the re-read"
+                error "failed too — check cluster access, then verify the anchor"
+                error "manually with 'oc get proxy cluster -o yaml'."
+                exit 1
+            fi
+            after="${after_snap%%$'\t'*}"
             if [[ "$after" == "user-ca-bundle" ]]; then
-                info "trustedCA was set to user-ca-bundle concurrently — nothing to do"
+                warn "trustedCA was set to user-ca-bundle by another writer while"
+                warn "we were patching — not overwriting it; verifying reconciliation."
             else
-                error "The proxy/cluster trustedCA patch failed. If the value is"
-                error "now '${after:-still not set}' another writer changed the"
-                error "anchor while we were patching — refusing to overwrite it."
-                error "Resolve the conflict manually and re-run."
+                error "The proxy/cluster trustedCA patch failed. The anchor is"
+                error "now '${after:-unset}' — another writer changed it while we"
+                error "were patching, so this run is refusing to overwrite it."
+                error "Decide which bundle should anchor the cluster, merge the"
+                error "mirror CA into it if needed, and re-run."
                 exit 1
             fi
         else
