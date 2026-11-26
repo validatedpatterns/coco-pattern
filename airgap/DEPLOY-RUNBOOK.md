@@ -17,8 +17,12 @@ Intel TDX: 15/15 applications Synced+Healthy, CoCo TDX attestation
 Affirming.
 
 **OCP 5.0** is qualified on a narrower scope — **bare-metal Intel TDX,
-OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`). Two hard
-requirements:
+OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`). The
+qualification record is the `deploy/ocp5-airgap-20261125` deploy branch
+on the pattern fork (the committed cluster state of the qualified run);
+the hardening fixes on `feat/ocp5-compatibility` post-date that record
+and re-qualify through the render gate and the mocked-`oc` suites in
+`tests/`. Two hard requirements:
 
 - The installer's `osImageStream` **must match**
   `global.cluster.osStream` in `values-global.yaml` (the qualified 5.0.2
@@ -207,6 +211,8 @@ global:
   airgap: true
   mirrorRegistry: <mirror-root-including-org>          # e.g. quay.example.com:443/mirror
   clusterVersion: "<minor>"                            # e.g. "5.0" — selects the version overlay
+  cluster:
+    osStream: rhel-9    # OCP 5.0 ONLY (see below) — MUST match the installer's --os-image-stream
 main:
   clusterGroupName: baremetal
   git:
@@ -219,6 +225,15 @@ main:
   multiSourceConfig:
     helmRepoUrl: <mirror-root-including-org>/validatedpatterns
 ```
+
+**OCP 5.0 — payload stream pin (required):** the qualified 5.0 deploy
+runs the **RHCOS 9** payload. Both sides must be set to the same stream:
+`global.cluster.osStream: rhel-9` in the deploy-branch values (above)
+**and** `--os-image-stream rhel-9` at `labctl generate` (B-1). Left
+unset, both the installer and the chart default to RHEL 10 — a
+qualified-but-untested payload (the SELinux `kvm_gmem` policy and the
+CoCo/kata/edk2 artifacts differ per stream; see the qualified-scope
+section). 4.22 needs no `osStream` (RHCOS 9 is its only stream).
 
 The mirrored catalog names are version-derived (see the sharedValueFiles
 tpl in `values-baremetal.yaml`): the airgap overlay is
@@ -288,12 +303,18 @@ labctl generate \
   --node <node-name> \
   --xlsx <lab-xlsx> \
   --ocp-version <version> \
+  --os-image-stream rhel-9 \
   --output-dir <output-dir> \
   --mirror-resources ~/oc-mirror-workspace/working-dir/cluster-resources \
   --additional-trust-bundle ~/combined-ca-bundle.pem \
   --http-serve-path ~/public_html
 
 ```
+
+`--os-image-stream` is the **OCP 5.0 payload pin** — RHCOS 9 for the
+qualified configuration. It must equal `global.cluster.osStream` in the
+deploy-branch values (see the disconnected value delta). Omit it only on
+4.22 (single stream).
 
 ### B-2: Boot and Install
 
@@ -331,6 +352,13 @@ cd ~/coco-pattern
 #    network, failed reads and failed patches all abort:
 scripts/airgap-post-install.sh --prereq-only
 # → must print "Prerequisite satisfied: routingViaHost=true"
+#
+# NOTE: "the API answers" does not imply the Network CR exists yet — a
+# young cluster can reject the network.operator read/write with
+# "no matches for kind" or NotFound. That is a RETRY, not a failure:
+# wait ~30 s and re-run --prereq-only (the qualification run needed one
+# retry). Only a real error message from the flag (wrong version, non-OVN,
+# failed patch) is a stop condition.
 
 # 3) Let the installer finish (exit=0 required; machine-config must not
 #    be Degraded — the MCD exits bootstrap mode on its own, no repairs):
@@ -338,7 +366,7 @@ openshift-install agent wait-for install-complete \
   --dir <output-dir>/<version>_build
 
 # 4) Full bootstrap (catalogs, IDMS, trustedCA, git server) — C-1:
-#    https://#c-1-airgap-post-install
+#    [C-1: Airgap Post-Install](#c-1-airgap-post-install)
 ```
 
 **If the MCD is already wedged** (node annotation references a missing
@@ -503,16 +531,32 @@ repo-server's first chart fetch fails:
 helm registry login quay.example.com:443 … x509: certificate signed by unknown authority
 ```
 
-This is now **step 7 of `scripts/airgap-post-install.sh`**
-(`configure_cluster_trusted_ca`, airgap-gated and idempotent). Because the
-bootstrap runs before the pattern deploys, the injected ConfigMaps are
-born with the mirror CA already in them — the post-deploy repo-server
-restart below is only needed when the patch is applied *after* a pattern
-deploy (e.g. recovery on an existing cluster):
+This is **step 7 of `scripts/airgap-post-install.sh`**
+(`configure_cluster_trusted_ca`, airgap-gated and idempotent — it
+validates the bundle with openssl, preserves any different existing trust
+anchor, writes conditionally on the resourceVersion, and verifies the
+injection reconciled). Because the bootstrap runs before the pattern
+deploys, the injected ConfigMaps are born with the mirror CA already in
+them — the post-deploy repo-server restart below is only needed when the
+patch is applied *after* a pattern deploy (e.g. recovery on an existing
+cluster; re-running the full script is the preferred way — every step is
+idempotent):
+
+If you must patch by hand (a full script re-run is not wanted), apply the
+SAME preservation logic — never an unconditional merge patch, which
+silently drops a different anchor the cluster already trusts:
 
 ```bash
+# 1) Read the CURRENT anchor — abort if it is set to anything other than
+#    user-ca-bundle or empty:
+oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}{"\n"}'
+#    "" or "user-ca-bundle" → safe to continue; anything else → merge the
+#    mirror CA into THAT bundle instead, do not repoint.
+
+# 2) Only then patch (still check the readout afterwards):
 oc patch proxy cluster --type merge \
   -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}'
+oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}{"\n"}'   # → user-ca-bundle
 ```
 
 **Step 2 — roll the repo-server** (recovery path only, when step 1 was
