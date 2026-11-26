@@ -47,13 +47,16 @@ else
 fi
 
 render_root() { # $1 = airgap|connected (baremetal chain)
-    local mode="$1" overlay
+    local mode="$1" overlay errfile rc=0 out
     if [[ "$mode" = airgap ]]; then
         overlay="$AIRGAP_OVERLAY"
     else
         overlay="values-baremetal-connected"
     fi
-    helm template cg "${CHART}" \
+    # stderr goes to a temp file and is replayed only on failure: a broken
+    # chart must not surface as a bare "root render errored".
+    errfile="$(mktemp)"
+    out=$(helm template cg "${CHART}" \
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
         -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
@@ -66,14 +69,22 @@ render_root() { # $1 = airgap|connected (baremetal chain)
         --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
         --set global.airgap="$([ "$mode" = airgap ] && echo true || echo false)" \
         --set-string "global.mirrorRegistry=$([ "$mode" = airgap ] && echo "$MIRROR_ROOT" || echo '')" \
-        2>/dev/null
+        2>"$errfile") || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "helm template failed (${mode} root render):" >&2
+        sed 's/^/    /' "$errfile" >&2 || true
+        rm -f "$errfile"
+        return $rc
+    fi
+    rm -f "$errfile"
+    printf '%s\n' "$out"
 }
 
 render_group() { # $1 = cluster group; prints the connected-mode render
     # The same chains the patterns-operator resolves via sharedValueFiles
     # for each group (connected mode: global.airgap=false); the bare-metal
     # groups divert to the version-split overlay on 5.0.
-    local group="$1"
+    local group="$1" errfile rc=0 out
     local -a args=()
     case "$group" in
         baremetal|baremetal-hub)
@@ -98,7 +109,10 @@ render_group() { # $1 = cluster group; prints the connected-mode render
             echo "render_group: unknown cluster group '$group'" >&2
             return 1 ;;
     esac
-    helm template cg "${CHART}" \
+    # stderr to a temp file, replayed only on failure (an unknown flag or a
+    # broken overlay must not surface as a bare "render errored").
+    errfile="$(mktemp)"
+    out=$(helm template cg "${CHART}" \
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${group}.yaml" \
         "${args[@]}" \
@@ -108,7 +122,15 @@ render_group() { # $1 = cluster group; prints the connected-mode render
         --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
         --set global.airgap=false \
         --set-string "global.mirrorRegistry=" \
-        2>/dev/null
+        2>"$errfile") || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "helm template failed (${group} connected render):" >&2
+        sed 's/^/    /' "$errfile" >&2 || true
+        rm -f "$errfile"
+        return $rc
+    fi
+    rm -f "$errfile"
+    printf '%s\n' "$out"
 }
 
 sub_source() { # $1 = rendered manifest, $2 = subscription name
