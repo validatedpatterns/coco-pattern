@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
-# Render gate for the CoCo pattern values chain, both connectivity modes:
-# catalog sources, sync-wave layout, chart CRB, workload image rewrite
-# (see the section headers below). Usage: render-gate.sh [mirror-root];
-# needs helm+python3; pulls the clustergroup chart unless CLUSTERGROUP_CHART
-# is a local dir. CLUSTER_VERSION (default 4.22) selects the version
-# overlay. Pipes: here-strings/fds — `echo|grep` SIGPIPEs (pipefail).
+# Render gate for the CoCo pattern values chain, both connectivity modes.
+#
+# SCOPE — only what the OCP 5.0 compatibility work can regress and no
+# other repo tooling covers (`make validate-schema` checks each values
+# file against the chart schema; `make show` renders for humans;
+# `make argo-healthcheck` needs a live cluster):
+#   - DCAP channel / OperatorGroup / imageset agreement (4.22 vs 5.0)
+#   - version-overlay path resolution (the sharedValueFiles chains)
+#   - catalog-source naming vs the version-pinned airgap overlays
+#   - airgap/connected mode split (subscription sources, workload images)
+#   - the 5.0 imagePullPolicy workaround (issue #176), NFD operand pin,
+#     namespaces-as-maps key parity, the CRB sync-wave knob
+# NOT here: a golden table of every sync-wave in every group, and
+# per-chart copies of assertions licensed by the helper-sync check —
+# the wave layout predates this branch and is pinned by the qualifying
+# deploy records.
+#
+# Usage: render-gate.sh [mirror-root]; needs helm+python3; pulls the
+# clustergroup chart unless CLUSTERGROUP_CHART is a local dir.
+# CLUSTER_VERSION (default 4.22) selects the version overlay.
+# Pipes: here-strings/fds — `echo|grep` SIGPIPEs (pipefail).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,7 +29,6 @@ trap 'rm -rf "$WORK"' EXIT
 
 CLUSTERGROUP_VERSION="0.9.60"
 GROUP="baremetal"
-PLATFORM="None"                 # SNO: no values-<platform> file is present
 CLUSTER_VERSION="${CLUSTER_VERSION:-4.22}"  # OCP minor: selects overrides/values-<ver>.yaml
 MIRROR_ROOT="${1:-quay.example:443/mirror}"
 FAILS=0
@@ -45,32 +59,25 @@ else
     CHART="${WORK}/clustergroup"
 fi
 
-render_root() { # $1 = airgap|connected (baremetal chain)
-    local mode="$1" overlay errfile rc=0 out
-    if [[ "$mode" = airgap ]]; then
-        overlay="$AIRGAP_OVERLAY"
-    else
-        overlay="values-baremetal-connected"
-    fi
-    # stderr goes to a temp file and is replayed only on failure: a broken
-    # chart must not surface as a bare "root render errored".
+# Common helm args: repo coordinates and the version knob, shared by every
+# render below.
+common_args=(
+    --set global.repoURL=https://example.com/coco-pattern.git
+    --set global.targetRevision=render-gate
+    --set global.vpArgoNamespace=vp-gitops
+    --set-string "global.clusterVersion=${CLUSTER_VERSION}"
+)
+
+# helm template with stderr captured to a temp file and replayed only on
+# failure: a broken chart must not surface as a bare "render errored".
+# $1 = failure label, remaining args = helm args.
+render() {
+    local label="$1" errfile rc=0 out
+    shift
     errfile="$(mktemp)"
-    out=$(helm template cg "${CHART}" \
-        -f "${PATTERN_DIR}/values-global.yaml" \
-        -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
-        -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
-        -f "${PATTERN_DIR}/overrides/${VERSION_OVERLAY}.yaml" \
-        -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml" \
-        -f "${PATTERN_DIR}/overrides/${overlay}.yaml" \
-        --set global.repoURL=https://example.com/coco-pattern.git \
-        --set global.targetRevision=render-gate \
-        --set global.vpArgoNamespace=vp-gitops \
-        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
-        --set global.airgap="$([ "$mode" = airgap ] && echo true || echo false)" \
-        --set-string "global.mirrorRegistry=$([ "$mode" = airgap ] && echo "$MIRROR_ROOT" || echo '')" \
-        2>"$errfile") || rc=$?
+    out=$(helm template cg "${CHART}" "$@" 2>"$errfile") || rc=$?
     if [[ $rc -ne 0 ]]; then
-        echo "helm template failed (${mode} root render):" >&2
+        echo "helm template failed (${label}):" >&2
         sed 's/^/    /' "$errfile" >&2 || true
         rm -f "$errfile"
         return $rc
@@ -79,14 +86,32 @@ render_root() { # $1 = airgap|connected (baremetal chain)
     printf '%s\n' "$out"
 }
 
+render_root() { # $1 = airgap|connected (baremetal chain)
+    local mode="$1" overlay
+    if [[ "$mode" = airgap ]]; then
+        overlay="$AIRGAP_OVERLAY"
+    else
+        overlay="values-baremetal-connected"
+    fi
+    render "${mode} root render" \
+        -f "${PATTERN_DIR}/values-global.yaml" \
+        -f "${PATTERN_DIR}/values-${GROUP}.yaml" \
+        -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml" \
+        -f "${PATTERN_DIR}/overrides/${VERSION_OVERLAY}.yaml" \
+        -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml" \
+        -f "${PATTERN_DIR}/overrides/${overlay}.yaml" \
+        "${common_args[@]}" \
+        --set global.airgap="$([ "$mode" = airgap ] && echo true || echo false)" \
+        --set-string "global.mirrorRegistry=$([ "$mode" = airgap ] && echo "$MIRROR_ROOT" || echo '')"
+}
+
 render_group() { # $1 = cluster group; prints the connected-mode render
     # The same chains the patterns-operator resolves via sharedValueFiles
-    # for each group (connected mode: global.airgap=false); the bare-metal
-    # groups divert to the version-split overlay on 5.0.
-    local group="$1" errfile rc=0 out
+    # for each group (connected mode: global.airgap=false).
+    local group="$1"
     local -a args=()
     case "$group" in
-        baremetal|baremetal-hub)
+        baremetal-hub)
             args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
                   -f "${PATTERN_DIR}/overrides/values-storage-lvm.yaml"
                   -f "${PATTERN_DIR}/overrides/${VERSION_OVERLAY}.yaml"
@@ -98,38 +123,20 @@ render_group() { # $1 = cluster group; prints the connected-mode render
                   -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml"
                   -f "${PATTERN_DIR}/overrides/values-hw-intel-tdx.yaml"
                   -f "${PATTERN_DIR}/overrides/values-baremetal-connected.yaml") ;;
-        azure|azure-spoke)
+        azure)
             args=(-f "${PATTERN_DIR}/overrides/values-Azure.yaml"
-                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
-        trusted-hub)
-            args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
                   -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
         *)
             echo "render_group: unknown cluster group '$group'" >&2
             return 1 ;;
     esac
-    # stderr to a temp file, replayed only on failure (an unknown flag or a
-    # broken overlay must not surface as a bare "render errored").
-    errfile="$(mktemp)"
-    out=$(helm template cg "${CHART}" \
+    render "${group} connected render" \
         -f "${PATTERN_DIR}/values-global.yaml" \
         -f "${PATTERN_DIR}/values-${group}.yaml" \
         "${args[@]}" \
-        --set global.repoURL=https://example.com/coco-pattern.git \
-        --set global.targetRevision=render-gate \
-        --set global.vpArgoNamespace=vp-gitops \
-        --set-string "global.clusterVersion=${CLUSTER_VERSION}" \
+        "${common_args[@]}" \
         --set global.airgap=false \
-        --set-string "global.mirrorRegistry=" \
-        2>"$errfile") || rc=$?
-    if [[ $rc -ne 0 ]]; then
-        echo "helm template failed (${group} connected render):" >&2
-        sed 's/^/    /' "$errfile" >&2 || true
-        rm -f "$errfile"
-        return $rc
-    fi
-    rm -f "$errfile"
-    printf '%s\n' "$out"
+        --set-string "global.mirrorRegistry="
 }
 
 sub_source() { # $1 = rendered manifest, $2 = subscription name
@@ -139,14 +146,14 @@ sub_source() { # $1 = rendered manifest, $2 = subscription name
         /^  source: / { if (cur == wanted) { print $2; exit } }' <<< "$1"
 }
 
-acm_override() { # $1 = rendered manifest
-    # sed -n '1p' instead of head -1: sed reads to EOF, head closes the pipe.
-    grep -A1 'name: acm.mce_operator.source' <<< "$1" | grep 'value:' \
-        | sed -n '1p' | sed "s/.*value: //; s/'//g; s/\"//g"
+sub_channel() { # $1 = rendered manifest, $2 = subscription name
+    awk -v wanted="$2" '
+        /^  name: / { cur = $2 }
+        /^  channel: / { if (cur == wanted) { print $2; exit } }' <<< "$1"
 }
 
-collateral_override() { # $1 = rendered manifest
-    grep -A1 'name: kbs.tdx.collateralService' <<< "$1" | grep 'value:' \
+value_override() { # $1 = rendered manifest, $2 = parameter name
+    grep -A1 "name: $2" <<< "$1" | grep 'value:' \
         | sed -n '1p' | sed "s/.*value: //; s/'//g; s/\"//g"
 }
 
@@ -170,10 +177,17 @@ print('ABSENT')
 PYEOF
 }
 
-# ── Airgap assertions ────────────────────────────────────────────────
-echo "── airgap mode (global.airgap=true, mirror=${MIRROR_ROOT}, version=${CLUSTER_VERSION})"
-AIRGAP="$(render_root airgap)" || { fail "airgap root render errored"; }
+# ── Renders ───────────────────────────────────────────────────────────
+# Root renders are reused by every later section that needs them.
+echo "── renders (version ${CLUSTER_VERSION}, mirror ${MIRROR_ROOT})"
+AIRGAP="$(render_root airgap)" || fail "airgap root render errored"
+CONNECTED="$(render_root connected)" || fail "connected root render errored"
+HUB="$(render_group baremetal-hub)" || fail "baremetal-hub connected render errored"
+SPOKE="$(render_group baremetal-spoke)" || fail "baremetal-spoke connected render errored"
+AZURE="$(render_group azure)" || fail "azure connected render errored"
 
+# ── Airgap mode: subscription sources + mode-dependent values ────────
+echo "── airgap mode (global.airgap=true)"
 for sub in intel-device-plugins-operator intel-tdx-dcap-operator; do
     src="$(sub_source "$AIRGAP" "$sub")"
     [[ "$src" == "$CERTIFIED_CS" ]] \
@@ -188,20 +202,18 @@ for sub in openshift-external-secrets-operator trustee-operator sandboxed-contai
         || fail "subscription $sub → '${src}' (expected ${REDHAT_CS})"
 done
 
-val="$(acm_override "$AIRGAP")"
+val="$(value_override "$AIRGAP" acm.mce_operator.source)"
 [[ "$val" == "$REDHAT_CS" ]] \
     && pass "acm.mce_operator.source → $val" \
     || fail "acm.mce_operator.source → '${val}' (expected ${REDHAT_CS})"
 
-val="$(collateral_override "$AIRGAP")"
+val="$(value_override "$AIRGAP" kbs.tdx.collateralService)"
 [[ "$val" == file:///opt/confidential-containers/attestation-service/tdx/platform_collaterals.json ]] \
     && pass "kbs.tdx.collateralService → file:// backend" \
     || fail "kbs.tdx.collateralService → '${val}' (expected the file:// backend)"
 
-# ── Connected assertions ─────────────────────────────────────────────
+# ── Connected mode: the same knobs flip back ──────────────────────────
 echo "── connected mode (global.airgap=false)"
-CONNECTED="$(render_root connected)" || { fail "connected root render errored"; }
-
 for sub in intel-device-plugins-operator intel-tdx-dcap-operator; do
     src="$(sub_source "$CONNECTED" "$sub")"
     [[ "$src" == "certified-operators" ]] \
@@ -216,12 +228,7 @@ for sub in openshift-external-secrets-operator trustee-operator sandboxed-contai
         || fail "subscription $sub → '${src}' (expected redhat-operators)"
 done
 
-val="$(acm_override "$CONNECTED")"
-[[ "$val" == "redhat-operators" ]] \
-    && pass "acm.mce_operator.source → $val (chart default)" \
-    || fail "acm.mce_operator.source → '${val}' (expected redhat-operators)"
-
-val="$(collateral_override "$CONNECTED")"
+val="$(value_override "$CONNECTED" kbs.tdx.collateralService)"
 [[ "$val" == https://api.trustedservices.intel.com/sgx/certification/v4/ ]] \
     && pass "kbs.tdx.collateralService → Intel PCS" \
     || fail "kbs.tdx.collateralService → '${val}' (expected Intel PCS URL)"
@@ -231,12 +238,6 @@ val="$(collateral_override "$CONNECTED")"
 # stable, OwnNamespace — see the PR description). Assert the render, the
 # OperatorGroup and the imageset stay consistent.
 echo "── Intel DCAP channel / OperatorGroup / imageset consistency (version ${CLUSTER_VERSION})"
-sub_channel() { # $1 = rendered manifest, $2 = subscription name
-    awk -v wanted="$2" '
-        /^  name: / { cur = $2 }
-        /^  channel: / { if (cur == wanted) { print $2; exit } }' <<< "$1"
-}
-
 expected_channel="alpha"
 expected_og="AllNamespaces"
 [[ "$CLUSTER_VERSION" == "5.0" ]] && { expected_channel="stable"; expected_og="OwnNamespace"; }
@@ -278,13 +279,17 @@ PYEOF
     && pass "imageset-config-${CLUSTER_VERSION}.yaml mirrors DCAP channel '$imageset_channel' (matches the render)" \
     || fail "imageset-config-${CLUSTER_VERSION}.yaml DCAP channel '${imageset_channel}' != rendered '${expected_channel}' — a fresh disconnected install cannot resolve the subscription"
 
-# ── Resolved value-file chain in the root render ─────────────────────
+# ── Resolved value-file chains ────────────────────────────────────────
 # The sharedValueFiles tpl resolution is pinned end-to-end AND in order:
-# a reordered or duplicated valueFiles entry is as broken as a missing one.
-echo "── resolved overlay chain, exact order (version ${CLUSTER_VERSION})"
+# a reordered, duplicated or renamed entry is as broken as a missing one.
+# baremetal (root render, both modes) covers the 5.0 divert to
+# values-5.0-baremetal.yaml; baremetal-hub proves the second copy of the
+# tpl did not drift; azure covers the shared values-<ver>.yaml overlay
+# path the non-baremetal groups take (values-5.0.yaml on 5.0).
+echo "── resolved overlay chains, exact order (version ${CLUSTER_VERSION})"
 
 # Ordered $patternref entries of the first valueFiles block in a render.
-valuefiles_list() { # $1 = rendered root manifest
+valuefiles_list() { # $1 = rendered manifest
     awk '
         /valueFiles:/ { inblock = 1; next }
         inblock && /parameters:/ { exit }
@@ -297,42 +302,40 @@ valuefiles_list() { # $1 = rendered root manifest
     ' <<< "$1"
 }
 
-# Expected chain for a bare-metal group: chart-prefixed globals, then the
+# Expected chain for a group: chart-prefixed globals, then the
 # sharedValueFiles chain (platform, storage, version, hw, mode).
-expected_valuefiles() { # $1 = group, $2 = mode overlay file name
+expected_valuefiles() { # $1 = group, $2... = shared overlay file names
+    local group="$1" overlay
+    shift
     printf '$patternref/values-global.yaml\n'
-    printf '$patternref/values-%s.yaml\n' "$1"
-    printf '$patternref/values-%s-%s.yaml\n' "$CLUSTER_VERSION" "$1"
-    printf '$patternref/overrides/values-.yaml\n'
-    printf '$patternref/overrides/values-storage-lvm.yaml\n'
-    printf '$patternref/overrides/%s.yaml\n' "${VERSION_OVERLAY}"
-    printf '$patternref/overrides/values-hw-intel-tdx.yaml\n'
-    printf '$patternref/overrides/%s.yaml\n' "$2"
+    printf '$patternref/values-%s.yaml\n' "$group"
+    printf '$patternref/values-%s-%s.yaml\n' "$CLUSTER_VERSION" "$group"
+    for overlay in "$@"; do
+        printf '$patternref/overrides/%s.yaml\n' "${overlay%.yaml}"
+    done
 }
 
-for mode in airgap connected; do
-    render_var="AIRGAP"
-    [[ "$mode" == "connected" ]] && render_var="CONNECTED"
-    actual="$(valuefiles_list "${!render_var}")"
-    expected="$(expected_valuefiles baremetal "${AIRGAP_OVERLAY}")"
-    [[ "$mode" == "connected" ]] && expected="$(expected_valuefiles baremetal values-baremetal-connected)"
-    if [[ "$actual" == "$expected" ]]; then
-        pass "baremetal ${mode}: exact ordered valueFiles chain (${VERSION_OVERLAY} + ${mode} overlay)"
+check_chain() { # $1 = label, $2 = rendered manifest, $3 = expected chain
+    local actual
+    actual="$(valuefiles_list "$2")"
+    if [[ "$actual" == "$3" ]]; then
+        pass "$1: exact ordered valueFiles chain"
     else
-        fail "baremetal ${mode}: valueFiles chain mismatch"
-        diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/      /'
+        fail "$1: valueFiles chain mismatch"
+        # `|| true`: diff exits 1 on mismatch — under set -e that would
+        # abort the gate before the verdict line.
+        diff <(printf '%s\n' "$3") <(printf '%s\n' "$actual") | sed 's/^/      /' || true
     fi
-done
-# The hub group rides the same shared chain (connected mode, render_group)
-hub_connected="$(render_group baremetal-hub)" || fail "baremetal-hub connected render errored"
-actual="$(valuefiles_list "$hub_connected")"
-expected="$(expected_valuefiles baremetal-hub values-baremetal-connected)"
-if [[ "$actual" == "$expected" ]]; then
-    pass "baremetal-hub connected: exact ordered valueFiles chain"
-else
-    fail "baremetal-hub connected: valueFiles chain mismatch"
-    diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/      /'
-fi
+}
+
+check_chain "baremetal airgap" "$AIRGAP" \
+    "$(expected_valuefiles baremetal values- values-storage-lvm "${VERSION_OVERLAY}" values-hw-intel-tdx "${AIRGAP_OVERLAY}")"
+check_chain "baremetal connected" "$CONNECTED" \
+    "$(expected_valuefiles baremetal values- values-storage-lvm "${VERSION_OVERLAY}" values-hw-intel-tdx values-baremetal-connected)"
+check_chain "baremetal-hub connected" "$HUB" \
+    "$(expected_valuefiles baremetal-hub values- values-storage-lvm "${VERSION_OVERLAY}" values-hw-intel-tdx values-baremetal-connected)"
+check_chain "azure connected" "$AZURE" \
+    "$(expected_valuefiles azure values- "values-${CLUSTER_VERSION}")"
 
 # ── Namespace-map overlay guard (5.0 overlay vs base) ────────────────
 # namespaces are a map now, so values-5.0-baremetal.yaml pins only the
@@ -367,7 +370,8 @@ done
 # ── Version-specific workload behaviour ──────────────────────────────
 # 5.0 + kata-cc only: the CRI-O guest-pull defect forces imagePullPolicy:
 # Always on digest-pinned kata-cc containers (issue #176 tracks the real
-# fix); every other combination keeps the default.
+# fix); every other combination keeps the default. Each chart carries
+# its own copy of the gate, so every chart is rendered.
 echo "── workload imagePullPolicy (version ${CLUSTER_VERSION})"
 declare -A EXPECT_ALWAYS=( [hello-openshift]=2 [kbs-access-curl]=1 [kbs-access-sealed]=1 )
 for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
@@ -405,18 +409,19 @@ else
         || fail "NFD operand pin wrong on ${CLUSTER_VERSION}: $nfd_img"
 fi
 
-# ── Sync-wave layout: every cluster group (connected mode) ───────────
-echo "── sync-wave layout (all cluster groups, connected mode)"
-declare -A RENDER=()
-for group in baremetal baremetal-hub baremetal-spoke azure azure-spoke trusted-hub; do
-    out="$(render_group "$group")" \
-        && RENDER[$group]="$out" \
-        || fail "$group connected render errored"
-done
-
-# Expected waves, one row per assertion: group|kind|metadata.name|wave.
-# "-" = the object is present but carries no sync-wave annotation;
-# "ABSENT" = the object must not render at all in that group.
+# ── Sync-wave layout: high-signal rows only ───────────────────────────
+# The full per-group golden table was retired (see the header): the wave
+# layout predates this branch and is pinned by the qualifying deploy
+# records. These rows guard the layout properties that are non-obvious
+# and cheap to break while editing the group values files:
+#   - tier ordering (job 5 → operators 10 → apps 20 → workloads 30)
+#   - eso renders WITHOUT a wave (live-validated; do not "fix" it)
+#   - the chart CRB: wave -1 on hubs, NO wave on spokes (ACM pre-creates)
+#   - spokes render workloads only (trust stack ABSENT)
+echo "── sync-wave layout (structural rows)"
+declare -A RENDER=( [baremetal]="$CONNECTED" [baremetal-hub]="$HUB" [baremetal-spoke]="$SPOKE" )
+# Rows: group|kind|metadata.name|wave. "-" = present without a wave;
+# "ABSENT" = must not render at all in that group.
 while IFS='|' read -r group kind name wave; do
     if [[ -z "${group:-}" || "$group" == \#* ]]; then
         continue
@@ -428,155 +433,31 @@ while IFS='|' read -r group kind name wave; do
         fail "$group: $kind/$name wave '${got}' (expected '${wave}')"
     fi
 done <<'EOF'
-# baremetal (single-cluster hub): full stack
-# NOTE: the eso/lvms/cnv subscriptions render WITHOUT a sync-wave ("-"):
-# live-validated state, pinned as-is. The cluster-admin CRB is the chart's
-# vp-gitops-cluster-admin-rolebinding: -1 on non-spokes, none on spokes
-# (ACM pre-creates it there; upstream reverted -1 for spokes, 61a99b4).
 baremetal|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
 baremetal|Job|wait-for-vault-unsealed|5
-baremetal|Application|acm|15
-baremetal|Application|vault|0
-baremetal|Application|openshift-external-secrets|0
-baremetal|Application|kyverno|0
-baremetal|Application|storage|0
-baremetal|Subscription|advanced-cluster-management|10
 baremetal|Subscription|openshift-external-secrets-operator|-
 baremetal|Subscription|trustee-operator|10
-baremetal|Subscription|sandboxed-containers-operator|10
-baremetal|Subscription|openshift-cert-manager-operator|10
-baremetal|Subscription|nfd|10
-baremetal|Subscription|lvms-operator|-
-baremetal|Subscription|kubevirt-hyperconverged|-
-baremetal|Subscription|intel-device-plugins-operator|10
-baremetal|Subscription|intel-tdx-dcap-operator|10
-baremetal|Application|sandbox|10
-baremetal|Application|baremetal|10
-baremetal|Application|trustee|20
-baremetal|Application|sandbox-policies|20
-baremetal|Application|coco-kyverno-policies|20
 baremetal|Application|intel-dcap|20
 baremetal|Application|hello-openshift|30
-baremetal|Application|kbs-access-curl|30
-baremetal|Application|kbs-access-sealed|30
-# baremetal-hub: same layout as baremetal (manages baremetal spokes)
-baremetal-hub|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
-baremetal-hub|Job|wait-for-vault-unsealed|5
-baremetal-hub|Application|acm|15
-baremetal-hub|Application|vault|0
-baremetal-hub|Application|openshift-external-secrets|0
-baremetal-hub|Application|kyverno|0
-baremetal-hub|Application|storage|0
-baremetal-hub|Subscription|advanced-cluster-management|10
-baremetal-hub|Subscription|openshift-external-secrets-operator|-
-baremetal-hub|Subscription|trustee-operator|10
-baremetal-hub|Subscription|sandboxed-containers-operator|10
-baremetal-hub|Subscription|openshift-cert-manager-operator|10
-baremetal-hub|Subscription|nfd|10
-baremetal-hub|Subscription|lvms-operator|-
-baremetal-hub|Subscription|kubevirt-hyperconverged|-
-baremetal-hub|Subscription|intel-device-plugins-operator|10
 baremetal-hub|Subscription|intel-tdx-dcap-operator|10
-baremetal-hub|Application|sandbox|10
-baremetal-hub|Application|baremetal|10
 baremetal-hub|Application|trustee|20
-baremetal-hub|Application|sandbox-policies|20
-baremetal-hub|Application|coco-kyverno-policies|20
-baremetal-hub|Application|intel-dcap|20
-baremetal-hub|Application|hello-openshift|30
-baremetal-hub|Application|kbs-access-curl|30
-baremetal-hub|Application|kbs-access-sealed|30
-# baremetal-spoke: workloads only — no acm/vault/trustee stack, no wait Job;
-# the chart CRB renders WITHOUT a wave (ACM pre-creates it on managed spokes)
 baremetal-spoke|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-
-baremetal-spoke|Job|wait-for-vault-unsealed|ABSENT
 baremetal-spoke|Application|acm|ABSENT
-baremetal-spoke|Application|vault|ABSENT
-baremetal-spoke|Application|openshift-external-secrets|0
-baremetal-spoke|Application|kyverno|0
-baremetal-spoke|Subscription|advanced-cluster-management|ABSENT
-baremetal-spoke|Subscription|openshift-external-secrets-operator|-
-baremetal-spoke|Subscription|trustee-operator|ABSENT
-baremetal-spoke|Subscription|sandboxed-containers-operator|10
-baremetal-spoke|Subscription|openshift-cert-manager-operator|10
-baremetal-spoke|Subscription|nfd|10
-baremetal-spoke|Application|sandbox|10
-baremetal-spoke|Application|baremetal|10
 baremetal-spoke|Application|trustee|ABSENT
-baremetal-spoke|Application|sandbox-policies|20
-baremetal-spoke|Application|coco-kyverno-policies|20
 baremetal-spoke|Application|hello-openshift|30
-baremetal-spoke|Application|kbs-access-curl|30
-baremetal-spoke|Application|kbs-access-sealed|30
-# azure (single-cluster): full stack
-azure|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
-azure|Job|wait-for-vault-unsealed|5
-azure|Application|acm|15
-azure|Application|vault|0
-azure|Application|openshift-external-secrets|0
-azure|Application|kyverno|0
-azure|Subscription|advanced-cluster-management|10
-azure|Subscription|openshift-external-secrets-operator|-
-azure|Subscription|trustee-operator|10
-azure|Subscription|sandboxed-containers-operator|10
-azure|Subscription|openshift-cert-manager-operator|10
-azure|Application|sandbox|10
-azure|Application|trustee|20
-azure|Application|sandbox-policies|20
-azure|Application|coco-kyverno-policies|20
-azure|Application|hello-openshift|30
-azure|Application|kbs-access-curl|30
-azure|Application|kbs-access-sealed|30
-# azure-spoke: workloads only — no acm/vault/trustee stack, no policies and
-# no kyverno engine either (unlike baremetal-spoke, which carries kyverno);
-# the chart CRB renders WITHOUT a wave (ACM pre-creates it on managed spokes)
-azure-spoke|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-
-azure-spoke|Job|wait-for-vault-unsealed|ABSENT
-azure-spoke|Application|acm|ABSENT
-azure-spoke|Application|vault|ABSENT
-azure-spoke|Application|openshift-external-secrets|0
-azure-spoke|Application|kyverno|ABSENT
-azure-spoke|Subscription|advanced-cluster-management|ABSENT
-azure-spoke|Subscription|openshift-external-secrets-operator|-
-azure-spoke|Subscription|trustee-operator|ABSENT
-azure-spoke|Subscription|sandboxed-containers-operator|10
-azure-spoke|Subscription|openshift-cert-manager-operator|10
-azure-spoke|Application|sandbox|10
-azure-spoke|Application|trustee|ABSENT
-azure-spoke|Application|sandbox-policies|ABSENT
-azure-spoke|Application|coco-kyverno-policies|ABSENT
-azure-spoke|Application|hello-openshift|30
-azure-spoke|Application|kbs-access-curl|30
-azure-spoke|Application|kbs-access-sealed|30
-# trusted-hub: hub stack (trustee/acm/vault/kyverno), no workloads, no sandbox sub
-trusted-hub|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-1
-trusted-hub|Job|wait-for-vault-unsealed|5
-trusted-hub|Application|acm|15
-trusted-hub|Application|vault|0
-trusted-hub|Application|openshift-external-secrets|0
-trusted-hub|Application|kyverno|0
-trusted-hub|Subscription|advanced-cluster-management|10
-trusted-hub|Subscription|openshift-external-secrets-operator|-
-trusted-hub|Subscription|trustee-operator|10
-trusted-hub|Subscription|sandboxed-containers-operator|ABSENT
-trusted-hub|Subscription|openshift-cert-manager-operator|10
-trusted-hub|Application|trustee|20
-trusted-hub|Application|sandbox-policies|20
-trusted-hub|Application|hello-openshift|ABSENT
-trusted-hub|Application|kbs-access-curl|ABSENT
-trusted-hub|Application|kbs-access-sealed|ABSENT
 EOF
 
 # ── Cluster-admin CRB (chart knob, patterns-operator#887) ────────────
 echo "── cluster-admin CRB"
-for mode in airgap connected; do
-    out="$(render_root "$mode")" || { fail "$mode root render errored"; continue; }
+for mode in AIRGAP CONNECTED; do
+    out="${!mode}"
+    mode_label="${mode,,}"
     # All documents mentioning the CRB name (the CRB itself, plus the
     # helm-values ConfigMap which embeds the values indented). The real CRB is
     # distinguished by an UNINDENTED "kind: ClusterRoleBinding" line.
     block="$(awk -v RS='---' '/vp-gitops-cluster-admin-rolebinding/' <<< "$out")"
     if [[ -z "$block" ]]; then
-        fail "$mode: chart cluster-admin CRB missing from root render"
+        fail "$mode_label: chart cluster-admin CRB missing from root render"
         continue
     fi
     ok=1
@@ -585,42 +466,44 @@ for mode in airgap connected; do
     grep -q "vp-gitops-argocd-application-controller" <<< "$block" || ok=0
     grep -q 'sync-wave: "-1"' <<< "$block" || ok=0
     if [[ $ok -eq 1 ]]; then
-        pass "$mode: chart cluster-admin CRB at wave -1 for the controller SA"
+        pass "$mode_label: chart cluster-admin CRB at wave -1 for the controller SA"
     else
-        fail "$mode: chart cluster-admin CRB malformed (kind/role/subject/wave)"
+        fail "$mode_label: chart cluster-admin CRB malformed (kind/role/subject/wave)"
     fi
     # No duplicate: the pre-0.9.59 hand-rolled bridge must not render anywhere.
     dup="$(awk -v RS='---' '/coco-pattern-argocd-cluster-admin-bootstrap/' <<< "$out")"
     if [[ -n "$dup" ]]; then
-        fail "$mode: hand-rolled bootstrap CRB still rendered (duplicate)"
+        fail "$mode_label: hand-rolled bootstrap CRB still rendered (duplicate)"
     else
-        pass "$mode: no hand-rolled bootstrap CRB duplicate"
+        pass "$mode_label: no hand-rolled bootstrap CRB duplicate"
     fi
 done
 
-# ── Workload charts ──────────────────────────────────────────────────
-echo "── workload charts"
-for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
-    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
-        --set global.coco.runtimeClassName=kata-cc 2>/dev/null)" \
-        || { fail "$chart connected render errored"; continue; }
-    if grep -q "registry.redhat.io/ubi9/httpd-24@sha256:68a91ff" <<< "$out"; then
-        pass "$chart connected: upstream image unchanged"
-    else
-        fail "$chart connected: image not the upstream registry.redhat.io reference"
-    fi
+# ── Workload image rewrite ────────────────────────────────────────────
+# hello-openshift carries the rewrite assertions; the three charts' image
+# helpers are asserted byte-identical below, so the other two inherit the
+# coverage. kbs-access-curl adds the initImage path (a different source
+# registry shape).
+echo "── workload charts (image rewrite)"
+out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/hello-openshift" \
+    --set global.coco.runtimeClassName=kata-cc 2>/dev/null)" \
+    || fail "hello-openshift connected render errored"
+if grep -q "registry.redhat.io/ubi9/httpd-24@sha256:68a91ff" <<< "$out"; then
+    pass "hello-openshift connected: upstream image unchanged"
+else
+    fail "hello-openshift connected: image not the upstream registry.redhat.io reference"
+fi
 
-    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/${chart}" \
-        --set global.coco.runtimeClassName=kata-cc --set global.airgap=true \
-        --set-string "global.mirrorRegistry=${MIRROR_ROOT}" 2>/dev/null)" \
-        || { fail "$chart airgap render errored"; continue; }
-    if grep -q "${MIRROR_ROOT}/ubi9/httpd-24@sha256:68a91ff" <<< "$out" \
-        && ! grep -q "registry.redhat.io/ubi9" <<< "$out"; then
-        pass "$chart airgap: image rewritten to ${MIRROR_ROOT}/ubi9/..."
-    else
-        fail "$chart airgap: image not rewritten to the mirror root"
-    fi
-done
+out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/hello-openshift" \
+    --set global.coco.runtimeClassName=kata-cc --set global.airgap=true \
+    --set-string "global.mirrorRegistry=${MIRROR_ROOT}" 2>/dev/null)" \
+    || fail "hello-openshift airgap render errored"
+if grep -q "${MIRROR_ROOT}/ubi9/httpd-24@sha256:68a91ff" <<< "$out" \
+    && ! grep -q "registry.redhat.io/ubi9" <<< "$out"; then
+    pass "hello-openshift airgap: image rewritten to ${MIRROR_ROOT}/ubi9/..."
+else
+    fail "hello-openshift airgap: image not rewritten to the mirror root"
+fi
 
 # initImage (registry.access.redhat.com source path)
 out="$(helm template x "${PATTERN_DIR}/charts/coco-supported/kbs-access-curl" \
@@ -639,37 +522,37 @@ else
     pass "airgap without global.mirrorRegistry fails fast"
 fi
 
-# ── Workload image-rewrite edge cases ────────────────────────────────
-image_rewrite_case() { # $1 = chart, $2 = label, $3 = image in, $4 = expected
+# Rewrite edge cases (helper logic; one chart suffices — see helper sync):
+# already-mirrored input must not double-prefix; hostless and localhost
+# references are rebased under the mirror root.
+image_rewrite_case() { # $1 = label, $2 = image in, $3 = expected
     local out
-    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/$1" \
+    out="$(helm template wg "${PATTERN_DIR}/charts/coco-supported/hello-openshift" \
         --set global.coco.runtimeClassName=kata-cc --set global.airgap=true \
         --set-string "global.mirrorRegistry=${MIRROR_ROOT}" \
-        --set-string "image=$3" 2>/dev/null)" \
-        || { fail "$1 airgap rewrite ($2): render errored"; return; }
+        --set-string "image=$2" 2>/dev/null)" \
+        || { fail "airgap rewrite ($1): render errored"; return; }
     # The expected reference must appear as a complete image: value (anchored
     # at end of line), and no double mirror prefix anywhere in the render.
-    if grep -q "image: $4\$" <<< "$out" \
+    if grep -q "image: $3\$" <<< "$out" \
         && ! grep -q "${MIRROR_ROOT}/${MIRROR_ROOT}" <<< "$out"; then
-        pass "$1 airgap rewrite ($2): $3 → $4"
+        pass "airgap rewrite ($1): $2 → $3"
     else
-        fail "$1 airgap rewrite ($2): '$3' did not render as '$4'"
+        fail "airgap rewrite ($1): '$2' did not render as '$3'"
     fi
 }
-for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
-    image_rewrite_case "$chart" "already-mirrored" \
-        "${MIRROR_ROOT}/ubi9/httpd-24:pass" "${MIRROR_ROOT}/ubi9/httpd-24:pass"
-    image_rewrite_case "$chart" "hostless" \
-        "library/httpd:2.4" "${MIRROR_ROOT}/library/httpd:2.4"
-    image_rewrite_case "$chart" "localhost" \
-        "localhost:5000/foo:latest" "${MIRROR_ROOT}/foo:latest"
-done
+image_rewrite_case "already-mirrored" \
+    "${MIRROR_ROOT}/ubi9/httpd-24:pass" "${MIRROR_ROOT}/ubi9/httpd-24:pass"
+image_rewrite_case "hostless" \
+    "library/httpd:2.4" "${MIRROR_ROOT}/library/httpd:2.4"
+image_rewrite_case "localhost" \
+    "localhost:5000/foo:latest" "${MIRROR_ROOT}/foo:latest"
 
-# ── Workload image helper sync ───────────────────────────────────────
+# ── Workload image helper sync ────────────────────────────────────────
 # The three path-rendered charts each carry a copy of the <chart>.image
-# helper (they cannot share a library template). Hash the define body of
-# each copy (define name normalised) and require all three byte-identical;
-# comments are excluded so prose may drift between the copies.
+# helper (no shared library templates); hash each copy (define name
+# normalised) and require all three byte-identical. This is what
+# licenses testing the image rewrite on one chart only.
 image_helper_block() { # $1 = chart; prints the normalised helper block
     local f="${PATTERN_DIR}/charts/coco-supported/$1/templates/_helpers.tpl" start
     start="$(awk '/^{{- define "[a-z-]*\.image" -}}$/ {print NR; exit}' "$f")"
@@ -681,7 +564,6 @@ image_helper_block() { # $1 = chart; prints the normalised helper block
 echo "── workload image helper sync"
 sync_ok=1
 ref_sha=""
-ref_chart=""
 for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
     if ! block="$(image_helper_block "$chart")"; then
         fail "$chart: image helper block not found in templates/_helpers.tpl"
@@ -691,9 +573,8 @@ for chart in hello-openshift kbs-access-curl kbs-access-sealed; do
     sha="$(printf '%s' "$block" | sha256sum | cut -d' ' -f1)"
     if [[ -z "$ref_sha" ]]; then
         ref_sha="$sha"
-        ref_chart="$chart"
     elif [[ "$sha" != "$ref_sha" ]]; then
-        fail "$chart: image helper differs from $ref_chart (sha256 $sha vs $ref_sha)"
+        fail "$chart: image helper differs from hello-openshift (sha256 $sha vs $ref_sha)"
         sync_ok=0
     fi
 done
