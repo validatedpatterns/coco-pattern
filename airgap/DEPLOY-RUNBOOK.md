@@ -351,10 +351,20 @@ produces the install configuration, it must:
 - include the mirror CA chain as the additional trust bundle
   (`~/combined-ca-bundle.pem`).
 
+Those requirements land in two files that must already exist in the
+`--dir` directory before `create image` runs — `install-config.yaml` and
+`agent-config.yaml` (agent-based installs have no interactive prompt):
+`additionalTrustBundle` takes the CA chain, `imageContentSources` takes
+the oc-mirror `cluster-resources` mirrors, and the OS image stream pin is
+the 5.0 platform setting in `install-config.yaml`.
+
 ```bash
-openshift-install agent create image --dir <output-dir>
+openshift-install agent create image --dir <install-dir>
 
 ```
+
+`<install-dir>` is the same directory B-2 and B-3 use (`auth/kubeconfig`
+lands there).
 
 One lab's reference invocation (its own tooling, not part of the
 pattern) is recorded in
@@ -818,8 +828,8 @@ image-stream registry). The qualified run therefore applied the
 `routingViaHost` change early, before the full post-install bootstrap.
 The pattern as shipped does not automate the pre-install form:
 `scripts/airgap-post-install-lab.sh` (the lab wrapper around C-1) applies
-it as lab step 8 before delegating to the generic bootstrap, and cannot
-rescue a stalled bootstrap either.
+it in a named "Lab step" phase before delegating to the generic
+bootstrap, and cannot rescue a stalled bootstrap either.
 
 A genuinely airgapped site does not normally hit this at all — the
 mirror is in-environment and reachable from the pod network from first
