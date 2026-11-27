@@ -126,6 +126,12 @@ render_group() { # $1 = cluster group; prints the connected-mode render
         azure)
             args=(-f "${PATTERN_DIR}/overrides/values-Azure.yaml"
                   -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
+        azure-spoke)
+            args=(-f "${PATTERN_DIR}/overrides/values-Azure.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
+        trusted-hub)
+            args=(-f "${PATTERN_DIR}/overrides/values-None.yaml"
+                  -f "${PATTERN_DIR}/overrides/values-${CLUSTER_VERSION}.yaml") ;;
         *)
             echo "render_group: unknown cluster group '$group'" >&2
             return 1 ;;
@@ -185,6 +191,8 @@ CONNECTED="$(render_root connected)" || fail "connected root render errored"
 HUB="$(render_group baremetal-hub)" || fail "baremetal-hub connected render errored"
 SPOKE="$(render_group baremetal-spoke)" || fail "baremetal-spoke connected render errored"
 AZURE="$(render_group azure)" || fail "azure connected render errored"
+AZURE_SPOKE="$(render_group azure-spoke)" || fail "azure-spoke connected render errored"
+TRUSTED_HUB="$(render_group trusted-hub)" || fail "trusted-hub connected render errored"
 
 # ── Airgap mode: subscription sources + mode-dependent values ────────
 echo "── airgap mode (global.airgap=true)"
@@ -418,8 +426,10 @@ fi
 #   - eso renders WITHOUT a wave (live-validated; do not "fix" it)
 #   - the chart CRB: wave -1 on hubs, NO wave on spokes (ACM pre-creates)
 #   - spokes render workloads only (trust stack ABSENT)
+#   - azure-spoke/trusted-hub still render at all (map-form namespaces)
 echo "── sync-wave layout (structural rows)"
-declare -A RENDER=( [baremetal]="$CONNECTED" [baremetal-hub]="$HUB" [baremetal-spoke]="$SPOKE" )
+declare -A RENDER=( [baremetal]="$CONNECTED" [baremetal-hub]="$HUB" [baremetal-spoke]="$SPOKE"
+                    [azure-spoke]="$AZURE_SPOKE" [trusted-hub]="$TRUSTED_HUB" )
 # Rows: group|kind|metadata.name|wave. "-" = present without a wave;
 # "ABSENT" = must not render at all in that group.
 while IFS='|' read -r group kind name wave; do
@@ -445,6 +455,12 @@ baremetal-spoke|ClusterRoleBinding|vp-gitops-cluster-admin-rolebinding|-
 baremetal-spoke|Application|acm|ABSENT
 baremetal-spoke|Application|trustee|ABSENT
 baremetal-spoke|Application|hello-openshift|30
+# azure-spoke: workloads only — no trust stack, no hub policies.
+azure-spoke|Application|trustee|ABSENT
+azure-spoke|Application|kyverno|ABSENT
+# trusted-hub: the inverse — hub stack present, workloads ABSENT.
+trusted-hub|Application|trustee|20
+trusted-hub|Application|hello-openshift|ABSENT
 EOF
 
 # ── Cluster-admin CRB (chart knob, patterns-operator#887) ────────────
