@@ -39,6 +39,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # The suites are deliberately small: trusted-CA keeps only the
+      # trust-anchor-preservation and happy-path cases, mirror-verify
+      # only the credential-handling (no argv, no temp-file leak) runs.
       - name: bash -n (syntax)
         run: |
           bash -n scripts/airgap-post-install.sh
