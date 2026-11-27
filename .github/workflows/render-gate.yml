@@ -39,12 +39,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # The suites are deliberately small: trusted-CA keeps only the
-      # trust-anchor-preservation and happy-path cases, mirror-verify
-      # only the credential-handling (no argv, no temp-file leak) runs.
+      # The suites are deliberately small: trusted-CA keeps the
+      # trust-anchor-preservation, one-snapshot, reconciliation and
+      # fingerprint-completeness cases; mirror-verify the credential
+      # handling (no argv, no temp-file leak) plus the staged-CA content.
       - name: bash -n (syntax)
         run: |
           bash -n scripts/airgap-post-install.sh
+          bash -n scripts/airgap-post-install-lab.sh
           bash -n scripts/verify/render-gate.sh
           bash -n tests/test-airgap-trusted-ca.sh
           bash -n tests/test-airgap-mirror-verify.sh
@@ -52,7 +54,9 @@ jobs:
       - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck scripts/airgap-post-install.sh scripts/verify/render-gate.sh \
+          shellcheck scripts/airgap-post-install.sh \
+            scripts/airgap-post-install-lab.sh \
+            scripts/verify/render-gate.sh \
             tests/test-airgap-trusted-ca.sh tests/test-airgap-mirror-verify.sh
 
       - name: Mocked-oc tests (trusted-CA + mirror verify)
