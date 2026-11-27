@@ -17,8 +17,7 @@ apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
 mirror:
   # OCP release — single version pin; update both min/max to change patch
-  # 5.0.2 is published only in candidate-5.0 (stable-5.0/fast-5.0 graphs
-  # are at 5.0.1). Re-point the channel when 5.0.2 promotes to stable-5.0.
+  # 5.0.2 is candidate-5.0 only; re-point to stable-5.0 once promoted
   platform:
     channels:
       - name: candidate-5.0
@@ -41,9 +40,7 @@ mirror:
             - name: stable
               minVersion: "1.2.1"
               maxVersion: "1.2.1"
-        # GitOps (ArgoCD) — keep aligned with main.gitops.channel in
-        # values-global.yaml. defaultChannel override required: filtering
-        # out the catalog default ("latest") fails oc-mirror v2 filtering.
+        # GitOps — defaultChannel override required (catalog default "latest" fails oc-mirror filtering)
         - name: openshift-gitops-operator
           defaultChannel: gitops-1.22
           channels:
@@ -56,11 +53,9 @@ mirror:
         - name: openshift-cert-manager-operator
           channels:
             - name: stable-v1
-        # ACM — use default channel (release-5.0 in the 5.0 catalog)
-        # filtering to non-default channel causes oc-mirror error
+        # ACM — use default channel (filtering to non-default fails oc-mirror)
         - name: advanced-cluster-management
-        # MCE — required dependency of ACM, must be mirrored explicitly.
-        # stable-5.0 is the 5.0 catalog default (stable-2.17 also exists)
+        # MCE — required ACM dependency, mirrored explicitly (stable-5.0 is the catalog default)
         - name: multicluster-engine
           channels:
             - name: stable-5.0
@@ -80,17 +75,13 @@ mirror:
   # Certified operators
     - catalog: registry.redhat.io/redhat/certified-operator-index:v5.0
       packages:
-        # GPU operator DISABLED — matches values-baremetal.yaml (the
-        # subscription is commented out there; re-enable both together).
+        # GPU operator DISABLED — matches values-baremetal.yaml (re-enable both together)
 
-        # Intel device plugins (for TDX/SGX) — certified, NOT redhat catalog
-        # Requires registries.d/no-sigstore-certified.yaml (cosign .sig manifests missing)
+        # Intel device plugins (TDX/SGX) — certified catalog; needs registries.d/no-sigstore-certified.yaml
         - name: intel-device-plugins-operator
           channels:
             - name: stable
-        # Intel TDX DCAP operator — QGS lifecycle management. The alpha
-        # channel is gone from the 5.0 catalog; stable is the default and
-        # only channel (CSV v0.27.0, OwnNamespace-only).
+        # Intel TDX DCAP — alpha channel removed in 5.0; stable only (CSV v0.27.0, OwnNamespace)
         - name: intel-tdx-dcap-operator
           channels:
             - name: stable
@@ -98,43 +89,36 @@ mirror:
   # Community operators
     - catalog: registry.redhat.io/redhat/community-operator-index:v5.0
       packages:
-        # Use v0.0.80+ (Docker manifest list; older tags use an OCI index
-        # Quay rejects). Cluster runs v0.0.83; "fast" is the catalog
-        # default (main.patternsOperator.channel).
+        # v0.0.80+ — Docker manifest list (older OCI-index tags are Quay-rejected)
         - name: patterns-operator
           channels:
             - name: fast
 
   # Additional container images (application workloads)
   additionalImages:
-    # Workload images — use the exact digest from charts/coco-supported/*/values.yaml
-    # oc-mirror with :latest mirrors the current tag which may differ from the chart digest
+    # Workload images — digest-pinned per charts/coco-supported/*/values.yaml
     - name: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
     - name: registry.redhat.io/ubi9/ubi:latest
-    # NFD operand — 5.0 DaemonSets are digest-pinned from the openshift5
-    # repo (CSV relatedImage digest, not the 4.22 tag form)
+    # NFD operand — digest-pinned CSV relatedImage (5.0 DaemonSet form)
     - name: registry.redhat.io/openshift5/ose-node-feature-discovery-rhel9@sha256:f238dc852b74caca695f2ba8a36a4b16d38e116a3c00936b13e3267647fd1494
-    # Vault — Red Hat certified UBI image from registry.connect.redhat.com
-    # (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi by default)
+    # Vault — certified UBI image (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi)
     - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
-    # Kyverno (Helm chart, not OLM): mirror from ghcr.io (paths identical
-    # to the chart's reg.kyverno.io) and let the manual ITMS redirect pulls.
+    # Kyverno — ghcr.io paths match the chart's reg.kyverno.io; manual ITMS redirects pulls
     - name: ghcr.io/kyverno/kyverno:v1.17.2
     - name: ghcr.io/kyverno/kyvernopre:v1.17.2
     - name: ghcr.io/kyverno/background-controller:v1.17.2
     - name: ghcr.io/kyverno/cleanup-controller:v1.17.2
     - name: ghcr.io/kyverno/reports-controller:v1.17.2
     - name: ghcr.io/kyverno/kyverno-cli:v1.17.2
-    # webhooksCleanup pre-delete hook (helm.sh/hook: pre-delete) — without it,
-    # deleting the kyverno app hangs on ImagePullBackOff in airgap.
+    # webhooksCleanup pre-delete hook — without it, kyverno app deletion hangs in airgap
     - name: registry.k8s.io/kubectl:v1.34.3
-    # helm test hook image (kyverno/readiness-checker) — cheap insurance.
+    # helm test hook image (cheap insurance)
     - name: ghcr.io/kyverno/readiness-checker:v0.1.0
 
     # --- VP Helm OCI charts ---
     - name: quay.io/validatedpatterns/clustergroup:0.9.60
     - name: quay.io/validatedpatterns/acm:0.1.27
-    # values pin 0.1.11 exactly (chart 0.1.11 deploys vault:2.1.2-ubi)
+    # values pin 0.1.11 exactly
     - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11
     - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
     - name: quay.io/validatedpatterns/trustee:0.10.2
@@ -145,8 +129,7 @@ mirror:
     - name: quay.io/validatedpatterns/utility-container:latest
     - name: quay.io/validatedpatterns/imperative-container:latest
     - name: quay.io/validatedpatterns/imperative-container:v1
-    # pattern-ui-catalog deliberately NOT mirrored: non-essential, and Quay
-    # rejects its hybrid manifest — the console tab is unavailable in airgap.
+    # pattern-ui-catalog not mirrored: Quay rejects its hybrid OCI-index manifest (non-essential; retest before enabling)
 
     # --- UBI minimal (ArgoCD repo-server init container) ---
     - name: registry.redhat.io/ubi9/ubi-minimal:latest
@@ -158,21 +141,15 @@ mirror:
     - name: registry.redhat.io/openshift4/ose-cli:latest
 
     # --- Intel DCAP chart images ---
-    # Requires registries.d/no-sigstore-certified.yaml. DCAP v0.27.0 moved
-    # QGS to the certified intel/intel-tdx-qgs repo; digests are the CSV
-    # relatedImage values (not the 4.22 digests).
+    # QGS moved to certified intel/intel-tdx-qgs in DCAP v0.27.0; digest = CSV relatedImage
     - name: registry.connect.redhat.com/intel/intel-tdx-qgs@sha256:d86a48e3668bff87e2e5f6914b1b06b861efeb9bd145abbcce3129cfb7eb972d
-    # intel-device-plugins CSV v0.37.1 digest — the operator overrides the
-    # chart's stale 4.22 pin on the SgxDevicePlugin CR at runtime
+    # intel-sgx-plugin — CSV v0.37.1 relatedImage digest (operator overrides the chart pin)
     - name: registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:b9018557fbf207f625bbfc3a070d2bec5d20b855b05c5cec09e8b12c35ad7871
 
     # --- Workload images ---
     - name: registry.access.redhat.com/ubi9/ubi:latest
 
     # --- CNV guest images (OPTIONAL — not mirrored) ---
-    # ~2 GB each and NOT consumed (enableCommonBootImageImport: false), and
-    # registry.redhat.io REJECTS :latest for virtio-win. Re-enable only for
-    # VM boot from DataSource, with pinned tags.
+    # ~2 GB each, not consumed (enableCommonBootImageImport: false); :latest rejected for virtio-win
 
-    # Note: kubeVirtContainer: true is for RHCOS/Hosted Control Planes only —
-    # do NOT add it for standalone TDX VMs on baremetal.
+    # Note: kubeVirtContainer: true is for RHCOS/Hosted Control Planes only — do NOT add it for baremetal TDX
