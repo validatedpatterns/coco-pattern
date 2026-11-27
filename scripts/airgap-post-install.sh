@@ -18,15 +18,21 @@
 #                     a temporary 0600 authfile (never on argv), removed after.
 #   SKOPEO_AUTHFILE — fallback authfile for the mirror verification
 #                     (default: ~/pull-secret.json, which may lack the robot).
+#   OC_MIRROR_WORKSPACE     — oc-mirror workspace (default: ~/oc-mirror-workspace)
 #   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
-#   ENABLE_ROUTINGVIAHOST   — set to "true" to enable OVN routingViaHost (test-lab only)
+#                             (default: the pattern repo itself — the external
+#                             charts are OCI pulls from the mirror, not git)
+
+# This script contains ONLY what any disconnected deployment needs.
+# Lab-specific behaviour (faked-airgap routingViaHost, a fixed checkout
+# layout) lives in scripts/airgap-post-install-lab.sh, which wraps this
+# script and is not part of the generic flow.
 
 # Modes (default: no args — run all steps):
 #   --sync-repos-only     — only sync working copies to bare HTTP repos
 #   --deploy-pattern      — deploy the Pattern CR directly (skip pattern.sh)
-#   --fix-manifest-lists  — fix oc-mirror manifest list failures with skopeo
 #   --repoint-subs        — re-run only the step 3d subscription repoint
 
 set -euo pipefail
@@ -37,6 +43,7 @@ PATTERN_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GIT_REPO_ROOT="${GIT_REPO_ROOT:-${HOME}/public_html/git}"
 GIT_HTTP_PORT="${GIT_HTTP_PORT:-8080}"
 MIRROR_REGISTRY="${MIRROR_REGISTRY:-}"
+OC_MIRROR_WORKSPACE="${OC_MIRROR_WORKSPACE:-${HOME}/oc-mirror-workspace}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,20 +77,19 @@ print('' if d is None else d)
 }
 
 # Resolve the version-pinned airgap overlay path from global.clusterVersion,
-# mirroring the sharedValueFiles tpl in values-baremetal.yaml (4.22 unsuffixed).
+# mirroring the sharedValueFiles tpl in values-baremetal.yaml: every minor
+# uses the dashed suffix (4.22 → values-baremetal-airgap-4-22.yaml).
 airgap_overlay_path() {
     local cluster_version suffix
     cluster_version=$(read_global_key global.clusterVersion '')
     if [[ -z "$cluster_version" ]]; then
+        # No clusterVersion configured — resolve the unsuffixed name;
+        # preflight fails with a clear error when it does not exist.
         echo "${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
         return
     fi
-    if [[ "$cluster_version" == "4.22" ]]; then
-        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
-    else
-        suffix="${cluster_version//./-}"
-        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap-${suffix}.yaml"
-    fi
+    suffix="${cluster_version//./-}"
+    echo "${PATTERN_DIR}/overrides/values-baremetal-airgap-${suffix}.yaml"
 }
 
 # ─── Mode dispatch ───────────────────────────────────────────────
@@ -94,17 +100,16 @@ case "${1:-}" in
     "")                    ;;
     --sync-repos-only)     MODE="sync"; shift ;;
     --deploy-pattern)      MODE="deploy"; shift ;;
-    --fix-manifest-lists)  MODE="fix-manifests"; shift ;;
     --repoint-subs)        MODE="repoint"; shift ;;
     *)
         error "Unknown argument: '${1}'"
-        error "Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs]"
+        error "Usage: $0 [--sync-repos-only|--deploy-pattern|--repoint-subs]"
         exit 2
         ;;
 esac
 if [[ $# -gt 0 ]]; then
     error "Unexpected argument(s) after the mode flag: '$*'"
-    error "A mode flag takes no operands. Usage: $0 [--sync-repos-only|--deploy-pattern|--fix-manifest-lists|--repoint-subs]"
+    error "A mode flag takes no operands. Usage: $0 [--sync-repos-only|--deploy-pattern|--repoint-subs]"
     exit 2
 fi
 
@@ -170,8 +175,7 @@ disable_default_catalogs() {
 create_catalog_sources() {
     step 3 "Apply CatalogSources from oc-mirror cluster-resources"
 
-    local workspace="${OC_MIRROR_WORKSPACE:-${HOME}/oc-mirror-workspace}"
-    local cs_dir="${workspace}/working-dir/cluster-resources"
+    local cs_dir="${OC_MIRROR_WORKSPACE}/working-dir/cluster-resources"
 
     if [[ ! -d "$cs_dir" ]]; then
         warn "oc-mirror cluster-resources not found at $cs_dir — skipping CatalogSource creation"
@@ -209,8 +213,7 @@ create_catalog_sources() {
 apply_ocmirror_resources() {
     step "3b" "Apply all oc-mirror cluster-resources (IDMS, ITMS, CatalogSource, signatures)"
 
-    local workspace="${HOME}/oc-mirror-workspace"
-    local resources="${workspace}/working-dir/cluster-resources"
+    local resources="${OC_MIRROR_WORKSPACE}/working-dir/cluster-resources"
 
     if [[ ! -d "$resources" ]]; then
         warn "No oc-mirror cluster-resources at $resources — skipping"
@@ -939,59 +942,12 @@ PY
     info "OCI mirroring complete"
 }
 
-# ─── Step 6: Fix oc-mirror manifest list failures ────────────────
-fix_manifest_lists() {
-    step 6 "Fix oc-mirror manifest list failures"
-
-    local workspace="${HOME}/oc-mirror-workspace"
-    local error_log
-    error_log=$(ls -t "${workspace}/working-dir/logs/mirroring_errors_"*.txt 2>/dev/null | head -1 || true)
-
-    if [[ -z "$error_log" ]] || [[ ! -f "$error_log" ]]; then
-        info "No mirroring error log found — skipping"
-        return
-    fi
-
-    local failed_images
-    failed_images=$(grep -oP 'docker://\S+' "$error_log" | sed 's/docker:\/\///' | sort -u || true)
-
-    if [[ -z "$failed_images" ]]; then
-        info "No failed images in error log — skipping"
-        return
-    fi
-
-    warn "Found $(echo "$failed_images" | wc -l | tr -d ' ') failed images from oc-mirror"
-
-    while IFS= read -r img; do
-        [[ -z "$img" ]] && continue
-        local src_registry="${img%%/*}"
-        local path_tag="${img#*/}"
-        # Strip digest for tag-based fallback
-        local path_notag="${path_tag%%@*}"
-        local dest="${MIRROR_REGISTRY}/${path_notag}"
-
-        info "  Fixing: $img"
-
-        # Try 1: oc image mirror with --keep-manifest-list (preserves multi-arch)
-        if oc image mirror --insecure=true --keep-manifest-list=true "$img" "$dest" 2>/dev/null; then
-            info "    OK (manifest list preserved)"
-            continue
-        fi
-
-        # Try 2: oc image mirror with --filter-by-os (single arch, tag-based)
-        local tag_img="${path_notag##*/}"
-        local tag_base="${img%%@*}"
-        if [[ "$tag_base" != "$img" ]]; then
-            # Has a digest — try by-tag equivalent
-            local repo_path="${path_notag%/*}"
-            # Mirror the tag version instead
-            info "    Fallback: mirroring by tag"
-            oc image mirror --insecure=true --filter-by-os="linux/amd64" \
-                "${tag_base}:latest" "${dest}:latest" 2>/dev/null || \
-                warn "    Tag-based fallback also failed"
-        fi
-    done <<< "$failed_images"
-}
+# Step 6 removed — the oc-mirror manifest-list repair (re-mirroring
+# failed images with --keep-manifest-list, falling back to :latest) was
+# an oc-mirror-bug workaround that no Makefile target or runbook step
+# invoked, and its tag fallback could mirror content that does not
+# match the failed digest. Re-run `make airgap-mirror` (or oc image
+# mirror --keep-manifest-list by hand) if oc-mirror reports failures.
 
 # ─── Step 7: Anchor the cluster trust bundle at user-ca-bundle ───
 # Runbook C-3 (upstream #171): the install-time --additional-trust-bundle
@@ -1229,28 +1185,11 @@ configure_cluster_trusted_ca() {
 }
 
 
-# ─── Step 8: Enable OVN routingViaHost (opt-in, test-lab only) ───
-enable_routing_via_host() {
-    step 8 "OVN routingViaHost (test-lab only)"
-
-    if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" ]]; then
-        info "Skipped (set ENABLE_ROUTINGVIAHOST=true to enable)"
-        return
-    fi
-
-    local current
-    current=$(oc get network.operator cluster \
-        -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}' 2>/dev/null || echo "")
-    if [[ "$current" == "true" ]]; then
-        info "Already enabled — skipping"
-        return
-    fi
-
-    warn "Enabling routingViaHost — this may cause a brief network disruption"
-    oc patch network.operator cluster --type merge \
-        -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"routingViaHost":true}}}}}'
-    info "routingViaHost enabled"
-}
+# Step 8 removed from the generic flow — OVN routingViaHost is only
+# needed by environments that fake disconnection at the pod boundary
+# (off-cluster egress via the node host network). It moved to
+# scripts/airgap-post-install-lab.sh (runbook Appendix B); a genuinely
+# airgapped cluster never needs it.
 
 # ─── Step 9: Set up git HTTP server ─────────────────────────────
 setup_git_server() {
@@ -1258,18 +1197,16 @@ setup_git_server() {
 
     mkdir -p "$GIT_REPO_ROOT"
 
-    # Auto-detect repos
+    # Repos to serve: explicit GIT_REPOS wins; the generic default is the
+    # pattern repo itself (what the Pattern CR clones — the external
+    # charts are OCI pulls from the mirror, not git repos). A fixed
+    # multi-checkout layout is a deploy-site choice: set GIT_REPOS (the
+    # lab wrapper does).
     local repos=()
     if [[ -n "${GIT_REPOS:-}" ]]; then
         read -ra repos <<< "$GIT_REPOS"
     else
-        for candidate in \
-            "${HOME}/coco-pattern" \
-            "${HOME}/trustee-chart" \
-            "${HOME}/sandboxed-containers-chart" \
-            "${HOME}/sandboxed-policies-chart"; do
-            [[ -d "$candidate/.git" ]] && repos+=("$candidate")
-        done
+        repos=("${PATTERN_DIR}")
     fi
 
     if [[ ${#repos[@]} -eq 0 ]]; then
@@ -1298,7 +1235,6 @@ setup_git_server() {
     # SELinux + permissions
     command -v restorecon >/dev/null 2>&1 && restorecon -R "$GIT_REPO_ROOT/"
     chmod -R a+rX "$GIT_REPO_ROOT/"
-    find "$GIT_REPO_ROOT/" -type f -exec chmod a+r {} \;
 
     # Start smart HTTP server (go-git can't handle dumb HTTP from Apache)
     local server_script="${SCRIPT_DIR}/git-http-server.py"
@@ -1307,8 +1243,12 @@ setup_git_server() {
         return
     fi
 
+    # Liveness probe against the first served repo (not a hardcoded name)
+    local probe_repo
+    probe_repo="$(basename "${repos[0]}").git"
+
     # Check if already running
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GIT_HTTP_PORT}/coco-pattern.git/info/refs?service=git-upload-pack" 2>/dev/null | grep -q 200; then
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${GIT_HTTP_PORT}/${probe_repo}/info/refs?service=git-upload-pack" 2>/dev/null | grep -q 200; then
         info "Smart HTTP server already running on port $GIT_HTTP_PORT"
     else
         # Try systemd user service first
@@ -1338,10 +1278,10 @@ SVCEOF
         fi
     fi
 
-    # Report URLs — use the DNS name (FR-017): the node resolves it via lab DNS
-    # (the ignition's resolver), so a host address change does not break pulls.
+    # Report URLs — use the serving host's FQDN so a host address change
+    # does not break pulls (values-global.yaml points at a DNS name).
     local host_name
-    host_name=$(hostname -f 2>/dev/null || echo "JUMP_HOST_DNS")
+    host_name=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "localhost")
     info ""
     info "Git HTTP URLs:"
     for repo_path in "${repos[@]}"; do
@@ -1480,13 +1420,7 @@ sync_repos() {
     if [[ -n "${GIT_REPOS:-}" ]]; then
         read -ra repos <<< "$GIT_REPOS"
     else
-        for candidate in \
-            "${HOME}/coco-pattern" \
-            "${HOME}/trustee-chart" \
-            "${HOME}/sandboxed-containers-chart" \
-            "${HOME}/sandboxed-policies-chart"; do
-            [[ -d "$candidate/.git" ]] && repos+=("$candidate")
-        done
+        repos=("${PATTERN_DIR}")
     fi
 
     for repo_path in "${repos[@]}"; do
@@ -1526,11 +1460,6 @@ case "$MODE" in
         # Mounting pull-secret as HELM_REGISTRY_CONFIG causes 401 errors.
         exit 0
         ;;
-    fix-manifests)
-        validate_prereqs
-        fix_manifest_lists
-        exit 0
-        ;;
     repoint)
         # Standalone safety net — safe to run any time after the bootstrap,
         # e.g. once MCH has created its runtime subscriptions.
@@ -1556,11 +1485,9 @@ normalise_mirror_source_policy
 repoint_default_catalog_subscriptions
 validate_airgap_overlay
 mirror_oci_charts
-fix_manifest_lists
 configure_cluster_trusted_ca
 # The old argocd-tls-certs-cm step (removed) was a silent no-op; step 7b
 # never ran (public repos; a pull-secret HELM_REGISTRY_CONFIG 401'd).
-enable_routing_via_host
 setup_git_server
 create_operator_config
 

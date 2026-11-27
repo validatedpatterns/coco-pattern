@@ -413,18 +413,20 @@ oc get nodes                # Ready
 cd ~/coco-pattern
 
 export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
-export GIT_SERVER=http://<git-host>:8080
 
 scripts/airgap-post-install.sh
 
 ```
 
-Optional: `ENABLE_ROUTINGVIAHOST=true` enables OVN `routingViaHost`
-(step 8) — pod off-cluster egress via the node host network. It is
-opt-in and specific to environments that enforce disconnection at the
-pod boundary (see
-[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern));
-a genuinely airgapped cluster does not need it.
+The bootstrap contains only what any disconnected deployment needs. A
+site that fakes its airgap at the pod boundary (off-cluster egress via
+the node host network, OVN `routingViaHost`) or wants a fixed
+multi-repo checkout served over the git server can run
+`scripts/airgap-post-install-lab.sh` instead — a thin lab wrapper that
+applies those two environment specifics first and then execs the
+generic script (see
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern)).
+A genuinely airgapped cluster does not need it.
 
 This applies:
 
@@ -433,15 +435,13 @@ This applies:
 - Repoints any default-catalog subscriptions to the mirrored catalogs
 - Configures the Git HTTP server
 - Creates the patterns-operator-config ConfigMap
-- Optionally enables OVN routingViaHost (step 8, verified after applying)
 
 Post-deploy safety net: `make airgap-repoint-subs` re-runs the
 default-catalog subscription repoint standalone — safe at any time (e.g.
 after MCH deploys its runtime subscriptions); ArgoCD-owned subscriptions
 are skipped via the tracking-id annotation.
 
-**Verify**: catalog pods Running (and routingViaHost=true when step 8
-was enabled).
+**Verify**: catalog pods Running.
 
 ### C-2: Deploy the Pattern
 
@@ -814,9 +814,10 @@ a strict install-first ordering: `wait-for install-complete` fails with
 machine-config Degraded while the MCO times out inspecting the
 image-stream registry). The qualified run therefore applied the
 `routingViaHost` change early, before the full post-install bootstrap.
-The pattern as shipped does not automate this: C-1's step 8
-(`ENABLE_ROUTINGVIAHOST=true`) is the post-install, opt-in form and
-cannot rescue a stalled bootstrap.
+The pattern as shipped does not automate the pre-install form:
+`scripts/airgap-post-install-lab.sh` (the lab wrapper around C-1) applies
+it as lab step 8 before delegating to the generic bootstrap, and cannot
+rescue a stalled bootstrap either.
 
 A genuinely airgapped site does not normally hit this at all — the
 mirror is in-environment and reachable from the pod network from first
