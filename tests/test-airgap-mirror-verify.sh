@@ -6,16 +6,17 @@
 # SCOPE — only the dangerous behaviours, three runs:
 #   A. happy path, default pull-secret: --authfile (never --creds),
 #      --tls-verify=true with a CA configured, target = the mirror,
+#      --cert-dir flat (ca.crt directly inside) and holding the SAME CA
+#      as configured (cmp -s — presence alone passes a wrong-cert bug),
 #      temp cert dir cleaned up after the step
 #   B. MIRROR_USER/MIRROR_PASS: temporary 0600 authfile taking
 #      precedence, correct credential content, password never on argv,
 #      file removed after the step
 #   C. failure BETWEEN authfile creation and the verification call:
 #      no credential-bearing artefact survives the abort
-# The retired assertions (cert-dir content comparison — tautological,
-# the mock compared the fixture against itself; SKOPEO_AUTHFILE
-# precedence matrices; argv flag permutations) re-encoded our own
-# assumptions rather than observable behaviour.
+# The retired assertions (SKOPEO_AUTHFILE precedence matrices, argv flag
+# permutations) re-encoded our own assumptions rather than observable
+# behaviour.
 #
 # Usage: bash tests/test-airgap-mirror-verify.sh
 set -u
@@ -78,8 +79,14 @@ case "$*" in
             [[ "$prev" == "--authfile" ]] && authfile="$a"
             prev="$a"
         done
-        # Flat layout: containers/image wants ca.crt directly in --cert-dir.
-        [[ -f "${certdir}/ca.crt" ]] && layout=FLAT || layout=WRONG
+        # Flat layout: containers/image wants ca.crt directly in --cert-dir,
+        # and it must be the CONFIGURED CA — presence alone would pass with
+        # the wrong certificate copied in.
+        if [[ -f "${certdir}/ca.crt" ]] && cmp -s "${certdir}/ca.crt" "${TEST_CA:?}"; then
+            layout=FLAT
+        else
+            layout=WRONG
+        fi
         printf 'certdir=%s layout=%s\n' "$certdir" "$layout" >> "${SKOPEO_CERTDIR:?}"
         printf 'path=%s\nmode=%s\ncontent=%s\n' "$authfile" \
             "$(stat -c %a "$authfile" 2>/dev/null || echo MISSING)" \
@@ -92,6 +99,7 @@ chmod +x "${WORK}/bin/oc" "${WORK}/bin/skopeo"
 export PATH="${WORK}/bin:$PATH"
 export SKOPEO_ARGS="${WORK}/skopeo-args"
 export SKOPEO_CERTDIR="${WORK}/certdir"
+export TEST_CA="${WORK}/ca.pem"   # compared against the copied ca.crt at call time
 export SKOPEO_AUTHFILE_INSPECT="${WORK}/authfile-inspect"
 
 # ── Run the step ─────────────────────────────────────────────────────
@@ -169,7 +177,7 @@ else
     certdir_line="$(cat "$SKOPEO_CERTDIR" 2>/dev/null || true)"
     certdir_path="$(sed 's/^certdir=//; s/ layout=.*//' <<< "$certdir_line")"
     if [[ "$certdir_line" == *"layout=FLAT" && -n "$certdir_path" && ! -e "$certdir_path" ]]; then
-        ok "happy path: flat --cert-dir (ca.crt directly in it), removed after the step"
+        ok "happy path: flat --cert-dir holding the configured CA (cmp -s), removed after the step"
     else
         bad "cert dir wrong or leaked: ${certdir_line:-no verification call}"
     fi
