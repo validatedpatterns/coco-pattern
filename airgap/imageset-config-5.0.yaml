@@ -40,7 +40,8 @@ mirror:
             - name: stable
               minVersion: "1.2.1"
               maxVersion: "1.2.1"
-        # GitOps — defaultChannel override required (catalog default "latest" fails oc-mirror filtering)
+        # GitOps — channel must match main.gitops.channel in values-global.yaml;
+        # defaultChannel override required (catalog default "latest" fails oc-mirror filtering)
         - name: openshift-gitops-operator
           defaultChannel: gitops-1.22
           channels:
