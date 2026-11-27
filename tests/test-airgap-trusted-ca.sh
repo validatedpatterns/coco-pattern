@@ -8,14 +8,16 @@
 #   1. a different, non-empty trust anchor is never clobbered
 #   2. a concurrent anchor change at patch time is never overwritten
 #   3. fresh anchor: patched exactly once, reconciliation verified
+#   3b. one proxy snapshot per decision (call counter: no re-opened
+#       clobber window between the anchor read and the patch)
 #   4. already anchored: idempotent no-op
+#   5. fingerprint completeness: a partially injected bundle never passes
 # The wider matrix this suite used to carry (empty/garbage bundles, read
-# failures, TOCTOU call counting, poll-loop timing, fingerprint
-# completeness) was retired in review: those are straight-line guards,
-# and asserting them through a hand-written oc mock mostly re-encoded
-# our own assumptions about oc's output shapes — false confidence
-# rather than coverage. The mock kept here is the minimum needed to
-# drive the four stateful scenarios above.
+# failures, poll-loop timing) was retired in review: those are
+# straight-line guards, and asserting them through a hand-written oc mock
+# mostly re-encoded our own assumptions about oc's output shapes — false
+# confidence rather than coverage. The mock kept here is the minimum
+# needed to drive the stateful scenarios above.
 #
 # Usage: bash tests/test-airgap-trusted-ca.sh
 set -u
@@ -162,6 +164,14 @@ PY
 HELPERS
 
 patch_calls() { awk '/patch proxy cluster/{n++} END{print n+0}' "$OC_CALLS" 2>/dev/null; }
+# One snapshot per decision: the anchor and the patch precondition's
+# resourceVersion must come from ONE proxy read (two reads re-open the
+# clobber window the json-patch test op exists to close).
+proxy_gets() { awk '/^get proxy cluster -o json$/{n++} END{print n+0}' "$OC_CALLS" 2>/dev/null; }
+proxy_gets_before_patch() {
+    awk '/^patch proxy cluster/{exit} /^get proxy cluster -o json$/{n++} END{print n+0}' \
+        "$OC_CALLS" 2>/dev/null
+}
 reset_state() {
     : > "${WORK}/state/trustedca"
     echo "100" > "${WORK}/state/rv"
@@ -212,6 +222,22 @@ else
     sed 's/^/    /' "$OUT" | head -8; sed 's/^/    /' "$ERR" | head -4
 fi
 
+# ── 3b. One snapshot per decision → 1 GET before the patch, 1 readback ─
+# A second proxy GET before the patch is exactly the TOCTOU window the
+# json-patch resourceVersion test exists to close; the counter keeps a
+# future refactor from silently re-opening it.
+# (`rc` from case 3 is reused: same state, the call log is what matters.)
+snapshot_rv="$(grep '^patch proxy cluster' "$OC_CALLS" \
+    | grep -o '"path":"/metadata/resourceVersion","value":"[^"]*"' \
+    | sed 's/.*"value":"//; s/"$//' | head -1)"
+if [[ "$RC" == "0" && "$(proxy_gets_before_patch)" == "1" ]] \
+    && [[ "$snapshot_rv" == "100" ]] && [[ "$(proxy_gets)" == "2" ]]; then
+    ok "single proxy snapshot: 1 GET before the patch, rv from it, 1 readback after"
+else
+    bad "snapshot reads: before_patch=$(proxy_gets_before_patch) total=$(proxy_gets) rv='${snapshot_rv}' RC=$RC"
+    sed 's/^/    /' "$OC_CALLS" | head -8
+fi
+
 # ── 4. Already anchored + reconciled → exit 0, no patch ─────────────
 reset_state
 printf 'user-ca-bundle' > "${WORK}/state/trustedca"
@@ -223,6 +249,21 @@ if [[ "$RC" == "0" && "$(patch_calls)" == "0" ]] \
 else
     bad "already anchored: RC=$RC patches=$(patch_calls)"
     sed 's/^/    /' "$OUT" | head -6
+fi
+
+# ── 5. Fingerprint completeness: 1 of 2 user CAs must NOT pass ───────
+# A "first cert matches" degradation would print "reconciled", exit 0 and
+# leave the repo-server failing with "unknown authority" for the cert that
+# never landed. Every fingerprint in the user bundle has to be present.
+reset_state
+CA_RECONCILE_TIMEOUT_SECONDS=2 CA_RECONCILE_POLL_SECONDS=1
+printf '%s' "$(cat "${WORK}/ca-1.pem")" > "${WORK}/state/injected"
+run_func
+if [[ "$RC" == "1" ]] && grep -q "picked up the user CA within" "$ERR"; then
+    ok "fingerprint completeness: half-injected bundle (1 of 2 CAs) never reconciles"
+else
+    bad "fingerprint completeness: RC=$RC (a partial bundle must not reconcile)"
+    sed 's/^/    /' "$OUT" | head -6; sed 's/^/    /' "$ERR" | head -4
 fi
 
 echo
