@@ -1,4 +1,4 @@
 # Connected (default) overlay — inert placeholder selected when global.airgap
-# is false. The disconnected deltas live in values-baremetal-airgap.yaml,
-# selected when global.airgap is true (see the sharedValueFiles entry in
-# values-baremetal.yaml).
+# is false. The disconnected deltas live in the version-pinned
+# values-baremetal-airgap-<minor-dashed>.yaml overlays (see the
+# sharedValueFiles entry in values-baremetal.yaml).

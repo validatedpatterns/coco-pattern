@@ -12,18 +12,19 @@ global:
 clusterGroup:
   name: trusted-hub
   isHubCluster: true
+  # Map form (deep-mergeable — see values-baremetal.yaml).
   namespaces:
-  - open-cluster-management
-  - vault
-  - external-secrets-operator:
+    open-cluster-management:
+    vault:
+    external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
-  - external-secrets
-  - trustee-operator-system
-  - cert-manager-operator
-  - openshift-sandboxed-containers-operator
-  - cert-manager
-  - kyverno
+    external-secrets:
+    trustee-operator-system:
+    cert-manager-operator:
+    openshift-sandboxed-containers-operator:
+    cert-manager:
+    kyverno:
   subscriptions:
     # ACM is kept anticipating
     acm:
@@ -115,7 +116,9 @@ clusterGroup:
       # values-baremetal.yaml.
       overrides:
         - name: acm.mce_operator.source
-          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v4-22{{ else }}redhat-operators{{ end }}'
+          # Catalog tag derives from global.clusterVersion (4.22 → v4-22,
+          # 5.0 → v5-0) — matches the oc-mirror CatalogSource naming.
+          value: '{{ if $.Values.global.airgap }}cs-redhat-operator-index-v{{ $.Values.global.clusterVersion | replace "." "-" }}{{ else }}redhat-operators{{ end }}'
 
     vault:
       name: vault

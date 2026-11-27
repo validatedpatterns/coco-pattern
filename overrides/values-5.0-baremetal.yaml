@@ -1,0 +1,28 @@
+# OCP 5.0 version-specific overlay for the baremetal AND baremetal-hub
+# cluster groups — loaded via sharedValueFiles when global.clusterVersion
+# is "5.0" (the chain entry in values-baremetal*.yaml). Other groups and
+# 4.x versions keep loading the shared overrides/values-<ver>.yaml.
+#
+# namespaces are a map now, so only the divergent DCAP entry is pinned
+# here (Helm deep-merges maps — no full-list restatement, no drift).
+#
+# SCOPE: reaches the ROOT clustergroup render and every child application
+# listing this file; does NOT reach the bootstrap operators.
+
+clusterGroup:
+  namespaces:
+    intel-dcap-operator-system:
+      operatorGroup: true
+      # v0.27.0 (the 5.0 catalog bundle) supports OwnNamespace only
+      targetNamespaces:
+      - intel-dcap-operator-system
+
+  subscriptions:
+    # Channel split from stable-4.22 in the 5.0 catalog
+    lvm-operator:
+      channel: stable-5.0
+    # The alpha channel is removed from the 5.0 catalog; stable is its
+    # only channel (CSV v0.27.0). 4.22 keeps alpha — no in-place upgrade
+    # from the alpha bundle (see the runbook's DCAP migration notes).
+    intel-tdx-dcap:
+      channel: stable

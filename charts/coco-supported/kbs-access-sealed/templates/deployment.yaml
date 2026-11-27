@@ -25,6 +25,11 @@ spec:
       containers:
       - name: httpd
         image: {{ include "kbs-access-sealed.image" (dict "root" $ "image" .Values.image) }}
+        {{- /* OCP 5.0 CRI-O guest-pull defect (issue #176): force the pull on
+              5.0 kata-cc clusters only; everything else keeps the default. */}}
+        {{- if and (eq .Values.global.clusterVersion "5.0") (hasPrefix "kata-cc" (default "" .Values.global.coco.runtimeClassName)) }}
+        imagePullPolicy: Always
+        {{- end }}
         ports:
         - containerPort: 8080
           protocol: TCP

@@ -5,10 +5,63 @@ OpenShift cluster using a **Quay registry** as the sole mirror target.
 
 For a **plain Docker registry** (registry:2) alternative, see
 [Appendix A](#appendix-a-plain-docker-registry-alternative).
+Lab-specific environment notes are confined to
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 Static verification of the values chain in both connectivity modes (the
 connected default and the airgap overlay) is `make render-gate` — it runs
-in CI on every push and pull request.
+in CI on every push and pull request, for OCP 4.22 and 5.0.
+
+## Qualified scope
+
+**OCP 4.22** (connected + disconnected) is fully qualified on bare-metal
+Intel TDX: 15/15 applications Synced+Healthy, CoCo TDX attestation
+Affirming.
+
+**OCP 5.0** is qualified on a narrower scope — **bare-metal Intel TDX,
+OCP 5.0.2, RHCOS 9 payload** (`osImageStream: rhel-9`), both
+connectivity modes.
+
+What was live-qualified, and what was not:
+
+- The live runs are recorded as committed cluster state on the deploy
+  branches `deploy/ocp5-airgap-20261125` (disconnected) and
+  `deploy/ocp5-connected-20261125` (connected). Those branches merge the
+  feature content up to `34a5e85` and `00fc5a7` respectively.
+- No feature-branch commit after those was live-run — including the
+  pre-refinement head `f4b9e5f` (backup ref
+  `backup/pr174-pre-refinement-20261126-1247`) and the current head of
+  `feat/ocp5-compatibility`. Those are verified by `make render-gate` at
+  `CLUSTER_VERSION=4.22` and `5.0` plus the mocked `oc`/`skopeo` suites
+  in `tests/` only. The 4.22 connected render differs from `main` only in
+  document order and the embedded helm-values ConfigMap (the namespaces
+  moved to map form, maintainer review on PR #174), plus — in airgap mode
+  — the renamed `valueFiles` entry
+  (`values-baremetal-airgap-4-22.yaml`); the rendered Namespace and
+  OperatorGroup object sets are semantically identical, so the 4.22 path
+  carries no new risk; the 5.0 path of the current head is
+  render-verified, **not** hardware-qualified.
+- A 5.0 deploy of the current head should therefore be treated as
+  pending a live run: the code paths it exercises (trust-anchor write,
+  mirror verification, 5.0 overlays) are covered by the gate and the
+  mocks, not by a cluster.
+
+Two hard requirements:
+
+- The node OS stream must match the payload the mirror carries: the
+  qualified 5.0.2 deploy runs the **RHCOS 9** payload; the RHEL 10
+  payload is unqualified (see the payload stream pin under
+  Prerequisites and B-1).
+- The mirror and the pattern values must agree on the minor:
+  `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml` (not the 4.22
+  default) with `global.clusterVersion: "5.0"`.
+
+**Unverified on 5.0:** the RHEL 10 payload (`osImageStream: rhel-10`),
+AMD SEV-SNP, GPU profiles, and every other topology (Azure peer-pods,
+hub/spoke, HCP). Setting `global.clusterVersion: "5.0"` alone is
+therefore NOT sufficient for a qualified 5.0 deploy — the imageset,
+the payload stream and (for pre-DCAP-v0.27.0 clusters) the Intel DCAP
+migration notes below all apply.
 
 ## Architecture
 
@@ -49,11 +102,15 @@ via a local Git HTTP server.
 
 Populate the mirror from a connected host (the imageset defaults to
 `airgap/imageset-config-4.22.yaml` — no `IMAGESET_CONFIG` override is
-needed for a 4.22 mirror):
+needed for a 4.22 mirror; a 5.0 mirror must point at the 5.0 imageset):
 
 ```bash
-make airgap-mirror MIRROR_REGISTRY=<mirror-root-including-org>
-# e.g. make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror
+# 4.22 mirror
+make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror
+
+# 5.0 mirror (version-specific imageset — REQUIRED on 5.0)
+make airgap-mirror MIRROR_REGISTRY=quay.example.com:443/mirror \
+     IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml
 ```
 
 The Quay mirror must contain all images the pattern resolves. Verify with
@@ -73,6 +130,25 @@ robots). Key content:
   (the kyverno chart itself is vendored in-repo at `charts/vendor/kyverno`;
   no kyverno OCI chart artifact is mirrored)
 - hashicorp/vault (the version the chart resolves, e.g. 2.1.2-ubi)
+
+**OCP 5.0 platform channel:** 5.0.2 is published only in `candidate-5.0`
+(`stable-5.0`/`fast-5.0` graphs are at 5.0.1), so
+`imageset-config-5.0.yaml` pins the platform to `candidate-5.0` with
+min=max=5.0.2. Re-point the channel to `stable-5.0` once 5.0.2 is
+promoted. The 4.22-stream oc-mirror binary resolves 5.0 platform pins
+without issue (verified by dry-run).
+
+**Intel DCAP channel migration (moving an existing cluster to 5.0 only):**
+the version overlay pins the DCAP subscription per minor — 4.22 keeps the
+`alpha` channel (`intel-tdx-dcap-operator` v0.1.0, AllNamespaces
+OperatorGroup, matching `imageset-config-4.22.yaml`, which mirrors `alpha`
+only); 5.0 pins `stable` (v0.27.0, OwnNamespace-only — the only channel in
+the 5.0 catalog, matching `imageset-config-5.0.yaml`). A fresh 4.22
+disconnected install therefore works unchanged, and 4.22 installs are never
+migrated by this pattern. When you MOVE a cluster to 5.0, Intel does not
+support an in-place upgrade from v0.1.0 to v0.27.0: on the 4.22 install,
+delete the old subscription, OperatorGroup, CSV and CRs before redeploying
+with `global.clusterVersion: "5.0"`.
 
 ### Imageset Pin Check (K16)
 
@@ -121,6 +197,29 @@ printf '%s' "<api-key>" > ~/.coco-pattern/intel-pcs-api-key
 
 ```
 
+**Who consumes those credentials.** Two different mechanisms, exported in
+the same shell:
+
+- `oc-mirror` (`make airgap-mirror`) and `oc image mirror` authenticate
+  from their **own registry auth file** — `--authfile`, defaulting to
+  `${XDG_RUNTIME_DIR}/containers/auth.json` and then
+  `~/.docker/config.json`. They do **not** read `MIRROR_USER`/`MIRROR_PASS`,
+  so the robot account must be logged in there for the mirroring steps.
+- `scripts/airgap-post-install.sh` (C-1) verifies that
+  `pattern-install` exists in the mirror with `skopeo list-tags`. When
+  both `MIRROR_USER` and `MIRROR_PASS` are set it writes a temporary
+  **0600** authfile containing
+  `{"auths":{"<mirror-host:port>":{"auth":"<base64 user:pass>"}}}`,
+  passes it as `--authfile` and deletes it afterwards (the password never
+  reaches a command line). When they are unset it falls back to
+  `SKOPEO_AUTHFILE`, then to `~/pull-secret.json`.
+
+A stock pull secret normally holds the Red Hat/Vendor pull credentials,
+not the private Quay robot account, so leaving `MIRROR_USER`/`MIRROR_PASS`
+unset on a private mirror makes the verification fail with an auth error
+that names the source it tried. Either export the pair (as above) or
+`export SKOPEO_AUTHFILE=<authfile containing the robot account>`.
+
 ### Values-Secret (Convention Location)
 
 The values-secret file **must** be at `~/values-secret-<pattern>.yaml`.
@@ -150,24 +249,39 @@ scripts/enable-airgap-secrets.sh
 The committed tree is a working **connected** install; every disconnected
 delta is a **config-only change on the deploy branch**. The disconnected
 deploy branch used in validation differs from the connected one by exactly
-these eight values:
+these values:
 
 ```yaml
 global:
   airgap: true
   mirrorRegistry: <mirror-root-including-org>          # e.g. quay.example.com:443/mirror
+  clusterVersion: "<minor>"                            # e.g. "5.0" — selects the version overlay
 main:
   clusterGroupName: baremetal
   git:
     repoURL: http://<git-host>:8080/coco-pattern.git   # served by scripts/git-http-server.py
     revision: <deploy-branch>
   patternsOperator:
-    source: cs-community-operator-index-v4-22
+    source: cs-community-operator-index-v<minor-dashed>   # 4.22 → v4-22, 5.0 → v5-0
   gitops:
-    operatorSource: cs-redhat-operator-index-v4-22
+    operatorSource: cs-redhat-operator-index-v<minor-dashed>
   multiSourceConfig:
     helmRepoUrl: <mirror-root-including-org>/validatedpatterns
 ```
+
+**OCP 5.0 — payload stream pin (required):** the qualified 5.0 deploy
+runs the **RHCOS 9** payload. Your install tooling must select that
+stream when it generates the install configuration (B-1). Left unset,
+the OCP 5.0 installer defaults to RHEL 10 — an unqualified payload (the
+CoCo/kata/edk2 artifacts differ per stream; see the qualified-scope
+section). 4.22 needs no pin (RHCOS 9 is its only stream).
+
+The mirrored catalog names are version-derived (see the sharedValueFiles
+tpl in `values-baremetal.yaml`): the airgap overlay is
+`overrides/values-baremetal-airgap-<minor-dashed>.yaml` for every minor
+(`4.22` → `values-baremetal-airgap-4-22.yaml`, `5.0` →
+`values-baremetal-airgap-5-0.yaml`). A new minor needs its overlay file and
+its `airgap/imageset-config-<minor>.yaml`.
 
 - `global.mirrorRegistry` must equal `$MIRROR_REGISTRY` (org path included).
 
@@ -224,32 +338,77 @@ The pattern source is served via a local Git HTTP server:
 
 ### B-1: Generate the ISO
 
+Generate the agent-based installer ISO with your own tooling. Whatever
+produces the install configuration, it must:
+
+- pin the **RHCOS 9** OS image stream on OCP 5.0 — the payload stream
+  pin above; this needs installer tooling that supports OS image stream
+  selection (OCP 5.0-era). 4.22 needs no selection (RHCOS 9 is its only
+  stream).
+- embed the oc-mirror `working-dir/cluster-resources`
+  (IDMS/ITMS/CatalogSources) in the install configuration, so the cluster
+  is born pulling from the mirror;
+- include the mirror CA chain as the additional trust bundle
+  (`~/combined-ca-bundle.pem`).
+
+Those requirements land in two files that must already exist in the
+`--dir` directory before `create image` runs — `install-config.yaml` and
+`agent-config.yaml` (agent-based installs have no interactive prompt):
+`additionalTrustBundle` takes the CA chain, `imageContentSources` takes
+the oc-mirror `cluster-resources` mirrors, and the OS image stream pin is
+the 5.0 platform setting in `install-config.yaml`.
+
 ```bash
-labctl generate \
-  --node <node-name> \
-  --xlsx <lab-xlsx> \
-  --ocp-version <version> \
-  --output-dir <output-dir> \
-  --mirror-resources ~/oc-mirror-workspace/working-dir/cluster-resources \
-  --additional-trust-bundle ~/combined-ca-bundle.pem \
-  --http-serve-path ~/public_html
+openshift-install agent create image --dir <install-dir>
 
 ```
+
+`<install-dir>` is the same directory B-2 and B-3 use (`auth/kubeconfig`
+lands there).
+
+One lab's reference invocation (its own tooling, not part of the
+pattern) is recorded in
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 ### B-2: Boot and Install
 
 ```bash
-# Mount the ISO via iDRAC/virtual media, one-time boot
+# Mount the ISO via your BMC's virtual media, one-time boot
 # Wait for install (~35 min):
 openshift-install agent wait-for install-complete \
-  --dir <output-dir>/<version>_build
+  --dir <install-dir>
 
 ```
+
+**Reachability requirement (OCP 5.0, disconnected): the cluster must be
+able to reach the mirror during install.** On 5.0 the Machine Config
+Operator's `OSImageStream` discovery pulls from the registry while the
+cluster is still bootstrapping — before `install-complete`. If
+pod-network access to the mirror is missing during bootstrap, the
+install stalls and never recovers: the pattern's post-install steps
+(C-1) run only after `install-complete` and cannot rescue a bootstrap
+that is already stuck — there is no post-hoc remedy for an install that
+never completes.
+
+Symptoms (the install will not recover on its own):
+
+- `oc get clusteroperators machine-config` → `Degraded=True`
+- MCO logs report `OSImageStream` inspection timeouts against the
+  registry
+- the machine-config daemon stays stuck in the bootstrap phase and
+  `openshift-install agent wait-for install-complete` never returns
+
+If you see these, the install is already lost: destroy it, provide
+pod→mirror reachability during bootstrap (a proxy, a mirror routed into
+the pod network — whatever your platform offers), and reinstall. How the
+qualification lab satisfies this in its faked airgap (host routing) is
+recorded in
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 ### B-3: Verify
 
 ```bash
-export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
+export KUBECONFIG=<install-dir>/auth/kubeconfig
 oc get clusterversion       # version, Available=True
 oc get clusteroperators     # all Available
 oc get nodes                # Ready
@@ -266,12 +425,20 @@ oc get nodes                # Ready
 cd ~/coco-pattern
 
 export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
-export GIT_SERVER=http://<git-host>:8080
-export ENABLE_ROUTINGVIAHOST=true               # required for pod→off-cluster egress
 
 scripts/airgap-post-install.sh
 
 ```
+
+The bootstrap contains only what any disconnected deployment needs. A
+site that fakes its airgap at the pod boundary (off-cluster egress via
+the node host network, OVN `routingViaHost`) or wants a fixed
+multi-repo checkout served over the git server can run
+`scripts/airgap-post-install-lab.sh` instead — a thin lab wrapper that
+applies those two environment specifics first and then execs the
+generic script (see
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern)).
+A genuinely airgapped cluster does not need it.
 
 This applies:
 
@@ -280,14 +447,13 @@ This applies:
 - Repoints any default-catalog subscriptions to the mirrored catalogs
 - Configures the Git HTTP server
 - Creates the patterns-operator-config ConfigMap
-- Enables OVN routingViaHost (verified after applying)
 
 Post-deploy safety net: `make airgap-repoint-subs` re-runs the
 default-catalog subscription repoint standalone — safe at any time (e.g.
 after MCH deploys its runtime subscriptions); ArgoCD-owned subscriptions
 are skipped via the tracking-id annotation.
 
-**Verify**: catalog pods Running, routingViaHost=true.
+**Verify**: catalog pods Running.
 
 ### C-2: Deploy the Pattern
 
@@ -327,7 +493,7 @@ name of the remote that resolves to the HTTP Git server — the same URL used
 in `main.git.repoURL` — so the CR is born correct:
 
 ```bash
-# Remote names vary per clone: `origin` is the HTTP server on the lab deploy
+# Remote names vary per clone: `origin` is the HTTP server on the deploy
 # host, while `github` tracks upstream. Pick the one whose URL is the HTTP
 # Git server, then export its NAME (not its URL).
 git remote -v
@@ -377,8 +543,6 @@ oc get pattern "$PATTERN_NAME" -n "$PATTERN_NS" \
 
 ### C-3: Point the cluster proxy at the mirror CA, then verify it
 
-Two steps, both required on OCP 4.22, then verification.
-
 **Step 1 — make the install-time bundle the cluster trust anchor.** The
 install-time `--additional-trust-bundle` (B-1) writes the mirror CA into
 `openshift-config/user-ca-bundle`, but that alone does **not** make it the
@@ -392,12 +556,36 @@ repo-server's first chart fetch fails:
 helm registry login quay.example.com:443 … x509: certificate signed by unknown authority
 ```
 
+This is **step 7 of `scripts/airgap-post-install.sh`**
+(`configure_cluster_trusted_ca`, airgap-gated and idempotent — it
+validates the bundle with openssl, preserves any different existing trust
+anchor, writes conditionally on the resourceVersion, and verifies the
+injection reconciled). Because the bootstrap runs before the pattern
+deploys, the injected ConfigMaps are born with the mirror CA already in
+them — the post-deploy repo-server restart below is only needed when the
+patch is applied *after* a pattern deploy (e.g. recovery on an existing
+cluster; re-running the full script is the preferred way — every step is
+idempotent):
+
+If you must patch by hand (a full script re-run is not wanted), apply the
+SAME preservation logic — never an unconditional merge patch, which
+silently drops a different anchor the cluster already trusts:
+
 ```bash
+# 1) Read the CURRENT anchor — abort if it is set to anything other than
+#    user-ca-bundle or empty:
+oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}{"\n"}'
+#    "" or "user-ca-bundle" → safe to continue; anything else → merge the
+#    mirror CA into THAT bundle instead, do not repoint.
+
+# 2) Only then patch (still check the readout afterwards):
 oc patch proxy cluster --type merge \
   -p '{"spec":{"trustedCA":{"name":"user-ca-bundle"}}}'
+oc get proxy cluster -o jsonpath='{.spec.trustedCA.name}{"\n"}'   # → user-ca-bundle
 ```
 
-**Step 2 — roll the repo-server** so the `fetch-ca` init container
+**Step 2 — roll the repo-server** (recovery path only, when step 1 was
+applied after the pattern deploy) so the `fetch-ca` init container
 re-concatenates the now-injected bundle (with the kube root CA) into the
 CA bundle the repo-server uses:
 
@@ -408,12 +596,10 @@ oc rollout status  deployment/vp-gitops-repo-server -n vp-gitops --timeout=5m
 
 Both steps are safe to repeat: the `proxy` patch is a no-op when the field
 already holds that value, while the `rollout restart` deliberately triggers
-another rollout each time (that is what makes the bundle get picked up). This is a real gap in the bootstrap, not a
-one-off lab quirk: the patch belongs in `scripts/airgap-post-install.sh`,
-tracked upstream (see the PR's follow-up issues). The earlier
-`argocd-tls-certs-cm` patch was a different and genuinely useless thing —
-it always ran before the `vp-gitops` namespace existed — so it stays
-deleted; it is not a substitute for the `proxy/cluster` patch above.
+another rollout each time (that is what makes the bundle get picked up).
+The patch is scripted as step 7 of `scripts/airgap-post-install.sh`
+(fail-closed: it preserves a different existing trust anchor and verifies
+the bundle was reconciled before continuing).
 
 Verify once the pattern is deployed and `vp-gitops` exists:
 
@@ -598,3 +784,53 @@ export MIRROR_REGISTRY=<host>:8443
 The Docker registry stores all manifest types (including OCI image indices
 and hybrid manifests that Quay may reject). However, it lacks Quay's
 org-based isolation, robot accounts, and API — use Quay where available.
+
+## Appendix B: Lab-Specific Notes (not part of the pattern)
+
+The disconnected qualification runs behind this runbook were produced in
+a lab that **fakes its airgap**: the "disconnected" cluster has no
+direct internet route, but off-cluster pod traffic leaves via the node
+host network (OVN `routingViaHost`). That is one lab's environment
+choice, not pattern functionality — everything in this appendix applies
+to that lab only, and the main body of this runbook is the generic
+procedure.
+
+### Lab tooling: `labctl` (apac-lab-scripts)
+
+The lab generates its install configuration with `labctl` from
+`apac-lab-scripts` — internal lab tooling, not part of the pattern and
+not needed to follow this runbook. Its B-1 equivalent:
+
+```bash
+labctl generate \
+  --node <node-name> \
+  --xlsx <lab-xlsx> \
+  --ocp-version <version> \
+  --os-image-stream rhel-9 \
+  --output-dir <output-dir> \
+  --mirror-resources ~/oc-mirror-workspace/working-dir/cluster-resources \
+  --additional-trust-bundle ~/combined-ca-bundle.pem \
+  --http-serve-path ~/public_html
+
+```
+
+`--os-image-stream rhel-9` selects the qualified RHCOS 9 payload stream
+(B-1). The labctl output directory is `<output-dir>/<version>_build`.
+
+### Bootstrap egress in the faked airgap
+
+Because that lab enforces disconnection at the pod boundary, the B-2
+reachability requirement means OVN `routingViaHost` must be on **before**
+`install-complete` — the install never finishes without it (verified on
+a strict install-first ordering: `wait-for install-complete` fails with
+machine-config Degraded while the MCO times out inspecting the
+image-stream registry). The qualified run therefore applied the
+`routingViaHost` change early, before the full post-install bootstrap.
+The pattern as shipped does not automate the pre-install form:
+`scripts/airgap-post-install-lab.sh` (the lab wrapper around C-1) applies
+it in a named "Lab step" phase before delegating to the generic
+bootstrap, and cannot rescue a stalled bootstrap either.
+
+A genuinely airgapped site does not normally hit this at all — the
+mirror is in-environment and reachable from the pod network from first
+boot, so no host routing is needed.

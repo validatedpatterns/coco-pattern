@@ -1,0 +1,25 @@
+# Airgap / disconnected overlay for OCP 5.0 — loaded only when
+# global.airgap is true AND global.clusterVersion is "5.0" (the
+# sharedValueFiles entry in values-baremetal.yaml resolves this file);
+# 4.22 loads values-baremetal-airgap-4-22.yaml.
+
+# SCOPE: reaches the ROOT clustergroup render (the patterns-operator
+# resolves sharedValueFiles when building the root Application), so the
+# subscriptions and app overrides below are all in scope. It does NOT
+# reach the bootstrap operators — set those in values-global.yaml:
+#   main.gitops.operatorSource / main.patternsOperator.source
+
+# LIST WARNING: Helm replaces lists when merging — this overlay sets ONLY
+# scalars; mode-dependent list entries are tpl-conditionals in the base file.
+global:
+  # Mirrored catalog for the Argo-rendered OLM subscriptions; the name
+  # tracks airgap/imageset-config-5.0.yaml. Step 3e fails fast if missing.
+  catalogSource: cs-redhat-operator-index-v5-0
+  catalogSourceNamespace: openshift-marketplace
+# Connected default: the certified-operators catalog, disabled in airgap.
+clusterGroup:
+  subscriptions:
+    intel-device-plugins:
+      source: cs-certified-operator-index-v5-0
+    intel-tdx-dcap:
+      source: cs-certified-operator-index-v5-0

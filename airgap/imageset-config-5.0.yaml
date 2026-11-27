@@ -1,0 +1,156 @@
+---
+# ImageSetConfiguration for CoCo Validated Pattern airgap deployment
+# Target: a single mirror registry (org-prefixed target for Quay, e.g.
+# quay.example:443/mirror — MIRROR_REGISTRY includes the org path)
+# OCP: 5.0.2
+# Topology: baremetal (full operator set from values-baremetal.yaml)
+
+# Naming convention: imageset-config-<minor>.yaml (5.0 covers all 5.0.x patches)
+# Patch target: 5.0.2 — update minVersion/maxVersion to change patch target
+
+# Usage:
+#   oc-mirror -c airgap/imageset-config-5.0.yaml \
+#     --workspace file://$HOME/oc-mirror-workspace \
+#     docker://<mirror-root-including-org> --v2
+
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+  # OCP release — single version pin; update both min/max to change patch
+  # 5.0.2 is candidate-5.0 only; re-point to stable-5.0 once promoted
+  platform:
+    channels:
+      - name: candidate-5.0
+        minVersion: "5.0.2"
+        maxVersion: "5.0.2"
+        type: ocp
+
+  # Red Hat operators (from values-baremetal.yaml subscriptions)
+  operators:
+    - catalog: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      packages:
+        # CoCo core
+        - name: sandboxed-containers-operator
+          channels:
+            - name: stable
+              minVersion: "1.13.1"
+              maxVersion: "1.13.1"
+        - name: trustee-operator
+          channels:
+            - name: stable
+              minVersion: "1.2.1"
+              maxVersion: "1.2.1"
+        # GitOps — channel must match main.gitops.channel in values-global.yaml;
+        # defaultChannel override required (catalog default "latest" fails oc-mirror filtering)
+        - name: openshift-gitops-operator
+          defaultChannel: gitops-1.22
+          channels:
+            - name: gitops-1.22
+        # External Secrets
+        - name: openshift-external-secrets-operator
+          channels:
+            - name: stable-v1
+        # Cert Manager
+        - name: openshift-cert-manager-operator
+          channels:
+            - name: stable-v1
+        # ACM — use default channel (filtering to non-default fails oc-mirror)
+        - name: advanced-cluster-management
+        # MCE — required ACM dependency, mirrored explicitly (stable-5.0 is the catalog default)
+        - name: multicluster-engine
+          channels:
+            - name: stable-5.0
+        # Storage (LVM) — channel split from stable-4.22 in the 5.0 catalog
+        - name: lvms-operator
+          channels:
+            - name: stable-5.0
+        # CNV (KubeVirt)
+        - name: kubevirt-hyperconverged
+          channels:
+            - name: stable
+        # Node Feature Discovery
+        - name: nfd
+          channels:
+            - name: stable
+
+  # Certified operators
+    - catalog: registry.redhat.io/redhat/certified-operator-index:v5.0
+      packages:
+        # GPU operator DISABLED — matches values-baremetal.yaml (re-enable both together)
+
+        # Intel device plugins (TDX/SGX) — certified catalog; needs registries.d/no-sigstore-certified.yaml
+        - name: intel-device-plugins-operator
+          channels:
+            - name: stable
+        # Intel TDX DCAP — alpha channel removed in 5.0; stable only (CSV v0.27.0, OwnNamespace)
+        - name: intel-tdx-dcap-operator
+          channels:
+            - name: stable
+
+  # Community operators
+    - catalog: registry.redhat.io/redhat/community-operator-index:v5.0
+      packages:
+        # v0.0.80+ — Docker manifest list (older OCI-index tags are Quay-rejected)
+        - name: patterns-operator
+          channels:
+            - name: fast
+
+  # Additional container images (application workloads)
+  additionalImages:
+    # Workload images — digest-pinned per charts/coco-supported/*/values.yaml
+    - name: registry.redhat.io/ubi9/httpd-24@sha256:68a91ff691092f455fea682330c499588747231c16516cd4f35aff821e6847f2
+    - name: registry.redhat.io/ubi9/ubi:latest
+    # NFD operand — digest-pinned CSV relatedImage (5.0 DaemonSet form)
+    - name: registry.redhat.io/openshift5/ose-node-feature-discovery-rhel9@sha256:f238dc852b74caca695f2ba8a36a4b16d38e116a3c00936b13e3267647fd1494
+    # Vault — certified UBI image (hashicorp-vault chart 0.1.11 deploys vault:2.1.2-ubi)
+    - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
+    # Kyverno — ghcr.io paths match the chart's reg.kyverno.io; manual ITMS redirects pulls
+    - name: ghcr.io/kyverno/kyverno:v1.17.2
+    - name: ghcr.io/kyverno/kyvernopre:v1.17.2
+    - name: ghcr.io/kyverno/background-controller:v1.17.2
+    - name: ghcr.io/kyverno/cleanup-controller:v1.17.2
+    - name: ghcr.io/kyverno/reports-controller:v1.17.2
+    - name: ghcr.io/kyverno/kyverno-cli:v1.17.2
+    # webhooksCleanup pre-delete hook — without it, kyverno app deletion hangs in airgap
+    - name: registry.k8s.io/kubectl:v1.34.3
+    # helm test hook image (cheap insurance)
+    - name: ghcr.io/kyverno/readiness-checker:v0.1.0
+
+    # --- VP Helm OCI charts ---
+    - name: quay.io/validatedpatterns/clustergroup:0.9.60
+    - name: quay.io/validatedpatterns/acm:0.1.27
+    # values pin 0.1.11 exactly
+    - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11
+    - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4
+    - name: quay.io/validatedpatterns/trustee:0.10.2
+    - name: quay.io/validatedpatterns/sandboxed-containers:0.2.1
+    - name: quay.io/validatedpatterns/sandboxed-policies:0.2.0
+
+    # --- VP framework utility images ---
+    - name: quay.io/validatedpatterns/utility-container:latest
+    - name: quay.io/validatedpatterns/imperative-container:latest
+    - name: quay.io/validatedpatterns/imperative-container:v1
+    # pattern-ui-catalog not mirrored: Quay rejects its hybrid OCI-index manifest (non-essential; retest before enabling)
+
+    # --- UBI minimal (ArgoCD repo-server init container) ---
+    - name: registry.redhat.io/ubi9/ubi-minimal:latest
+
+    # --- oc-debug support-tools ---
+    - name: registry.redhat.io/rhel9/support-tools:latest
+
+    # --- VP infrastructure images ---
+    - name: registry.redhat.io/openshift4/ose-cli:latest
+
+    # --- Intel DCAP chart images ---
+    # QGS moved to certified intel/intel-tdx-qgs in DCAP v0.27.0; digest = CSV relatedImage
+    - name: registry.connect.redhat.com/intel/intel-tdx-qgs@sha256:d86a48e3668bff87e2e5f6914b1b06b861efeb9bd145abbcce3129cfb7eb972d
+    # intel-sgx-plugin — CSV v0.37.1 relatedImage digest (operator overrides the chart pin)
+    - name: registry.connect.redhat.com/intel/intel-sgx-plugin@sha256:b9018557fbf207f625bbfc3a070d2bec5d20b855b05c5cec09e8b12c35ad7871
+
+    # --- Workload images ---
+    - name: registry.access.redhat.com/ubi9/ubi:latest
+
+    # --- CNV guest images (OPTIONAL — not mirrored) ---
+    # ~2 GB each, not consumed (enableCommonBootImageImport: false); :latest rejected for virtio-win
+
+    # Note: kubeVirtContainer: true is for RHCOS/Hosted Control Planes only — do NOT add it for baremetal TDX

@@ -10,18 +10,19 @@
 clusterGroup:
   name: baremetal-spoke
   isHubCluster: false
+  # Map form (deep-mergeable — see values-baremetal.yaml).
   namespaces:
-  - external-secrets-operator:
+    external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
-  - external-secrets
-  - openshift-sandboxed-containers-operator
-  - hello-openshift
-  - kbs-access
-  - cert-manager-operator
-  - openshift-nfd
-  - baremetal
-  - kyverno
+    external-secrets:
+    openshift-sandboxed-containers-operator:
+    hello-openshift:
+    kbs-access:
+    cert-manager-operator:
+    openshift-nfd:
+    baremetal:
+    kyverno:
 
   subscriptions:
     eso:
@@ -61,7 +62,9 @@ clusterGroup:
   - '/overrides/values-storage-{{ $.Values.global.storageProvider }}.yaml'
   - '/overrides/values-{{ $.Values.global.clusterVersion }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
-  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ else }}connected{{ end }}.yaml'
+  # Airgap overlay is version-pinned: every minor appends its dashed
+  # version (4.22 → -4-22, 5.0 → -5-0).
+  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap-{{ $.Values.global.clusterVersion | replace "." "-" }}{{ else }}connected{{ end }}.yaml'
 
   # No CRB wave knob here: the cluster-admin CRB is pre-created by the ACM policy
   # on managed spokes, and upstream reverted the -1 default for spokes after

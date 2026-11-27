@@ -5,7 +5,7 @@ global:
   singleArgoCD: true
   multiSourceRepoUrl: quay.io/validatedpatterns
   storageProvider: lvm  # Options: hpp, lvm, external
-  clusterVersion: "4.22"  # OCP minor version for operator pins. 4.22 is the tested version; the 4.19-4.21 overlays exist but are not covered by this branch's validation.
+  clusterVersion: "4.22"  # OCP minor. 4.22 is fully qualified (connected + airgap, all topologies); 5.0 is qualified on bare-metal TDX / RHCOS 9 only (bare-metal chain loads overrides/values-5.0-baremetal.yaml — see the qualified-scope section in airgap/DEPLOY-RUNBOOK.md). The 4.19-4.21 overlays exist but are not covered by this branch's validation.
   # Airgap / disconnected master switch. false (default, connected):
   # Intel DCAP zero-touch registration; trustee collateral from Intel PCS.
   # true: loads the airgap overlay (repoints subscriptions and workload
@@ -64,15 +64,17 @@ main:
     revision: main
   patternsOperator:
     # Required for airgap -- set to your mirrored catalog source name on the
-    # disconnected deploy branch (runbook; validated by step 3e).
-    # source: cs-community-operator-index-v4-22
+    # disconnected deploy branch (runbook; validated by step 3e). The tag
+    # tracks global.clusterVersion (4.22 → -v4-22, 5.0 → -v5-0).
+    # source: cs-community-operator-index-v5-0
     channel: fast
   gitops:
     # Required for airgap -- set to your mirrored catalog source name on the
-    # disconnected deploy branch (runbook; validated by step 3e).
-    # operatorSource: cs-redhat-operator-index-v4-22
+    # disconnected deploy branch (runbook; validated by step 3e). The tag
+    # tracks global.clusterVersion (4.22 → -v4-22, 5.0 → -v5-0).
+    # operatorSource: cs-redhat-operator-index-v5-0
 
-    # Keep this channel aligned with airgap/imageset-config-4.22.yaml.
+    # Keep this channel aligned with airgap/imageset-config-<minor>.yaml.
     channel: gitops-1.22
     # App-of-apps sync-wave gating. ArgoCD 1.8 dropped the Application
     # health check (argoproj/argo-cd#3781); the operator defaults it off,
