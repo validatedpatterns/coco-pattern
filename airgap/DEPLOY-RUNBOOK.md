@@ -5,6 +5,8 @@ OpenShift cluster using a **Quay registry** as the sole mirror target.
 
 For a **plain Docker registry** (registry:2) alternative, see
 [Appendix A](#appendix-a-plain-docker-registry-alternative).
+Lab-specific environment notes are confined to
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 Static verification of the values chain in both connectivity modes (the
 connected default and the airgap overlay) is `make render-gate` — it runs
@@ -41,9 +43,10 @@ What was live-qualified, and what was not:
 
 Two hard requirements:
 
-- The installer must run the RHCOS 9 payload (`--os-image-stream rhel-9`
-  at `labctl generate`, B-1 — matching the qualified 5.0.2 deploy); the
-  RHEL 10 payload is unqualified.
+- The node OS stream must match the payload the mirror carries: the
+  qualified 5.0.2 deploy runs the **RHCOS 9** payload; the RHEL 10
+  payload is unqualified (see the payload stream pin under
+  Prerequisites and B-1).
 - The mirror and the pattern values must agree on the minor:
   `IMAGESET_CONFIG=airgap/imageset-config-5.0.yaml` (not the 4.22
   default) with `global.clusterVersion: "5.0"`.
@@ -262,11 +265,11 @@ main:
 ```
 
 **OCP 5.0 — payload stream pin (required):** the qualified 5.0 deploy
-runs the **RHCOS 9** payload — pass `--os-image-stream rhel-9` at
-`labctl generate` (B-1). Left unset, the installer defaults to RHEL 10 —
-an unqualified payload (the CoCo/kata/edk2 artifacts differ per stream;
-see the qualified-scope section). 4.22 needs no pin (RHCOS 9 is its only
-stream).
+runs the **RHCOS 9** payload. Your install tooling must select that
+stream when it generates the install configuration (B-1). Left unset,
+the OCP 5.0 installer defaults to RHEL 10 — an unqualified payload (the
+CoCo/kata/edk2 artifacts differ per stream; see the qualified-scope
+section). 4.22 needs no pin (RHCOS 9 is its only stream).
 
 The mirrored catalog names are version-derived (see the sharedValueFiles
 tpl in `values-baremetal.yaml`): the airgap overlay is
@@ -331,62 +334,49 @@ The pattern source is served via a local Git HTTP server:
 
 ### B-1: Generate the ISO
 
+Generate the agent-based installer ISO with your own tooling. Whatever
+produces the install configuration, it must:
+
+- pin the **RHCOS 9** OS image stream on OCP 5.0 — the payload stream
+  pin above; this needs installer tooling that supports OS image stream
+  selection (OCP 5.0-era). 4.22 needs no selection (RHCOS 9 is its only
+  stream).
+- embed the oc-mirror `working-dir/cluster-resources`
+  (IDMS/ITMS/CatalogSources) in the install configuration, so the cluster
+  is born pulling from the mirror;
+- include the mirror CA chain as the additional trust bundle
+  (`~/combined-ca-bundle.pem`).
+
 ```bash
-labctl generate \
-  --node <node-name> \
-  --xlsx <lab-xlsx> \
-  --ocp-version <version> \
-  --os-image-stream rhel-9 \
-  --output-dir <output-dir> \
-  --mirror-resources ~/oc-mirror-workspace/working-dir/cluster-resources \
-  --additional-trust-bundle ~/combined-ca-bundle.pem \
-  --http-serve-path ~/public_html
+openshift-install agent create image --dir <output-dir>
 
 ```
 
-`--os-image-stream` is the **OCP 5.0 payload pin** — RHCOS 9 for the
-qualified configuration (see the payload stream pin note above). Omit it
-only on 4.22 (single stream).
-
-**Minimum `labctl`:** the flag ships with the companion `apac-lab-scripts`
-change on branch `feat/os-image-stream` (tip `3e1d8ac`, "feat(generate):
-pin the RHCOS image stream via --os-image-stream"); no released `labctl`
-carries it yet. An older `labctl` rejects the command outright —
-`Error: No such option: --os-image-stream` (exit 2, nothing generated) —
-so upgrade to that branch/commit before running B-1.
+One lab's reference invocation (its own tooling, not part of the
+pattern) is recorded in
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 ### B-2: Boot and Install
 
 ```bash
-# Mount the ISO via iDRAC/virtual media, one-time boot
+# Mount the ISO via your BMC's virtual media, one-time boot
 # Wait for install (~35 min):
 openshift-install agent wait-for install-complete \
-  --dir <output-dir>/<version>_build
+  --dir <install-dir>
 
 ```
 
-**Pre-install requirement (OCP 5.0, disconnected): pods must be able to
-reach the mirror during bootstrap.** On 5.0 the Machine Config Operator's
-`OSImageStream` discovery pulls from the registry while the cluster is
-still bootstrapping, i.e. **before** `install-complete`. The pattern does
-not automate that egress, and C-1 (`ENABLE_ROUTINGVIAHOST`) runs *after*
-the install — it cannot rescue a bootstrap that is already stalled, and
-nothing in this repository can: there is no post-hoc remedy for an
-install that never completes.
+**Reachability requirement (OCP 5.0, disconnected): the cluster must be
+able to reach the mirror during install.** On 5.0 the Machine Config
+Operator's `OSImageStream` discovery pulls from the registry while the
+cluster is still bootstrapping — before `install-complete`. If
+pod-network access to the mirror is missing during bootstrap, the
+install stalls and never recovers: the pattern's post-install steps
+(C-1) run only after `install-complete` and cannot rescue a bootstrap
+that is already stuck — there is no post-hoc remedy for an install that
+never completes.
 
-Choose one, before starting B-2:
-
-- **(a) Satisfy pod→mirror egress before the install**, with your own
-  platform tooling (whatever your environment uses for bootstrap-time pod
-  egress to the mirror: a proxy, a mirror host routed into the pod
-  network, or an equivalent of `routingViaHost` applied during bootstrap).
-  This is the supported path for a 5.0 disconnected install that needs it.
-- **(b) Treat such an install as unsupported by this pattern** — install
-  on a topology where bootstrap pod egress already exists, or on 4.22,
-  where the requirement does not arise. Do not start a 5.0 disconnected
-  install on a network that forbids it and expect C-1 to fix it later.
-
-Symptom you are hitting it (the install will not recover on its own):
+Symptoms (the install will not recover on its own):
 
 - `oc get clusteroperators machine-config` → `Degraded=True`
 - MCO logs report `OSImageStream` inspection timeouts against the
@@ -394,13 +384,17 @@ Symptom you are hitting it (the install will not recover on its own):
 - the machine-config daemon stays stuck in the bootstrap phase and
   `openshift-install agent wait-for install-complete` never returns
 
-If you see these, the install is already lost: destroy it, fix pod→mirror
-egress per (a), and reinstall.
+If you see these, the install is already lost: destroy it, provide
+pod→mirror reachability during bootstrap (a proxy, a mirror routed into
+the pod network — whatever your platform offers), and reinstall. How the
+qualification lab satisfies this in its faked airgap (host routing) is
+recorded in
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern).
 
 ### B-3: Verify
 
 ```bash
-export KUBECONFIG=<output-dir>/<version>_build/auth/kubeconfig
+export KUBECONFIG=<install-dir>/auth/kubeconfig
 oc get clusterversion       # version, Available=True
 oc get clusteroperators     # all Available
 oc get nodes                # Ready
@@ -418,11 +412,17 @@ cd ~/coco-pattern
 
 export MIRROR_REGISTRY=quay.example.com:443/mirror  # org path included (Quay)
 export GIT_SERVER=http://<git-host>:8080
-export ENABLE_ROUTINGVIAHOST=true               # pattern pods → off-cluster egress (post-install; bootstrap egress is B-2)
 
 scripts/airgap-post-install.sh
 
 ```
+
+Optional: `ENABLE_ROUTINGVIAHOST=true` enables OVN `routingViaHost`
+(step 8) — pod off-cluster egress via the node host network. It is
+opt-in and specific to environments that enforce disconnection at the
+pod boundary (see
+[Appendix B](#appendix-b-lab-specific-notes-not-part-of-the-pattern));
+a genuinely airgapped cluster does not need it.
 
 This applies:
 
@@ -431,14 +431,15 @@ This applies:
 - Repoints any default-catalog subscriptions to the mirrored catalogs
 - Configures the Git HTTP server
 - Creates the patterns-operator-config ConfigMap
-- Enables OVN routingViaHost (verified after applying)
+- Optionally enables OVN routingViaHost (step 8, verified after applying)
 
 Post-deploy safety net: `make airgap-repoint-subs` re-runs the
 default-catalog subscription repoint standalone — safe at any time (e.g.
 after MCH deploys its runtime subscriptions); ArgoCD-owned subscriptions
 are skipped via the tracking-id annotation.
 
-**Verify**: catalog pods Running, routingViaHost=true.
+**Verify**: catalog pods Running (and routingViaHost=true when step 8
+was enabled).
 
 ### C-2: Deploy the Pattern
 
@@ -478,7 +479,7 @@ name of the remote that resolves to the HTTP Git server — the same URL used
 in `main.git.repoURL` — so the CR is born correct:
 
 ```bash
-# Remote names vary per clone: `origin` is the HTTP server on the lab deploy
+# Remote names vary per clone: `origin` is the HTTP server on the deploy
 # host, while `github` tracks upstream. Pick the one whose URL is the HTTP
 # Git server, then export its NAME (not its URL).
 git remote -v
@@ -769,3 +770,52 @@ export MIRROR_REGISTRY=<host>:8443
 The Docker registry stores all manifest types (including OCI image indices
 and hybrid manifests that Quay may reject). However, it lacks Quay's
 org-based isolation, robot accounts, and API — use Quay where available.
+
+## Appendix B: Lab-Specific Notes (not part of the pattern)
+
+The disconnected qualification runs behind this runbook were produced in
+a lab that **fakes its airgap**: the "disconnected" cluster has no
+direct internet route, but off-cluster pod traffic leaves via the node
+host network (OVN `routingViaHost`). That is one lab's environment
+choice, not pattern functionality — everything in this appendix applies
+to that lab only, and the main body of this runbook is the generic
+procedure.
+
+### Lab tooling: `labctl` (apac-lab-scripts)
+
+The lab generates its install configuration with `labctl` from
+`apac-lab-scripts` — internal lab tooling, not part of the pattern and
+not needed to follow this runbook. Its B-1 equivalent:
+
+```bash
+labctl generate \
+  --node <node-name> \
+  --xlsx <lab-xlsx> \
+  --ocp-version <version> \
+  --os-image-stream rhel-9 \
+  --output-dir <output-dir> \
+  --mirror-resources ~/oc-mirror-workspace/working-dir/cluster-resources \
+  --additional-trust-bundle ~/combined-ca-bundle.pem \
+  --http-serve-path ~/public_html
+
+```
+
+`--os-image-stream rhel-9` selects the qualified RHCOS 9 payload stream
+(B-1). The labctl output directory is `<output-dir>/<version>_build`.
+
+### Bootstrap egress in the faked airgap
+
+Because that lab enforces disconnection at the pod boundary, the B-2
+reachability requirement means OVN `routingViaHost` must be on **before**
+`install-complete` — the install never finishes without it (verified on
+a strict install-first ordering: `wait-for install-complete` fails with
+machine-config Degraded while the MCO times out inspecting the
+image-stream registry). The qualified run therefore applied the
+`routingViaHost` change early, before the full post-install bootstrap.
+The pattern as shipped does not automate this: C-1's step 8
+(`ENABLE_ROUTINGVIAHOST=true`) is the post-install, opt-in form and
+cannot rescue a stalled bootstrap.
+
+A genuinely airgapped site does not normally hit this at all — the
+mirror is in-environment and reachable from the pod network from first
+boot, so no host routing is needed.
