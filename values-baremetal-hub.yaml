@@ -13,8 +13,8 @@ global:
 clusterGroup:
   name: baremetal-hub
   isHubCluster: true
-  # Map form: Helm deep-merges maps, so version overlays pin single
-  # entries; a bare (null) key gets a default OperatorGroup.
+  # Map form (deep-mergeable — see values-baremetal.yaml for the map-aware
+  # chart requirement); a bare (null) key gets a default OperatorGroup.
   namespaces:
     open-cluster-management:
     vault:

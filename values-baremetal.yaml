@@ -14,6 +14,8 @@ clusterGroup:
   isHubCluster: true
   # Map form: Helm deep-merges maps, so version overlays pin single
   # entries; a bare (null) key gets a default OperatorGroup.
+  # Needs the map-aware clustergroup chart (>=0.9.60, pinned by
+  # main.multiSourceConfig.clusterGroupChartVersion); older charts read the keys.
   namespaces:
     open-cluster-management:
     vault:
