@@ -204,19 +204,23 @@ airgap-mirror: ## Mirror content to disconnected registry (requires MIRROR_REGIS
 
 .PHONY: airgap-post-install
 airgap-post-install: ## Post-install bootstrap (after airgap-mirror + labctl apply-mirror-resources)
-	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" scripts/airgap-post-install.sh
+	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" OC_MIRROR_WORKSPACE="$(OC_MIRROR_WORKSPACE)" \
+		scripts/airgap-post-install.sh
 
 .PHONY: airgap-repoint-subs
 airgap-repoint-subs: ## Re-run the default-catalog subscription repoint (safety net; safe any time, e.g. after MCH deploys)
-	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" scripts/airgap-post-install.sh --repoint-subs
+	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" OC_MIRROR_WORKSPACE="$(OC_MIRROR_WORKSPACE)" \
+		scripts/airgap-post-install.sh --repoint-subs
 
 .PHONY: airgap-deploy-pattern
 airgap-deploy-pattern: ## Deploy the Pattern CR directly (disconnected; bypasses pattern.sh GitHub-URL detection)
-	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" scripts/airgap-post-install.sh --deploy-pattern
+	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" OC_MIRROR_WORKSPACE="$(OC_MIRROR_WORKSPACE)" \
+		scripts/airgap-post-install.sh --deploy-pattern
 
 .PHONY: airgap-sync-repos
 airgap-sync-repos: ## Sync Git working copies to the bare smart-HTTP repos
-	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" scripts/airgap-post-install.sh --sync-repos-only
+	@MIRROR_REGISTRY="$(MIRROR_REGISTRY)" OC_MIRROR_WORKSPACE="$(OC_MIRROR_WORKSPACE)" \
+		scripts/airgap-post-install.sh --sync-repos-only
 
 .PHONY: render-gate
 render-gate: ## Render-gate the values chain in both connectivity modes (needs helm; pulls the clustergroup chart unless CLUSTERGROUP_CHART is set)

@@ -18,7 +18,9 @@
 #                     a temporary 0600 authfile (never on argv), removed after.
 #   SKOPEO_AUTHFILE — fallback authfile for the mirror verification
 #                     (default: ~/pull-secret.json, which may lack the robot).
-#   OC_MIRROR_WORKSPACE     — oc-mirror workspace (default: ~/oc-mirror-workspace)
+#   OC_MIRROR_WORKSPACE     — oc-mirror workspace as a path or a file:// URL,
+#                             matching the Makefile's --workspace
+#                             (default: ~/oc-mirror-workspace)
 #   GIT_HTTP_PORT           — port for smart HTTP git server (default: 8080)
 #   GIT_REPO_ROOT           — path to bare git repos (default: ~/public_html/git)
 #   GIT_REPOS               — space-separated list of working copy dirs to serve
@@ -44,6 +46,9 @@ GIT_REPO_ROOT="${GIT_REPO_ROOT:-${HOME}/public_html/git}"
 GIT_HTTP_PORT="${GIT_HTTP_PORT:-8080}"
 MIRROR_REGISTRY="${MIRROR_REGISTRY:-}"
 OC_MIRROR_WORKSPACE="${OC_MIRROR_WORKSPACE:-${HOME}/oc-mirror-workspace}"
+# oc-mirror v2 takes the workspace as a URL (Makefile: file://$HOME/...);
+# this script uses it as a path. Normalise rather than building "$url/working-dir".
+OC_MIRROR_WORKSPACE="${OC_MIRROR_WORKSPACE#file://}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -83,10 +88,11 @@ airgap_overlay_path() {
     local cluster_version suffix
     cluster_version=$(read_global_key global.clusterVersion '')
     if [[ -z "$cluster_version" ]]; then
-        # No clusterVersion configured — resolve the unsuffixed name;
-        # preflight fails with a clear error when it does not exist.
-        echo "${PATTERN_DIR}/overrides/values-baremetal-airgap.yaml"
-        return
+        error "global.clusterVersion is empty in values-global.yaml — cannot"
+        error "resolve the version-pinned airgap overlay"
+        error "(overrides/values-baremetal-airgap-<minor-with-dashes>.yaml)."
+        error "Set global.clusterVersion (e.g. 5.0) and re-run."
+        return 1
     fi
     suffix="${cluster_version//./-}"
     echo "${PATTERN_DIR}/overrides/values-baremetal-airgap-${suffix}.yaml"
@@ -139,6 +145,27 @@ validate_prereqs() {
         error "MIRROR_REGISTRY is not set (mirror root INCLUDING the org path,"
         error "e.g. quay.example:443/mirror — a bare host:port gets 401/404 on Quay)"
         exit 1
+    fi
+
+    # Full bootstrap only: steps 3/3b apply the oc-mirror cluster-resources.
+    # Missing/empty resources used to warn-and-skip and the run then reported
+    # success with no CatalogSources — fail before any cluster write instead.
+    if [[ "$MODE" == "full" ]]; then
+        local cs_dir="${OC_MIRROR_WORKSPACE}/working-dir/cluster-resources"
+        if [[ ! -d "$cs_dir" ]]; then
+            error "No oc-mirror cluster-resources at $cs_dir"
+            error "OC_MIRROR_WORKSPACE='${OC_MIRROR_WORKSPACE}' — steps 3/3b apply that"
+            error "directory's CatalogSources/IDMS/ITMS. Run 'make airgap-mirror' first"
+            error "(--workspace must be the same path), or point OC_MIRROR_WORKSPACE"
+            error "at the finished workspace."
+            exit 1
+        fi
+        if [[ -z "$(find "$cs_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+            error "oc-mirror cluster-resources directory is empty: $cs_dir"
+            error "The mirror run did not finish, or --workspace points elsewhere."
+            exit 1
+        fi
+        info "oc-mirror resources: $cs_dir"
     fi
 
     if ! oc whoami >/dev/null 2>&1; then
@@ -1191,6 +1218,9 @@ configure_cluster_trusted_ca() {
 # (off-cluster egress via the node host network). It moved to
 # scripts/airgap-post-install-lab.sh (runbook Appendix B); a genuinely
 # airgapped cluster never needs it.
+if [[ -n "${ENABLE_ROUTINGVIAHOST:-}" ]]; then
+    warn "ENABLE_ROUTINGVIAHOST is inert here — OVN routingViaHost lives in scripts/airgap-post-install-lab.sh (the lab wrapper); unset it."
+fi
 
 # ─── Step 9: Set up git HTTP server ─────────────────────────────
 setup_git_server() {
