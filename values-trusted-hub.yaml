@@ -12,18 +12,19 @@ global:
 clusterGroup:
   name: trusted-hub
   isHubCluster: true
+  # Map form (deep-mergeable — see values-baremetal.yaml).
   namespaces:
-  - open-cluster-management
-  - vault
-  - external-secrets-operator:
+    open-cluster-management:
+    vault:
+    external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
-  - external-secrets
-  - trustee-operator-system
-  - cert-manager-operator
-  - openshift-sandboxed-containers-operator
-  - cert-manager
-  - kyverno
+    external-secrets:
+    trustee-operator-system:
+    cert-manager-operator:
+    openshift-sandboxed-containers-operator:
+    cert-manager:
+    kyverno:
   subscriptions:
     # ACM is kept anticipating
     acm:

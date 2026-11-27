@@ -1,7 +1,7 @@
 # Airgap / disconnected overlay for OCP 5.0 — loaded only when
 # global.airgap is true AND global.clusterVersion is "5.0" (the
-# sharedValueFiles entry in values-baremetal.yaml resolves this file).
-# 4.22 keeps the unsuffixed values-baremetal-airgap.yaml name.
+# sharedValueFiles entry in values-baremetal.yaml resolves this file);
+# 4.22 loads values-baremetal-airgap-4-22.yaml.
 
 # SCOPE: reaches the ROOT clustergroup render (the patterns-operator
 # resolves sharedValueFiles when building the root Application), so the

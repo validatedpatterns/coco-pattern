@@ -33,8 +33,11 @@ What was live-qualified, and what was not:
   `backup/pr174-pre-refinement-20261126-1247`) and the current head of
   `feat/ocp5-compatibility`. Those are verified by `make render-gate` at
   `CLUSTER_VERSION=4.22` and `5.0` plus the mocked `oc`/`skopeo` suites
-  in `tests/` only. The 4.22 render output is byte-identical to
-  `main`, so the 4.22 path carries no new risk; the 5.0 path of the
+  in `tests/` only. The 4.22 render differs from `main` only in document
+  order and the embedded helm-values ConfigMap (the namespaces moved to
+  map form, maintainer review on PR #174); the rendered Namespace and
+  OperatorGroup object sets are semantically identical, so the 4.22 path
+  carries no new risk; the 5.0 path of the
   current head is render-verified, **not** hardware-qualified.
 - A 5.0 deploy of the current head should therefore be treated as
   pending a live run: the code paths it exercises (trust-anchor write,
@@ -273,11 +276,10 @@ section). 4.22 needs no pin (RHCOS 9 is its only stream).
 
 The mirrored catalog names are version-derived (see the sharedValueFiles
 tpl in `values-baremetal.yaml`): the airgap overlay is
-`overrides/values-baremetal-airgap-<minor-dashed>.yaml` (`5.0` →
-`values-baremetal-airgap-5-0.yaml`); 4.22 alone keeps the unsuffixed
-`values-baremetal-airgap.yaml` for render byte-compatibility with the
-qualified 4.22 deploy. A new minor needs its overlay file and its
-`airgap/imageset-config-<minor>.yaml`.
+`overrides/values-baremetal-airgap-<minor-dashed>.yaml` for every minor
+(`4.22` → `values-baremetal-airgap-4-22.yaml`, `5.0` →
+`values-baremetal-airgap-5-0.yaml`). A new minor needs its overlay file and
+its `airgap/imageset-config-<minor>.yaml`.
 
 - `global.mirrorRegistry` must equal `$MIRROR_REGISTRY` (org path included).
 

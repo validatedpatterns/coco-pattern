@@ -6,15 +6,16 @@
 clusterGroup:
   name: azure-spoke
   isHubCluster: false
+  # Map form (deep-mergeable — see values-baremetal.yaml).
   namespaces:
-  - external-secrets-operator:
+    external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
-  - external-secrets
-  - openshift-sandboxed-containers-operator
-  - hello-openshift
-  - kbs-access
-  - cert-manager-operator
+    external-secrets:
+    openshift-sandboxed-containers-operator:
+    hello-openshift:
+    kbs-access:
+    cert-manager-operator:
   subscriptions:
     # ACM is kept anticipating
     eso:

@@ -24,10 +24,9 @@ FAILS=0
 VER_DASHED="${CLUSTER_VERSION//./-}"
 REDHAT_CS="cs-redhat-operator-index-v${VER_DASHED}"
 CERTIFIED_CS="cs-certified-operator-index-v${VER_DASHED}"
-# Airgap overlay: 4.22 keeps the unsuffixed name; other minors append the
-# dashed version, mirroring the sharedValueFiles tpl in values-baremetal.yaml.
-AIRGAP_OVERLAY="values-baremetal-airgap"
-[[ "$CLUSTER_VERSION" != "4.22" ]] && AIRGAP_OVERLAY="values-baremetal-airgap-${VER_DASHED}"
+# Airgap overlay: version-pinned (values-baremetal-airgap-<minor-dashed>.yaml
+# for every minor), mirroring the sharedValueFiles tpl in values-baremetal.yaml.
+AIRGAP_OVERLAY="values-baremetal-airgap-${VER_DASHED}"
 # Version overlay for the baremetal chain: 5.0 diverts to
 # values-5.0-baremetal.yaml (DCAP OperatorGroup — see that file).
 VERSION_OVERLAY="values-${CLUSTER_VERSION}"
@@ -335,33 +334,33 @@ else
     diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/      /'
 fi
 
-# ── Namespace-list drift guard (5.0 overlay vs base) ─────────────────
-# Helm replaces lists wholesale, so values-5.0-baremetal.yaml carries a
-# full copy of the base namespaces list (DCAP entry flipped). Assert the
-# copies stay in sync apart from that one entry.
-echo "── namespaces-list parity: values-5.0-baremetal.yaml vs values-baremetal{,-hub}.yaml"
+# ── Namespace-map overlay guard (5.0 overlay vs base) ────────────────
+# namespaces are a map now, so values-5.0-baremetal.yaml pins only the
+# DCAP entry (Helm deep-merges maps). Assert every overlay key exists in
+# the base map — a typo'd key would silently create a new namespace.
+echo "── namespaces-map keys: values-5.0-baremetal.yaml vs values-baremetal{,-hub}.yaml"
 namespace_parity() { # $1 = base values file; prints OK or the divergence
     python3 - "$1" "${PATTERN_DIR}" <<'PYEOF'
 import sys, yaml
 base = yaml.safe_load(open(sys.argv[1]))["clusterGroup"]["namespaces"]
 ovr = yaml.safe_load(open(f"{sys.argv[2]}/overrides/values-5.0-baremetal.yaml"))["clusterGroup"]["namespaces"]
-if len(base) != len(ovr):
-    print(f"LENGTH base={len(base)} overlay={len(ovr)}")
+if not isinstance(base, dict) or not isinstance(ovr, dict):
+    print("FORM base=%s overlay=%s (both must be maps)" % (type(base).__name__, type(ovr).__name__))
     sys.exit(0)
-for i, (b, o) in enumerate(zip(base, ovr)):
-    if b == o:
-        continue
-    if isinstance(b, dict) and isinstance(o, dict) and list(b) == list(o) == ["intel-dcap-operator-system"]:
-        continue  # the one sanctioned difference: the DCAP OperatorGroup entry
-    print(f"ENTRY {i}: base={b!r} overlay={o!r}")
-    sys.exit(0)
+for key, value in ovr.items():
+    if key not in base:
+        print(f"UNKNOWN KEY {key}: not in the base namespaces map (would create a new namespace)")
+        sys.exit(0)
+    if key != "intel-dcap-operator-system" and value != base[key]:
+        print(f"ENTRY {key}: base={base[key]!r} overlay={value!r}")
+        sys.exit(0)
 print("OK")
 PYEOF
 }
 for base_file in values-baremetal.yaml values-baremetal-hub.yaml; do
     parity="$(namespace_parity "${PATTERN_DIR}/${base_file}")"
     [[ "$parity" == "OK" ]] \
-        && pass "namespaces lists identical apart from the DCAP OperatorGroup entry (${base_file})" \
+        && pass "overlay namespaces keys all resolve against ${base_file} (DCAP entry only)" \
         || fail "namespaces drift between ${base_file} and values-5.0-baremetal.yaml: $parity"
 done
 

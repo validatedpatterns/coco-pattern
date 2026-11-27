@@ -13,31 +13,33 @@ global:
 clusterGroup:
   name: baremetal-hub
   isHubCluster: true
+  # Map form: Helm deep-merges maps, so version overlays pin single
+  # entries; a bare (null) key gets a default OperatorGroup.
   namespaces:
-  - open-cluster-management
-  - vault
-  - external-secrets-operator:
+    open-cluster-management:
+    vault:
+    external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
-  - external-secrets
-  - openshift-sandboxed-containers-operator
-  - trustee-operator-system
-  - cert-manager-operator
-  - cert-manager
-  - hello-openshift
-  - kbs-access
-  - openshift-cnv
-  - openshift-storage
-  - openshift-nfd
-  - baremetal
-  - intel-dcap
-  - intel-dcap-operator-system:
+    external-secrets:
+    openshift-sandboxed-containers-operator:
+    trustee-operator-system:
+    cert-manager-operator:
+    cert-manager:
+    hello-openshift:
+    kbs-access:
+    openshift-cnv:
+    openshift-storage:
+    openshift-nfd:
+    baremetal:
+    intel-dcap:
+    intel-dcap-operator-system:
       operatorGroup: true
       targetNamespaces: []
-  - nvidia-gpu-operator
-  - gpu-workload
-  - kyverno
-  - kubevirt-vms
+    nvidia-gpu-operator:
+    gpu-workload:
+    kyverno:
+    kubevirt-vms:
 
   subscriptions:
     acm:
@@ -91,7 +93,7 @@ clusterGroup:
       namespace: openshift-operators
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
+      # Airgap: repointed by overrides/values-baremetal-airgap-<minor-dashed>.yaml
       channel: stable
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -100,7 +102,7 @@ clusterGroup:
       namespace: intel-dcap-operator-system
       # These Intel operators live in the certified-operators catalog, not redhat-operators
       source: certified-operators
-      # Airgap: repointed by overrides/values-baremetal-airgap.yaml
+      # Airgap: repointed by overrides/values-baremetal-airgap-<minor-dashed>.yaml
       channel: alpha
       annotations:
         argocd.argoproj.io/sync-wave: "10"
@@ -121,8 +123,9 @@ clusterGroup:
   # overlay (DCAP OperatorGroup swap — see that file).
   - '/overrides/values-{{ $.Values.global.clusterVersion }}{{ if eq $.Values.global.clusterVersion "5.0" }}-baremetal{{ end }}.yaml'
   - '/overrides/values-hw-{{ $.Values.global.hardware.profile }}.yaml'
-  # Airgap overlay is version-pinned: 4.22 keeps the unsuffixed name; other minors append their dashed version (5.0 → -5-0).
-  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap{{ if ne $.Values.global.clusterVersion "4.22" }}-{{ $.Values.global.clusterVersion | replace "." "-" }}{{ end }}{{ else }}connected{{ end }}.yaml'
+  # Airgap overlay is version-pinned: every minor appends its dashed
+  # version (4.22 → -4-22, 5.0 → -5-0).
+  - '/overrides/values-baremetal-{{ if $.Values.global.airgap }}airgap-{{ $.Values.global.clusterVersion | replace "." "-" }}{{ else }}connected{{ end }}.yaml'
 
   extraObjects:
     wait-for-vault-unsealed:

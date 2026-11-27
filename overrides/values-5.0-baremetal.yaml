@@ -3,45 +3,19 @@
 # is "5.0" (the chain entry in values-baremetal*.yaml). Other groups and
 # 4.x versions keep loading the shared overrides/values-<ver>.yaml.
 #
-# WHY the namespaces list is repeated: the 5.0 DCAP bundle (v0.27.0) is
-# OwnNamespace-only, and Helm replaces lists wholesale on merge (the
-# clustergroup chart does not tpl namespaces), so the whole list must be
-# replaced here. Keep it in sync with values-baremetal.yaml apart from
-# the DCAP OperatorGroup — the render gate fails if it drifts.
+# namespaces are a map now, so only the divergent DCAP entry is pinned
+# here (Helm deep-merges maps — no full-list restatement, no drift).
 #
 # SCOPE: reaches the ROOT clustergroup render and every child application
 # listing this file; does NOT reach the bootstrap operators.
 
 clusterGroup:
-  # Full replacement of the values-baremetal.yaml namespaces list (see the
-  # header); only the DCAP OperatorGroup entry differs (OwnNamespace).
   namespaces:
-  - open-cluster-management
-  - vault
-  - external-secrets-operator:
-      operatorGroup: true
-      targetNamespaces: []
-  - external-secrets
-  - openshift-sandboxed-containers-operator
-  - trustee-operator-system
-  - cert-manager-operator
-  - cert-manager
-  - hello-openshift
-  - kbs-access
-  - openshift-cnv
-  - openshift-storage
-  - openshift-nfd
-  - baremetal
-  - intel-dcap
-  - intel-dcap-operator-system:
+    intel-dcap-operator-system:
       operatorGroup: true
       # v0.27.0 (the 5.0 catalog bundle) supports OwnNamespace only
       targetNamespaces:
       - intel-dcap-operator-system
-  - nvidia-gpu-operator
-  - gpu-workload
-  - kyverno
-  - kubevirt-vms
 
   subscriptions:
     # Channel split from stable-4.22 in the 5.0 catalog
