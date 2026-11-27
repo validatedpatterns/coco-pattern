@@ -33,12 +33,14 @@ What was live-qualified, and what was not:
   `backup/pr174-pre-refinement-20261126-1247`) and the current head of
   `feat/ocp5-compatibility`. Those are verified by `make render-gate` at
   `CLUSTER_VERSION=4.22` and `5.0` plus the mocked `oc`/`skopeo` suites
-  in `tests/` only. The 4.22 render differs from `main` only in document
-  order and the embedded helm-values ConfigMap (the namespaces moved to
-  map form, maintainer review on PR #174); the rendered Namespace and
+  in `tests/` only. The 4.22 connected render differs from `main` only in
+  document order and the embedded helm-values ConfigMap (the namespaces
+  moved to map form, maintainer review on PR #174), plus — in airgap mode
+  — the renamed `valueFiles` entry
+  (`values-baremetal-airgap-4-22.yaml`); the rendered Namespace and
   OperatorGroup object sets are semantically identical, so the 4.22 path
-  carries no new risk; the 5.0 path of the
-  current head is render-verified, **not** hardware-qualified.
+  carries no new risk; the 5.0 path of the current head is
+  render-verified, **not** hardware-qualified.
 - A 5.0 deploy of the current head should therefore be treated as
   pending a live run: the code paths it exercises (trust-anchor write,
   mirror verification, 5.0 overlays) are covered by the gate and the

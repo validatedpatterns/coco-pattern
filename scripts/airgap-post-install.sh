@@ -307,10 +307,11 @@ print(yaml.dump_all(docs, default_flow_style=False))
 
 # ─── Step 3c: Normalise mirrorSourcePolicy on ALL cluster IDMS/ITMS ─
 # The cluster bootstrap IDMS (named "image-digest-mirror") is embedded in the
-# agent-config ignition by labctl at install time and applied before this script
-# runs. It has no mirrorSourcePolicy. When any source appears in both that IDMS
-# and a newer IDMS/ITMS with NeverContactSource, MCO reports a conflict and stops
-# re-rendering registries.conf — silently blocking all future mirror rule updates.
+# agent-config ignition by the installer at install time and applied before
+# this script runs. It has no mirrorSourcePolicy. When any source appears in
+# both that IDMS and a newer IDMS/ITMS with NeverContactSource, MCO reports a
+# conflict and stops re-rendering registries.conf — silently blocking all
+# future mirror rule updates.
 # This step patches every IDMS and ITMS on the cluster, regardless of origin, so
 # all entries are consistent. Idempotent — re-running is safe.
 normalise_mirror_source_policy() {
