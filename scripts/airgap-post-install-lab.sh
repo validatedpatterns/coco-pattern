@@ -42,18 +42,31 @@ NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-step()  { echo -e "\n${GREEN}===${NC} Step $1: $2 ${GREEN}===${NC}"; }
+# Lab-specific phases are named, not numbered: they run BEFORE the generic
+# script's Step 1, so a "Step 8" label here read as out-of-order.
+lab_step() { echo -e "\n${GREEN}===${NC} Lab step: $* ${GREEN}===${NC}"; }
 
-# ─── Lab step 8: OVN routingViaHost (faked-airgap pod egress) ────
+# ─── Lab pre-phase: OVN routingViaHost (faked-airgap pod egress) ────
 # Moved verbatim from the generic script (PR #174 review comment 13):
 # only environments that fake disconnection at the pod boundary need
 # off-cluster egress via the node host network.
 enable_routing_via_host() {
-    step 8 "OVN routingViaHost (lab faked-airgap egress)"
+    lab_step "OVN routingViaHost (lab faked-airgap egress)"
 
     if [[ "${ENABLE_ROUTINGVIAHOST:-}" != "true" ]]; then
         info "Skipped (set ENABLE_ROUTINGVIAHOST=true to enable)"
         return
+    fi
+
+    # Before the first `oc` call: without a login the read below fails into
+    # its 2>/dev/null default and the wrapper would patch blind.
+    if [[ -z "${KUBECONFIG:-}" ]]; then
+        error "KUBECONFIG is not set — point it at the cluster's auth/kubeconfig."
+        exit 1
+    fi
+    if [[ ! -f "$KUBECONFIG" ]]; then
+        error "KUBECONFIG file not found: $KUBECONFIG"
+        exit 1
     fi
 
     local current
